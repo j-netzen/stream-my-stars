@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Info, Loader2 } from "lucide-react";
 
 export default function HomePage() {
-  const { media, isLoading: mediaLoading } = useMedia();
+  const { media, isLoading: mediaLoading, deleteMedia } = useMedia();
   const { progress, getContinueWatching } = useWatchProgress();
   const { categories } = useCategories();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
@@ -33,8 +33,8 @@ export default function HomePage() {
     setActiveMedia(item);
   };
 
-  const handleDelete = async (item: Media) => {
-    // TODO: Add confirmation dialog
+  const handleDelete = (item: Media) => {
+    deleteMedia.mutate(item.id);
   };
 
   if (mediaLoading) {
