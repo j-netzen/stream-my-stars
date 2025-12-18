@@ -9,6 +9,7 @@ import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import MoviesPage from "./pages/MoviesPage";
 import TVShowsPage from "./pages/TVShowsPage";
+import HomeMoviesPage from "./pages/HomeMoviesPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import PlaylistsPage from "./pages/PlaylistsPage";
 import DiscoverPage from "./pages/DiscoverPage";
@@ -47,6 +48,14 @@ const App = () => (
               element={
                 <MainLayout>
                   <TVShowsPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/home-movies"
+              element={
+                <MainLayout>
+                  <HomeMoviesPage />
                 </MainLayout>
               }
             />
