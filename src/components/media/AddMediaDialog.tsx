@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo } from "lucide-react";
+import { useRef } from "react";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
 
@@ -32,6 +33,7 @@ interface AddMediaDialogProps {
 export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
   const { categories } = useCategories();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -41,6 +43,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [manualTitle, setManualTitle] = useState("");
   const [manualOverview, setManualOverview] = useState("");
   const [manualType, setManualType] = useState<"movie" | "tv" | "custom">("custom");
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
   const handleSearch = async () => {
@@ -154,6 +157,21 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Store the file path for display (browser only gives us the filename for security)
+      setSelectedFileName(file.name);
+      // Auto-fill the title if empty
+      if (!manualTitle) {
+        // Remove extension and clean up the filename for title
+        const titleFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/[._-]/g, " ");
+        setManualTitle(titleFromFile);
+      }
+      toast.info("File selected. Note: For local files to work, you may need to run a local media server or use a network path.");
+    }
+  };
+
   const resetForm = () => {
     setSearchQuery("");
     setSearchResults([]);
@@ -163,6 +181,10 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setManualTitle("");
     setManualOverview("");
     setManualType("custom");
+    setSelectedFileName("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -414,6 +436,31 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                   <SelectItem value="custom">Custom / Home Movie</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Browse Local File</Label>
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1"
+                >
+                  <FileVideo className="w-4 h-4 mr-2" />
+                  {selectedFileName || "Browse File..."}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Select a video file from your computer
+              </p>
             </div>
 
             <div className="space-y-2">
