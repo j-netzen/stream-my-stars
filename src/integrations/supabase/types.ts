@@ -14,7 +14,259 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          cover_image: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sort_order: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_image?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_image?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      media: {
+        Row: {
+          backdrop_path: string | null
+          cast_members: Json | null
+          category_id: string | null
+          created_at: string
+          episodes: number | null
+          genres: string[] | null
+          id: string
+          media_type: string
+          overview: string | null
+          poster_path: string | null
+          rating: number | null
+          release_date: string | null
+          runtime: number | null
+          seasons: number | null
+          source_type: string
+          source_url: string | null
+          storage_path: string | null
+          title: string
+          tmdb_id: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backdrop_path?: string | null
+          cast_members?: Json | null
+          category_id?: string | null
+          created_at?: string
+          episodes?: number | null
+          genres?: string[] | null
+          id?: string
+          media_type: string
+          overview?: string | null
+          poster_path?: string | null
+          rating?: number | null
+          release_date?: string | null
+          runtime?: number | null
+          seasons?: number | null
+          source_type: string
+          source_url?: string | null
+          storage_path?: string | null
+          title: string
+          tmdb_id?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backdrop_path?: string | null
+          cast_members?: Json | null
+          category_id?: string | null
+          created_at?: string
+          episodes?: number | null
+          genres?: string[] | null
+          id?: string
+          media_type?: string
+          overview?: string | null
+          poster_path?: string | null
+          rating?: number | null
+          release_date?: string | null
+          runtime?: number | null
+          seasons?: number | null
+          source_type?: string
+          source_url?: string | null
+          storage_path?: string | null
+          title?: string
+          tmdb_id?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlist_items: {
+        Row: {
+          added_at: string
+          id: string
+          media_id: string
+          playlist_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          media_id: string
+          playlist_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          media_id?: string
+          playlist_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_items_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "playlist_items_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          cover_image: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_image?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_image?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      watch_progress: {
+        Row: {
+          completed: boolean | null
+          duration_seconds: number | null
+          episode_number: number | null
+          id: string
+          last_watched_at: string
+          media_id: string
+          progress_seconds: number
+          season_number: number | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          duration_seconds?: number | null
+          episode_number?: number | null
+          id?: string
+          last_watched_at?: string
+          media_id: string
+          progress_seconds?: number
+          season_number?: number | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          duration_seconds?: number | null
+          episode_number?: number | null
+          id?: string
+          last_watched_at?: string
+          media_id?: string
+          progress_seconds?: number
+          season_number?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "watch_progress_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
