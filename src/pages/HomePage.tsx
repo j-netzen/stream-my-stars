@@ -93,7 +93,7 @@ export default function HomePage() {
       )}
 
       {/* Content Rows */}
-      <div className="space-y-8 pb-12 -mt-24 relative z-10">
+      <div className="space-y-8 pb-12 mt-4 md:-mt-24 relative z-10">
         {continueWatchingMedia.length > 0 && (
           <MediaRow
             title="Continue Watching"
