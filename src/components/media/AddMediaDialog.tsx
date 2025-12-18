@@ -20,8 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus } from "lucide-react";
 import { toast } from "sonner";
+import { NetworkPathHelper } from "./NetworkPathHelper";
 
 interface AddMediaDialogProps {
   open: boolean;
@@ -127,6 +128,32 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
+  const handleBulkAdd = async (
+    entries: Array<{ title: string; path: string }>,
+    mediaType: string,
+    categoryId?: string
+  ) => {
+    setIsAdding(true);
+    try {
+      for (const entry of entries) {
+        const input: CreateMediaInput = {
+          title: entry.title,
+          media_type: mediaType as "movie" | "tv" | "custom",
+          source_type: "url",
+          source_url: entry.path,
+          category_id: categoryId,
+        };
+        await addMedia.mutateAsync(input);
+      }
+      toast.success(`Added ${entries.length} items to library`);
+      resetForm();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error("Failed to add some media items");
+    }
+    setIsAdding(false);
+  };
+
   const resetForm = () => {
     setSearchQuery("");
     setSearchResults([]);
@@ -146,18 +173,22 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         </DialogHeader>
 
         <Tabs defaultValue="tmdb" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="tmdb" className="gap-2">
               <Search className="w-4 h-4" />
-              Search TMDB
+              TMDB
             </TabsTrigger>
             <TabsTrigger value="manual" className="gap-2">
               <LinkIcon className="w-4 h-4" />
-              URL Entry
+              URL
             </TabsTrigger>
             <TabsTrigger value="network" className="gap-2">
               <FolderOpen className="w-4 h-4" />
-              Network Path
+              Network
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="gap-2">
+              <ListPlus className="w-4 h-4" />
+              Bulk
             </TabsTrigger>
           </TabsList>
 
@@ -431,6 +462,14 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               {isAdding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Add to Library
             </Button>
+          </TabsContent>
+
+          <TabsContent value="bulk" className="mt-4">
+            <NetworkPathHelper
+              onAddEntries={handleBulkAdd}
+              categories={categories}
+              isAdding={isAdding}
+            />
           </TabsContent>
         </Tabs>
       </DialogContent>
