@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, Upload } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
 interface AddMediaDialogProps {
@@ -146,14 +146,18 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         </DialogHeader>
 
         <Tabs defaultValue="tmdb" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="tmdb" className="gap-2">
               <Search className="w-4 h-4" />
               Search TMDB
             </TabsTrigger>
             <TabsTrigger value="manual" className="gap-2">
               <LinkIcon className="w-4 h-4" />
-              Manual Entry
+              URL Entry
+            </TabsTrigger>
+            <TabsTrigger value="network" className="gap-2">
+              <FolderOpen className="w-4 h-4" />
+              Network Path
             </TabsTrigger>
           </TabsList>
 
@@ -313,6 +317,84 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 value={sourceUrl}
                 onChange={(e) => setSourceUrl(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Enter description"
+                value={manualOverview}
+                onChange={(e) => setManualOverview(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category (Optional)</Label>
+              <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              onClick={handleAddManual}
+              disabled={isAdding}
+              className="w-full"
+            >
+              {isAdding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Add to Library
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="network" className="space-y-4 mt-4">
+            <div className="p-3 bg-secondary/30 rounded-lg text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Windows Shared Folder</p>
+              <p>Enter a network path to access media from shared folders on your local network.</p>
+              <p className="mt-2 font-mono text-xs">Example: \\\\SERVER\\Movies\\video.mp4</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input
+                placeholder="Enter title"
+                value={manualTitle}
+                onChange={(e) => setManualTitle(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={manualType} onValueChange={(v) => setManualType(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="movie">Movie</SelectItem>
+                  <SelectItem value="tv">TV Show</SelectItem>
+                  <SelectItem value="custom">Custom / Home Movie</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Network Path *</Label>
+              <Input
+                placeholder="\\\\SERVER\\Share\\folder\\video.mp4"
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Use double backslashes (\\\\) or forward slashes (//server/share)
+              </p>
             </div>
 
             <div className="space-y-2">
