@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar, MobileMenuTrigger } from "./Sidebar";
 import { AddMediaDialog } from "@/components/media/AddMediaDialog";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +39,11 @@ export function MainLayout({ children }: MainLayoutProps) {
         onMobileOpenChange={setMobileMenuOpen}
       />
       
-      {/* Mobile menu trigger */}
-      <MobileMenuTrigger onClick={() => setMobileMenuOpen(true)} />
+      {/* Top bar with mobile menu trigger and theme toggle */}
+      <div className="fixed top-0 right-0 left-0 md:left-auto z-30 flex items-center justify-between md:justify-end px-4 h-14 bg-background/80 backdrop-blur-sm border-b md:border-0">
+        <MobileMenuTrigger onClick={() => setMobileMenuOpen(true)} />
+        <ThemeToggle />
+      </div>
       
       <main
         className={cn(

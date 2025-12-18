@@ -225,7 +225,7 @@ export function MobileMenuTrigger({ onClick }: { onClick: () => void }) {
     <Button
       variant="ghost"
       size="icon"
-      className="md:hidden fixed top-4 left-4 z-40"
+      className="md:hidden"
       onClick={onClick}
     >
       <Menu className="w-5 h-5" />
