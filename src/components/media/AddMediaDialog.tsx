@@ -3,7 +3,7 @@ import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream } from "@/lib/torrentio";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, resolveTorrentioUrl } from "@/lib/torrentio";
 import {
   Dialog,
   DialogContent,
@@ -328,7 +328,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
     for (const item of readyItems) {
       try {
-        const unrestricted = await unrestrictLink(item.stream!.url);
+        // Resolve Torrentio URL first to get the actual RD link
+        let linkToUnrestrict = item.stream!.url;
+        if (linkToUnrestrict.includes("torrentio.strem.fun/resolve")) {
+          const resolvedUrl = await resolveTorrentioUrl(linkToUnrestrict);
+          linkToUnrestrict = resolvedUrl;
+        }
+        const unrestricted = await unrestrictLink(linkToUnrestrict);
         const episodeTitle = `${manualTitle} - S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
         
         const input: CreateMediaInput = {
@@ -578,9 +584,16 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           throw new Error("No download links available from torrent");
         }
       } else {
+        // Check if it's a Torrentio resolve URL
+        let linkToUnrestrict = rdLink;
+        if (rdLink.includes("torrentio.strem.fun/resolve")) {
+          setRdStatus("Resolving Torrentio stream...");
+          linkToUnrestrict = await resolveTorrentioUrl(rdLink);
+        }
+        
         // Regular link - just unrestrict
         setRdStatus("Unrestricting link...");
-        const unrestricted = await unrestrictLink(rdLink);
+        const unrestricted = await unrestrictLink(linkToUnrestrict);
         streamUrl = unrestricted.download;
       }
 

@@ -64,6 +64,39 @@ serve(async (req) => {
       });
     }
 
+    // Resolve a Torrentio stream URL to get the actual download link
+    if (action === "resolve") {
+      const { url } = await req.json().catch(() => ({}));
+      
+      if (!url) {
+        return new Response(
+          JSON.stringify({ error: "URL is required for resolve action" }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log("Resolving Torrentio URL:", url.substring(0, 50) + "...");
+      
+      // Fetch the resolve URL - it will redirect to the actual RD link
+      const response = await fetch(url, { redirect: 'follow' });
+      
+      if (!response.ok) {
+        console.error("Torrentio resolve error:", response.status);
+        return new Response(
+          JSON.stringify({ error: "Failed to resolve stream", status: response.status }),
+          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // The final URL after redirects is the actual download link
+      const finalUrl = response.url;
+      console.log("Resolved to:", finalUrl.substring(0, 50) + "...");
+
+      return new Response(JSON.stringify({ url: finalUrl }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(
       JSON.stringify({ error: `Unknown action: ${action}` }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

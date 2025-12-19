@@ -101,6 +101,16 @@ export async function searchTorrentio(
   return sortStreams(streams);
 }
 
+// Resolve a Torrentio stream URL to get the actual download link
+export async function resolveTorrentioUrl(url: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("torrentio", {
+    body: { action: "resolve", url },
+  });
+
+  if (error) throw error;
+  return data.url;
+}
+
 // Get IMDB ID from TMDB
 export async function getImdbIdFromTmdb(
   tmdbId: number,
