@@ -24,12 +24,40 @@ const qualityRanking: Record<string, number> = {
   "UNKNOWN": 20,
 };
 
-// Check if URL is already a direct Real-Debrid download link
+// Check if URL is already a direct Real-Debrid download link or cached debrid link
 export function isDirectRdLink(url: string): boolean {
-  return url.includes("real-debrid.com/d/") || 
-         url.includes("rdb.so/") ||
-         url.includes(".rdeb.io/") ||
-         url.includes("download.real-debrid.com/");
+  // Common Real-Debrid direct download patterns
+  if (url.includes("real-debrid.com/d/") || 
+      url.includes("rdb.so/") ||
+      url.includes(".rdeb.io/") ||
+      url.includes("download.real-debrid.com/")) {
+    return true;
+  }
+  
+  // Torrentio RD cached links - they use debrid.io or contain debrid patterns
+  if (url.includes("debrid.io/") || 
+      url.includes("/debrid/") ||
+      url.includes("debrid-link")) {
+    return true;
+  }
+  
+  // Check for direct HTTP video file links (already unrestricted)
+  // These are typically .mkv, .mp4, etc. on CDN domains
+  const videoExtensions = ['.mkv', '.mp4', '.avi', '.m4v', '.webm'];
+  const isVideoFile = videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  const isHttps = url.startsWith('https://');
+  
+  // If it's an HTTPS link to a video file (not a magnet), it's likely already unrestricted
+  if (isHttps && isVideoFile && !url.startsWith('magnet:')) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Check if URL is a magnet link
+export function isMagnetLink(url: string): boolean {
+  return url.startsWith('magnet:');
 }
 
 // Parse quality and size info from stream title

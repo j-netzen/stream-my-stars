@@ -3,7 +3,7 @@ import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink } from "@/lib/torrentio";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink } from "@/lib/torrentio";
 import {
   Dialog,
   DialogContent,
@@ -331,10 +331,23 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       try {
         // Check if it's already a direct RD link (from Torrentio with RD configured)
         let downloadUrl: string;
-        if (isDirectRdLink(item.stream!.url)) {
-          downloadUrl = item.stream!.url;
+        const streamUrl = item.stream!.url;
+        
+        if (isDirectRdLink(streamUrl)) {
+          // Already unrestricted, use directly
+          downloadUrl = streamUrl;
+        } else if (isMagnetLink(streamUrl)) {
+          // Magnet link - need to add and wait for download
+          const torrent = await addMagnetAndWait(streamUrl, () => {});
+          if (torrent.links && torrent.links.length > 0) {
+            const unrestricted = await unrestrictLink(torrent.links[0]);
+            downloadUrl = unrestricted.download;
+          } else {
+            throw new Error("No download links available from torrent");
+          }
         } else {
-          const unrestricted = await unrestrictLink(item.stream!.url);
+          // Regular link - just unrestrict
+          const unrestricted = await unrestrictLink(streamUrl);
           downloadUrl = unrestricted.download;
         }
         const episodeTitle = `${manualTitle} - S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
@@ -572,7 +585,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       let streamUrl: string;
 
       // Check if it's a magnet link
-      if (rdLink.startsWith("magnet:")) {
+      if (isMagnetLink(rdLink)) {
         setRdStatus("Adding magnet to Real-Debrid...");
         const torrent = await addMagnetAndWait(rdLink, (progress) => {
           setRdProgress(progress);
