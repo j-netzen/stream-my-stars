@@ -60,6 +60,21 @@ export function isMagnetLink(url: string): boolean {
   return url.startsWith('magnet:');
 }
 
+// Extract torrent hash from Torrentio URL to create a magnet link as fallback
+// Torrentio URLs look like: https://torrentio.strem.fun/resolve/realdebrid/TOKEN/HASH/null/0/filename.mp4
+export function extractMagnetFromTorrentioUrl(url: string): string | null {
+  // Pattern: look for a 40-character hex hash in the URL path
+  const hashMatch = url.match(/\/([a-f0-9]{40})\//i);
+  if (hashMatch) {
+    const hash = hashMatch[1];
+    // Extract filename for the magnet link name
+    const filenameMatch = url.match(/\/([^\/]+\.(mp4|mkv|avi|m4v|webm))$/i);
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'Unknown';
+    return `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(filename)}`;
+  }
+  return null;
+}
+
 // Parse quality and size info from stream title
 export function parseStreamInfo(stream: TorrentioStream): {
   quality: string;

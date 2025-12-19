@@ -3,7 +3,7 @@ import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink } from "@/lib/torrentio";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
 import {
   Dialog,
   DialogContent,
@@ -346,9 +346,31 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             throw new Error("No download links available from torrent");
           }
         } else {
-          // Regular link - just unrestrict
-          const unrestricted = await unrestrictLink(streamUrl);
-          downloadUrl = unrestricted.download;
+          // Regular link - try to unrestrict, fallback to magnet extraction if it fails
+          try {
+            const unrestricted = await unrestrictLink(streamUrl);
+            downloadUrl = unrestricted.download;
+          } catch (unrestrictError: any) {
+            // Check if it's a hoster_unsupported error and try magnet fallback
+            const errorMessage = unrestrictError?.message || '';
+            if (errorMessage.includes('hoster_unsupported') || errorMessage.includes('400')) {
+              console.log(`Episode S${item.season}E${item.episode}: Unrestrict failed, trying magnet fallback...`);
+              const magnetLink = extractMagnetFromTorrentioUrl(streamUrl);
+              if (magnetLink) {
+                const torrent = await addMagnetAndWait(magnetLink, () => {});
+                if (torrent.links && torrent.links.length > 0) {
+                  const unrestricted = await unrestrictLink(torrent.links[0]);
+                  downloadUrl = unrestricted.download;
+                } else {
+                  throw new Error("No download links available from torrent");
+                }
+              } else {
+                throw new Error("Link not supported and no magnet hash found");
+              }
+            } else {
+              throw unrestrictError;
+            }
+          }
         }
         const episodeTitle = `${manualTitle} - S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
         
@@ -604,10 +626,38 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         setRdStatus("Using direct link...");
         streamUrl = rdLink;
       } else {
-        // Regular link - just unrestrict
+        // Regular link - try to unrestrict, fallback to magnet extraction if it fails
         setRdStatus("Unrestricting link...");
-        const unrestricted = await unrestrictLink(rdLink);
-        streamUrl = unrestricted.download;
+        try {
+          const unrestricted = await unrestrictLink(rdLink);
+          streamUrl = unrestricted.download;
+        } catch (unrestrictError: any) {
+          // Check if it's a hoster_unsupported error and try magnet fallback
+          const errorMessage = unrestrictError?.message || '';
+          if (errorMessage.includes('hoster_unsupported') || errorMessage.includes('400')) {
+            console.log("Unrestrict failed, attempting magnet extraction fallback...");
+            const magnetLink = extractMagnetFromTorrentioUrl(rdLink);
+            if (magnetLink) {
+              setRdStatus("Falling back to magnet link...");
+              const torrent = await addMagnetAndWait(magnetLink, (progress) => {
+                setRdProgress(progress);
+                setRdStatus(`Downloading: ${progress}%`);
+              });
+              
+              if (torrent.links && torrent.links.length > 0) {
+                setRdStatus("Unrestricting download link...");
+                const unrestricted = await unrestrictLink(torrent.links[0]);
+                streamUrl = unrestricted.download;
+              } else {
+                throw new Error("No download links available from torrent");
+              }
+            } else {
+              throw new Error("Link not supported and no magnet hash found");
+            }
+          } else {
+            throw unrestrictError;
+          }
+        }
       }
 
       setRdStatus("Adding to library...");
