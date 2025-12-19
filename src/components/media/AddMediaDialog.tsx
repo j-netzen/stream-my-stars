@@ -84,19 +84,14 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsLoadingRdItems(false);
   }, []);
 
-  // Filter RD items based on title
+  // Filter RD items based on title (show all if title is empty)
   useEffect(() => {
-    if (!manualTitle.trim()) {
-      setFilteredRdItems([]);
-      return;
-    }
-
-    const searchTerm = manualTitle.toLowerCase();
+    const searchTerm = manualTitle.toLowerCase().trim();
     const items: { label: string; value: string; type: "torrent" | "download" }[] = [];
 
     // Filter torrents - use first link from each torrent
     rdTorrents
-      .filter(t => t.filename.toLowerCase().includes(searchTerm) && t.links.length > 0)
+      .filter(t => t.links.length > 0 && (searchTerm === "" || t.filename.toLowerCase().includes(searchTerm)))
       .forEach(t => {
         items.push({
           label: `[Torrent] ${t.filename}`,
@@ -107,7 +102,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
     // Filter downloads
     rdDownloadsList
-      .filter(d => d.filename.toLowerCase().includes(searchTerm))
+      .filter(d => searchTerm === "" || d.filename.toLowerCase().includes(searchTerm))
       .forEach(d => {
         items.push({
           label: `[Download] ${d.filename}`,
