@@ -98,7 +98,7 @@ export function NetworkPathHelper({ onAddEntries, categories, isAdding }: Networ
             <SelectContent>
               <SelectItem value="movie">Movie</SelectItem>
               <SelectItem value="tv">TV Show</SelectItem>
-              <SelectItem value="custom">Home Movie</SelectItem>
+              <SelectItem value="custom">Home Video</SelectItem>
             </SelectContent>
           </Select>
         </div>
