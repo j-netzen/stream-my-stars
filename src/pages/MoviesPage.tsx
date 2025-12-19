@@ -12,7 +12,9 @@ export default function MoviesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
 
-  const movies = media.filter((m) => m.media_type === "movie");
+  const movies = media
+    .filter((m) => m.media_type === "movie")
+    .sort((a, b) => a.title.localeCompare(b.title));
   
   const filteredMovies = movies.filter((m) =>
     m.title.toLowerCase().includes(searchQuery.toLowerCase())

@@ -8,9 +8,9 @@ export default function HomeMoviesPage() {
   const { media, deleteMedia } = useMedia();
   const [search, setSearch] = useState("");
 
-  const homeMovies = media.filter(
-    (m) => m.media_type === "custom"
-  );
+  const homeMovies = media
+    .filter((m) => m.media_type === "custom")
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   const filtered = homeMovies.filter((m) =>
     m.title.toLowerCase().includes(search.toLowerCase())

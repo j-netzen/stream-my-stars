@@ -12,7 +12,9 @@ export default function TVShowsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
 
-  const tvShows = media.filter((m) => m.media_type === "tv");
+  const tvShows = media
+    .filter((m) => m.media_type === "tv")
+    .sort((a, b) => a.title.localeCompare(b.title));
   
   const filteredShows = tvShows.filter((m) =>
     m.title.toLowerCase().includes(searchQuery.toLowerCase())
