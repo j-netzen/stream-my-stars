@@ -32,10 +32,10 @@ serve(async (req) => {
         url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false`;
         break;
       case "movie_details":
-        url = `${TMDB_BASE_URL}/movie/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+        url = `${TMDB_BASE_URL}/movie/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids`;
         break;
       case "tv_details":
-        url = `${TMDB_BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+        url = `${TMDB_BASE_URL}/tv/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids`;
         break;
       case "trending":
         url = `${TMDB_BASE_URL}/trending/${media_type || "all"}/week?api_key=${TMDB_API_KEY}`;
@@ -46,6 +46,12 @@ serve(async (req) => {
       case "popular_tv":
         url = `${TMDB_BASE_URL}/tv/popular?api_key=${TMDB_API_KEY}`;
         break;
+      case "get_imdb_id": {
+        // Get external IDs including IMDB ID
+        const endpoint = media_type === "movie" ? "movie" : "tv";
+        url = `${TMDB_BASE_URL}/${endpoint}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
+        break;
+      }
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action" }),

@@ -3,6 +3,7 @@ import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream } from "@/lib/torrentio";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download } from "lucide-react";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
 import {
@@ -72,6 +73,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [showTmdbDebridDropdown, setShowTmdbDebridDropdown] = useState(false);
   const [selectedTmdbForDebrid, setSelectedTmdbForDebrid] = useState<{
     tmdb_id: number;
+    imdb_id?: string;
     poster_path: string | null;
     backdrop_path: string | null;
     release_date?: string;
@@ -81,7 +83,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     seasons?: number;
     episodes?: number;
     cast_members?: any;
+    media_type: "movie" | "tv";
   } | null>(null);
+  
+  // Torrentio search state
+  const [isSearchingTorrentio, setIsSearchingTorrentio] = useState(false);
+  const [torrentioResults, setTorrentioResults] = useState<TorrentioStream[]>([]);
+  const [showTorrentioDropdown, setShowTorrentioDropdown] = useState(false);
 
   // TMDB search for Debrid tab
   const handleTmdbSearchForDebrid = async () => {
@@ -119,6 +127,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       setManualType(result.media_type === "movie" ? "movie" : result.media_type === "tv" ? "tv" : "custom");
       
       // Store TMDB data for when adding media
+      const mediaType = result.media_type === "movie" ? "movie" : "tv" as const;
       setSelectedTmdbForDebrid({
         tmdb_id: result.id,
         poster_path: result.poster_path,
@@ -130,7 +139,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         seasons: details?.number_of_seasons,
         episodes: details?.number_of_episodes,
         cast_members: details?.credits?.cast?.slice(0, 10) || [],
+        media_type: mediaType,
+        imdb_id: details?.external_ids?.imdb_id,
       });
+      
+      // Clear any previous torrentio results when changing selection
+      setTorrentioResults([]);
+      setShowTorrentioDropdown(false);
       
       toast.success(`Loaded metadata for "${result.title || result.name}"`);
     } catch (error) {
@@ -138,14 +153,69 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       setManualTitle(result.title || result.name || "");
       setManualOverview(result.overview || "");
       setManualType(result.media_type === "movie" ? "movie" : result.media_type === "tv" ? "tv" : "custom");
+      const mediaType = result.media_type === "movie" ? "movie" : "tv" as const;
       setSelectedTmdbForDebrid({
         tmdb_id: result.id,
         poster_path: result.poster_path,
         backdrop_path: result.backdrop_path,
         release_date: result.release_date || result.first_air_date,
         rating: result.vote_average,
+        media_type: mediaType,
       });
     }
+  };
+
+  // Search Torrentio for streams
+  const handleTorrentioSearch = async () => {
+    if (!selectedTmdbForDebrid) {
+      toast.error("Please select a title from TMDB first");
+      return;
+    }
+
+    setIsSearchingTorrentio(true);
+    setShowTorrentioDropdown(false);
+    
+    try {
+      let imdbId = selectedTmdbForDebrid.imdb_id;
+      
+      // If we don't have IMDB ID, fetch it
+      if (!imdbId) {
+        imdbId = await getImdbIdFromTmdb(
+          selectedTmdbForDebrid.tmdb_id, 
+          selectedTmdbForDebrid.media_type
+        ) || undefined;
+        
+        if (!imdbId) {
+          toast.error("Could not find IMDB ID for this title");
+          setIsSearchingTorrentio(false);
+          return;
+        }
+        
+        // Store the IMDB ID for future use
+        setSelectedTmdbForDebrid(prev => prev ? { ...prev, imdb_id: imdbId } : null);
+      }
+
+      const type = selectedTmdbForDebrid.media_type === "movie" ? "movie" : "series";
+      const streams = await searchTorrentio(imdbId, type);
+      
+      if (streams.length === 0) {
+        toast.info("No streams found for this title");
+      } else {
+        setTorrentioResults(streams);
+        setShowTorrentioDropdown(true);
+        toast.success(`Found ${streams.length} stream(s)`);
+      }
+    } catch (error: any) {
+      console.error("Torrentio search error:", error);
+      toast.error(error.message || "Failed to search for streams");
+    }
+    
+    setIsSearchingTorrentio(false);
+  };
+
+  const handleSelectTorrentioStream = (stream: TorrentioStream) => {
+    setRdLink(stream.url);
+    setShowTorrentioDropdown(false);
   };
 
   const fetchRdItems = useCallback(async () => {
@@ -486,6 +556,8 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setSelectedTmdbForDebrid(null);
     setTmdbDebridResults([]);
     setShowTmdbDebridDropdown(false);
+    setTorrentioResults([]);
+    setShowTorrentioDropdown(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -818,29 +890,102 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             <div className="space-y-2">
               <Label className="flex items-center justify-between">
                 <span>Magnet Link or Download URL *</span>
-                <button
-                  type="button"
-                  onClick={() => fetchRdItems()}
-                  disabled={isLoadingRdItems}
-                  className="p-1 hover:bg-accent rounded transition-colors disabled:opacity-50"
-                  title="Refresh Real-Debrid items"
-                >
-                  {isLoadingRdItems ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3" />
-                  )}
-                </button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTorrentioSearch}
+                    disabled={isSearchingTorrentio || !selectedTmdbForDebrid}
+                    title={selectedTmdbForDebrid ? "Search for streams based on selected title" : "Select a title from TMDB first"}
+                    className="h-7 px-2 gap-1"
+                  >
+                    {isSearchingTorrentio ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3" />
+                    )}
+                    <span className="text-xs">Find Streams</span>
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => fetchRdItems()}
+                    disabled={isLoadingRdItems}
+                    className="p-1 hover:bg-accent rounded transition-colors disabled:opacity-50"
+                    title="Refresh Real-Debrid items"
+                  >
+                    {isLoadingRdItems ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
               </Label>
               <div className="relative">
                 <Textarea
                   placeholder="magnet:?xt=urn:btih:... or https://..."
                   value={rdLink}
                   onChange={(e) => setRdLink(e.target.value)}
-                  onFocus={() => setShowRdDropdown(true)}
+                  onFocus={() => {
+                    if (torrentioResults.length > 0) {
+                      setShowTorrentioDropdown(true);
+                    } else {
+                      setShowRdDropdown(true);
+                    }
+                  }}
                   className="min-h-[80px] font-mono text-sm"
                 />
-                {showRdDropdown && filteredRdItems.length > 0 && (
+                {/* Torrentio streams dropdown */}
+                {showTorrentioDropdown && torrentioResults.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-64 overflow-y-auto">
+                    <div className="sticky top-0 bg-muted px-3 py-2 border-b border-border flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {torrentioResults.length} stream(s) found
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setShowTorrentioDropdown(false);
+                          setTorrentioResults([]);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {torrentioResults.map((stream, idx) => {
+                      const info = parseStreamInfo(stream);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-accent border-b border-border/50 last:border-b-0"
+                          onClick={() => handleSelectTorrentioStream(stream)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{stream.name}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
+                                {stream.title}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                                {info.quality}
+                              </span>
+                              {info.size && (
+                                <span className="text-xs text-muted-foreground">{info.size}</span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* RD items dropdown (fallback when no torrentio results) */}
+                {showRdDropdown && !showTorrentioDropdown && filteredRdItems.length > 0 && (
                   <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
                     {filteredRdItems.map((item, idx) => (
                       <button
@@ -868,9 +1013,11 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {filteredRdItems.length > 0 
-                  ? `${filteredRdItems.length} matching Real-Debrid item(s) found - click to select`
-                  : "Supported: Magnet links, torrent URLs, or any link from supported hosters"}
+                {selectedTmdbForDebrid 
+                  ? 'Click "Find Streams" to search for available sources, or enter a link manually'
+                  : filteredRdItems.length > 0 
+                    ? `${filteredRdItems.length} matching Real-Debrid item(s) found - click to select`
+                    : "Supported: Magnet links, torrent URLs, or any link from supported hosters"}
               </p>
             </div>
 
