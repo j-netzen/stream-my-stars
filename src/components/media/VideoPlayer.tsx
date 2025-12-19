@@ -156,19 +156,25 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       durationSeconds: d,
       completed: t / d > 0.95,
     });
-  }, [media.id, updateProgress]);
+  }, [media.id, updateProgress.mutate]);
 
+  // Keep the latest callback in a ref so effects don't re-run every render
+  const saveProgressNowRef = useRef(saveProgressNow);
   useEffect(() => {
-    const interval = window.setInterval(saveProgressNow, 10000);
-    return () => window.clearInterval(interval);
+    saveProgressNowRef.current = saveProgressNow;
   }, [saveProgressNow]);
 
-  // Save on unmount
+  useEffect(() => {
+    const interval = window.setInterval(() => saveProgressNowRef.current(), 10000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  // Save on unmount only
   useEffect(() => {
     return () => {
-      saveProgressNow();
+      saveProgressNowRef.current();
     };
-  }, [saveProgressNow]);
+  }, []);
 
   const openFilePicker = async () => {
     // Try File System Access API first for persistence
