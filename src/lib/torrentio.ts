@@ -24,6 +24,14 @@ const qualityRanking: Record<string, number> = {
   "UNKNOWN": 20,
 };
 
+// Check if URL is already a direct Real-Debrid download link
+export function isDirectRdLink(url: string): boolean {
+  return url.includes("real-debrid.com/d/") || 
+         url.includes("rdb.so/") ||
+         url.includes(".rdeb.io/") ||
+         url.includes("download.real-debrid.com/");
+}
+
 // Parse quality and size info from stream title
 export function parseStreamInfo(stream: TorrentioStream): {
   quality: string;
@@ -31,9 +39,11 @@ export function parseStreamInfo(stream: TorrentioStream): {
   seeds?: number;
   source: string;
   qualityRank: number;
+  isDirectLink: boolean;
 } {
   const title = stream.title || "";
   const name = stream.name || "";
+  const url = stream.url || "";
   
   // Extract quality (1080p, 720p, 4K, etc.)
   const qualityMatch = title.match(/(\d{3,4}p|4K|2160p)/i);
@@ -53,7 +63,10 @@ export function parseStreamInfo(stream: TorrentioStream): {
   // Get quality rank for sorting
   const qualityRank = qualityRanking[quality] || qualityRanking["UNKNOWN"];
   
-  return { quality, size, seeds, source, qualityRank };
+  // Check if it's a direct RD link
+  const isDirectLink = isDirectRdLink(url);
+  
+  return { quality, size, seeds, source, qualityRank, isDirectLink };
 }
 
 // Sort streams by quality (descending) then by seeds (descending)
