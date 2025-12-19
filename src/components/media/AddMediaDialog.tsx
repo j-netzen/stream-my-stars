@@ -326,16 +326,31 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(true);
     let added = 0;
 
+    // Helper to check if URL is already a direct Real-Debrid download link
+    const isDirectRdLink = (url: string): boolean => {
+      return url.includes("real-debrid.com/d/") || 
+             url.includes("rdb.so/") ||
+             url.includes(".rdeb.io/") ||
+             url.includes("download.real-debrid.com/");
+    };
+
     for (const item of readyItems) {
       try {
-        const unrestricted = await unrestrictLink(item.stream!.url);
+        // Check if it's already a direct RD link (from Torrentio with RD configured)
+        let downloadUrl: string;
+        if (isDirectRdLink(item.stream!.url)) {
+          downloadUrl = item.stream!.url;
+        } else {
+          const unrestricted = await unrestrictLink(item.stream!.url);
+          downloadUrl = unrestricted.download;
+        }
         const episodeTitle = `${manualTitle} - S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
         
         const input: CreateMediaInput = {
           title: episodeTitle,
           media_type: "tv",
           source_type: "url",
-          source_url: unrestricted.download,
+          source_url: downloadUrl,
           category_id: selectedCategory || undefined,
           overview: manualOverview,
           ...(selectedTmdbForDebrid && {
@@ -543,6 +558,15 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
+  // Helper to check if URL is already a direct Real-Debrid download link
+  const isDirectRdLink = (url: string): boolean => {
+    // Real-Debrid direct download links have these patterns
+    return url.includes("real-debrid.com/d/") || 
+           url.includes("rdb.so/") ||
+           url.includes(".rdeb.io/") ||
+           url.includes("download.real-debrid.com/");
+  };
+
   // Real-Debrid handler
   const handleRealDebrid = async () => {
     if (!rdLink.trim()) {
@@ -577,6 +601,10 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         } else {
           throw new Error("No download links available from torrent");
         }
+      } else if (isDirectRdLink(rdLink)) {
+        // Already a direct RD link (e.g., from Torrentio with RD), use directly
+        setRdStatus("Using direct link...");
+        streamUrl = rdLink;
       } else {
         // Regular link - just unrestrict
         setRdStatus("Unrestricting link...");
