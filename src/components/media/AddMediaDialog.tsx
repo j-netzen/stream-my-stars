@@ -251,26 +251,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     }
     setIsUnrestricting(false);
   };
-    setIsAdding(true);
-    try {
-      for (const entry of entries) {
-        const input: CreateMediaInput = {
-          title: entry.title,
-          media_type: mediaType as "movie" | "tv" | "custom",
-          source_type: "url",
-          source_url: entry.path,
-          category_id: categoryId,
-        };
-        await addMedia.mutateAsync(input);
-      }
-      toast.success(`Added ${entries.length} items to library`);
-      resetForm();
-      onOpenChange(false);
-    } catch (error) {
-      toast.error("Failed to add some media items");
-    }
-    setIsAdding(false);
-  };
 
   // Use File System Access API if supported for persistent handles
   const handleBrowseFile = async () => {
