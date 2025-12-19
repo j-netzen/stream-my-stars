@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
 import {
@@ -67,8 +67,54 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [filteredRdItems, setFilteredRdItems] = useState<{ label: string; value: string; type: "torrent" | "download" }[]>([]);
   const [isLoadingRdItems, setIsLoadingRdItems] = useState(false);
   const [showRdDropdown, setShowRdDropdown] = useState(false);
+  const [isSearchingTmdbForDebrid, setIsSearchingTmdbForDebrid] = useState(false);
+  const [tmdbDebridResults, setTmdbDebridResults] = useState<TMDBSearchResult[]>([]);
+  const [showTmdbDebridDropdown, setShowTmdbDebridDropdown] = useState(false);
 
-  // Fetch Real-Debrid items when dialog opens
+  // TMDB search for Debrid tab
+  const handleTmdbSearchForDebrid = async () => {
+    if (!manualTitle.trim()) {
+      toast.error("Please enter a title to search");
+      return;
+    }
+    setIsSearchingTmdbForDebrid(true);
+    try {
+      const results = await searchTMDB(manualTitle);
+      setTmdbDebridResults(results);
+      setShowTmdbDebridDropdown(true);
+      if (results.length === 0) {
+        toast.info("No TMDB results found");
+      }
+    } catch (error) {
+      toast.error("TMDB search failed");
+    }
+    setIsSearchingTmdbForDebrid(false);
+  };
+
+  const handleSelectTmdbForDebrid = async (result: TMDBSearchResult) => {
+    setShowTmdbDebridDropdown(false);
+    try {
+      let details: any = null;
+      if (result.media_type === "movie") {
+        details = await getMovieDetails(result.id);
+      } else if (result.media_type === "tv") {
+        details = await getTVDetails(result.id);
+      }
+      
+      // Fill in metadata
+      setManualTitle(result.title || result.name || "");
+      setManualOverview(result.overview || "");
+      setManualType(result.media_type === "movie" ? "movie" : result.media_type === "tv" ? "tv" : "custom");
+      
+      toast.success(`Loaded metadata for "${result.title || result.name}"`);
+    } catch (error) {
+      // Still use basic info if details fail
+      setManualTitle(result.title || result.name || "");
+      setManualOverview(result.overview || "");
+      setManualType(result.media_type === "movie" ? "movie" : result.media_type === "tv" ? "tv" : "custom");
+    }
+  };
+
   const fetchRdItems = useCallback(async () => {
     setIsLoadingRdItems(true);
     try {
@@ -634,29 +680,75 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
             <div className="space-y-2">
               <Label>Title *</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter media title"
-                  value={manualTitle}
-                  onChange={(e) => setManualTitle(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    fetchRdItems();
-                    setShowRdDropdown(true);
-                  }}
-                  disabled={isLoadingRdItems}
-                  title="Search Real-Debrid for matching links"
-                >
-                  {isLoadingRdItems ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Search className="w-4 h-4" />
-                  )}
-                </Button>
+              <div className="relative">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter media title"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTmdbSearchForDebrid}
+                    disabled={isSearchingTmdbForDebrid}
+                    title="Fetch metadata from TMDB"
+                  >
+                    {isSearchingTmdbForDebrid ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      fetchRdItems();
+                      setShowRdDropdown(true);
+                    }}
+                    disabled={isLoadingRdItems}
+                    title="Search Real-Debrid for matching links"
+                  >
+                    {isLoadingRdItems ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+                {showTmdbDebridDropdown && tmdbDebridResults.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-64 overflow-y-auto">
+                    {tmdbDebridResults.map((result) => (
+                      <button
+                        key={result.id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-3"
+                        onClick={() => handleSelectTmdbForDebrid(result)}
+                      >
+                        {result.poster_path ? (
+                          <img 
+                            src={getImageUrl(result.poster_path, "w200") || ""} 
+                            alt="" 
+                            className="w-8 h-12 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-8 h-12 bg-muted rounded flex items-center justify-center">
+                            {result.media_type === "movie" ? <Film className="w-4 h-4" /> : <Tv className="w-4 h-4" />}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{result.title || result.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {result.media_type === "movie" ? "Movie" : "TV"} • {result.release_date?.slice(0, 4) || result.first_air_date?.slice(0, 4) || "N/A"}
+                            {result.vote_average > 0 && ` • ${result.vote_average.toFixed(1)}★`}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
