@@ -13,9 +13,19 @@ import {
   SkipBack,
   SkipForward,
   X,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  getFileHandle,
+  storeFileHandle,
+  requestFileFromHandle,
+  isFileSystemAccessSupported,
+} from "@/lib/fileHandleStore";
+
+// Special marker URL for local files stored via File System Access API
+const LOCAL_FILE_MARKER = "local-file://stored-handle";
 
 interface VideoPlayerProps {
   media: Media;
@@ -35,37 +45,76 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [isRestoringHandle, setIsRestoringHandle] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
   const filePickerRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
-
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const restoredMediaIdRef = useRef<string | null>(null);
 
-  const [src, setSrc] = useState(() => media.source_url || "");
+  const [src, setSrc] = useState("");
   const [playbackError, setPlaybackError] = useState<string | null>(null);
 
+  // Attempt to restore file handle on mount or media change
   useEffect(() => {
-    // Reset player state for new media
-    setSrc(media.source_url || "");
-    setPlaybackError(null);
+    let cancelled = false;
 
-    // Release any user-picked object URL when switching media
+    const init = async () => {
+      const rawUrl = media.source_url || "";
+
+      // If it's our special marker, try to restore the handle
+      if (rawUrl === LOCAL_FILE_MARKER) {
+        setIsRestoringHandle(true);
+        const handle = await getFileHandle(media.id);
+        if (cancelled) return;
+
+        if (handle) {
+          const file = await requestFileFromHandle(handle);
+          if (cancelled) return;
+
+          if (file) {
+            const url = URL.createObjectURL(file);
+            if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = url;
+            setSrc(url);
+            setPlaybackError(null);
+            setIsRestoringHandle(false);
+            return;
+          }
+        }
+
+        // Handle not found or permission denied
+        setIsRestoringHandle(false);
+        setPlaybackError("Local file handle expired or permission denied. Please re-select the file.");
+        return;
+      }
+
+      // Regular URL
+      setSrc(rawUrl);
+      setPlaybackError(null);
+    };
+
+    // Reset state
+    setPlaybackError(null);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
-
     setIsPlaying(false);
     setIsBuffering(false);
     setDuration(0);
     durationRef.current = 0;
     setCurrentTime(0);
     currentTimeRef.current = 0;
-
     restoredMediaIdRef.current = null;
+
+    init();
+
+    return () => {
+      cancelled = true;
+    };
   }, [media.id, media.source_url]);
 
   useEffect(() => {
@@ -121,7 +170,48 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     };
   }, [saveProgressNow]);
 
-  const openFilePicker = () => filePickerRef.current?.click();
+  const openFilePicker = async () => {
+    // Try File System Access API first for persistence
+    if (isFileSystemAccessSupported()) {
+      try {
+        // @ts-ignore
+        const [handle]: FileSystemFileHandle[] = await window.showOpenFilePicker({
+          types: [
+            {
+              description: "Video Files",
+              accept: { "video/*": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"] },
+            },
+          ],
+          multiple: false,
+        });
+
+        const file = await handle.getFile();
+        const url = URL.createObjectURL(file);
+
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = url;
+
+        // Store handle for future sessions
+        await storeFileHandle(media.id, handle);
+
+        setSrc(url);
+        setPlaybackError(null);
+        toast.success("File loaded – will persist across refresh");
+
+        requestAnimationFrame(() => {
+          videoRef.current?.play().catch(() => {});
+        });
+        return;
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.warn("File picker error:", err);
+        }
+      }
+    }
+
+    // Fallback to regular file input
+    filePickerRef.current?.click();
+  };
 
   const handleLocalFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,25 +223,26 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
     setSrc(url);
     setPlaybackError(null);
-    toast.success("Local file loaded");
+    toast.info("File loaded (won't persist after refresh)");
 
     requestAnimationFrame(() => {
-      videoRef.current?.play().catch(() => {
-        // ignore; user can press play
-      });
+      videoRef.current?.play().catch(() => {});
     });
   };
 
   const handleVideoError = () => {
     const raw = src || media.source_url || "";
     const isBlob = raw.startsWith("blob:");
-    const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\\\/.test(raw);
+    const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\/.test(raw);
+    const isLocalMarker = raw === LOCAL_FILE_MARKER;
 
-    const message = isBlob
-      ? "This looks like a temporary local-file link. Please re-select the video file to play."
-      : looksLikePath
-        ? "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL."
-        : "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
+    const message = isLocalMarker
+      ? "Local file handle not found. Please re-select the file."
+      : isBlob
+        ? "This looks like a temporary local-file link. Please re-select the video file to play."
+        : looksLikePath
+          ? "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL."
+          : "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
 
     setPlaybackError(message);
     toast.error(message);
@@ -258,6 +349,18 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     ? getImageUrl(media.backdrop_path, "original")
     : null;
 
+  // Show loading state while restoring file handle
+  if (isRestoringHandle) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+          <p className="text-white/70">Restoring local file access...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -293,7 +396,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       {playbackError && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-6">
           <div className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-lg">
-            <h2 className="text-base font-semibold">Can’t play this video</h2>
+            <h2 className="text-base font-semibold">Can't play this video</h2>
             <p className="mt-1 text-sm text-muted-foreground">{playbackError}</p>
             <div className="mt-4 flex items-center justify-end gap-2">
               <Button variant="secondary" onClick={onClose}>
