@@ -38,7 +38,7 @@ export function MediaRow({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between px-6">
+      <div className="flex items-center justify-between px-4 md:px-6">
         <h2 className="text-xl font-semibold">{title}</h2>
         <div className="flex gap-2">
           <Button
@@ -62,10 +62,10 @@ export function MediaRow({
 
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto scrollbar-hide px-6 pb-4"
+        className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide px-4 md:px-6 pb-4 snap-x snap-mandatory"
       >
         {media.map((item) => (
-          <div key={item.id} className="flex-shrink-0 w-40">
+          <div key={item.id} className="flex-shrink-0 w-32 sm:w-36 md:w-40 lg:w-44 snap-start">
             <MediaCard
               media={item}
               progress={progress.find((p) => p.media_id === item.id)}
