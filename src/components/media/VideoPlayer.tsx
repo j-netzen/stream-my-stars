@@ -1,9 +1,8 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import {
   Play,
   Pause,
@@ -22,7 +21,6 @@ interface VideoPlayerProps {
   onClose: () => void;
 }
 
-
 export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,25 +34,11 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekValue, setSeekValue] = useState(0);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
-
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
-  const lastUiTimeRef = useRef(0);
   const restoredMediaIdRef = useRef<string | null>(null);
-
-  const progressSliderValue = useMemo(
-    () => [isSeeking ? seekValue : currentTime],
-    [isSeeking, seekValue, currentTime]
-  );
-
-  const volumeSliderValue = useMemo(
-    () => [isMuted ? 0 : volume],
-    [isMuted, volume]
-  );
 
   // Load saved progress (once per media)
   useEffect(() => {
@@ -72,9 +56,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       const t = savedProgress.progress_seconds ?? 0;
       videoRef.current.currentTime = t;
       currentTimeRef.current = t;
-      lastUiTimeRef.current = t;
       setCurrentTime(t);
-      setSeekValue(t);
     }
 
     restoredMediaIdRef.current = media.id;
@@ -118,15 +100,9 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
-
     const t = videoRef.current.currentTime;
     currentTimeRef.current = t;
-
-    // Throttle UI updates so sliders don't re-render on every tiny time tick.
-    if (!isSeeking && Math.abs(t - lastUiTimeRef.current) >= 0.25) {
-      lastUiTimeRef.current = t;
-      setCurrentTime(t);
-    }
+    setCurrentTime(t);
   };
 
   const handleLoadedMetadata = () => {
@@ -139,38 +115,23 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     }
   };
 
-  const handleSeekStart = useCallback(() => {
-    setIsSeeking(true);
-    setSeekValue(currentTimeRef.current);
-  }, []);
-
-  const handleSeekChange = useCallback(
-    (value: number[]) => {
-      if (isSeeking) {
-        setSeekValue(value[0]);
-      }
-    },
-    [isSeeking]
-  );
-
-  const handleSeekEnd = useCallback((value: number[]) => {
-    const t = value[0];
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = parseFloat(e.target.value);
     if (videoRef.current) {
       videoRef.current.currentTime = t;
     }
     currentTimeRef.current = t;
-    lastUiTimeRef.current = t;
     setCurrentTime(t);
-    setIsSeeking(false);
-  }, []);
+  };
 
-  const handleVolumeChange = useCallback((value: number[]) => {
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
     if (videoRef.current) {
-      videoRef.current.volume = value[0];
-      setVolume(value[0]);
-      setIsMuted(value[0] === 0);
+      videoRef.current.volume = v;
     }
-  }, []);
+    setVolume(v);
+    setIsMuted(v === 0);
+  };
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -181,7 +142,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
-    
+
     if (!document.fullscreenElement) {
       await containerRef.current.requestFullscreen();
       setIsFullscreen(true);
@@ -291,15 +252,16 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
         {/* Bottom Controls */}
         <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4">
+          {/* Progress Bar - Native range input */}
           {duration > 0 && (
-            <Slider
-              value={progressSliderValue}
+            <input
+              type="range"
+              min={0}
               max={duration}
-              step={1}
-              onPointerDown={handleSeekStart}
-              onValueChange={handleSeekChange}
-              onValueCommit={handleSeekEnd}
-              className="cursor-pointer"
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeekChange}
+              className="w-full h-2 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
             />
           )}
 
@@ -355,12 +317,14 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
                     <Volume2 className="w-5 h-5" />
                   )}
                 </Button>
-                <Slider
-                  value={volumeSliderValue}
+                <input
+                  type="range"
+                  min={0}
                   max={1}
                   step={0.1}
-                  onValueChange={handleVolumeChange}
-                  className="w-24"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="w-20 h-2 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
                 />
               </div>
 
