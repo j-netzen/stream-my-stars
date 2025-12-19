@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
+import { unrestrictLink, addMagnetAndWait, getTorrentInfo } from "@/lib/realDebrid";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -20,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
 import {
@@ -54,6 +56,12 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [selectedFileName, setSelectedFileName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [hasStoredHandle, setHasStoredHandle] = useState(false);
+  
+  // Real-Debrid state
+  const [rdLink, setRdLink] = useState("");
+  const [rdProgress, setRdProgress] = useState(0);
+  const [rdStatus, setRdStatus] = useState<string | null>(null);
+  const [isUnrestricting, setIsUnrestricting] = useState(false);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -180,6 +188,90 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
+  // Real-Debrid handler
+  const handleRealDebrid = async () => {
+    if (!rdLink.trim()) {
+      toast.error("Please enter a link or magnet");
+      return;
+    }
+
+    if (!manualTitle.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+
+    setIsUnrestricting(true);
+    setRdProgress(0);
+    setRdStatus(null);
+
+    try {
+      let streamUrl: string;
+
+      // Check if it's a magnet link
+      if (rdLink.startsWith("magnet:")) {
+        setRdStatus("Adding magnet to Real-Debrid...");
+        const torrent = await addMagnetAndWait(rdLink, (progress) => {
+          setRdProgress(progress);
+          setRdStatus(`Downloading: ${progress}%`);
+        });
+
+        if (torrent.links && torrent.links.length > 0) {
+          setRdStatus("Unrestricting download link...");
+          const unrestricted = await unrestrictLink(torrent.links[0]);
+          streamUrl = unrestricted.download;
+        } else {
+          throw new Error("No download links available from torrent");
+        }
+      } else {
+        // Regular link - just unrestrict
+        setRdStatus("Unrestricting link...");
+        const unrestricted = await unrestrictLink(rdLink);
+        streamUrl = unrestricted.download;
+      }
+
+      setRdStatus("Adding to library...");
+
+      const input: CreateMediaInput = {
+        title: manualTitle,
+        media_type: manualType,
+        source_type: "url",
+        source_url: streamUrl,
+        category_id: selectedCategory || undefined,
+        overview: manualOverview,
+      };
+
+      await addMedia.mutateAsync(input);
+      toast.success("Media added via Real-Debrid!");
+      resetForm();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Real-Debrid error:", error);
+      toast.error(error.message || "Failed to process with Real-Debrid");
+      setRdStatus(null);
+    }
+    setIsUnrestricting(false);
+  };
+    setIsAdding(true);
+    try {
+      for (const entry of entries) {
+        const input: CreateMediaInput = {
+          title: entry.title,
+          media_type: mediaType as "movie" | "tv" | "custom",
+          source_type: "url",
+          source_url: entry.path,
+          category_id: categoryId,
+        };
+        await addMedia.mutateAsync(input);
+      }
+      toast.success(`Added ${entries.length} items to library`);
+      resetForm();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error("Failed to add some media items");
+    }
+    setIsAdding(false);
+  };
+
   // Use File System Access API if supported for persistent handles
   const handleBrowseFile = async () => {
     if (isFileSystemAccessSupported()) {
@@ -257,6 +349,9 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setSelectedFileName("");
     setHasStoredHandle(false);
     pendingFileHandleRef.current = null;
+    setRdLink("");
+    setRdProgress(0);
+    setRdStatus(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -270,7 +365,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         </DialogHeader>
 
         <Tabs defaultValue="tmdb" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="tmdb" className="gap-2">
               <Search className="w-4 h-4" />
               TMDB
@@ -278,6 +373,10 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             <TabsTrigger value="manual" className="gap-2">
               <LinkIcon className="w-4 h-4" />
               URL
+            </TabsTrigger>
+            <TabsTrigger value="debrid" className="gap-2">
+              <Zap className="w-4 h-4" />
+              Debrid
             </TabsTrigger>
             <TabsTrigger value="network" className="gap-2">
               <FolderOpen className="w-4 h-4" />
@@ -480,6 +579,104 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             >
               {isAdding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Add to Library
+            </Button>
+          </TabsContent>
+
+          <TabsContent value="debrid" className="space-y-4 mt-4">
+            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm">
+              <p className="font-medium text-foreground mb-1 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-green-500" />
+                Real-Debrid Integration
+              </p>
+              <p className="text-muted-foreground">
+                Paste a magnet link or download URL to unrestrict it through Real-Debrid and add it to your library.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input
+                placeholder="Enter media title"
+                value={manualTitle}
+                onChange={(e) => setManualTitle(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={manualType} onValueChange={(v) => setManualType(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="movie">Movie</SelectItem>
+                  <SelectItem value="tv">TV Show</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Magnet Link or Download URL *</Label>
+              <Textarea
+                placeholder="magnet:?xt=urn:btih:... or https://..."
+                value={rdLink}
+                onChange={(e) => setRdLink(e.target.value)}
+                className="min-h-[80px] font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Supported: Magnet links, torrent URLs, or any link from supported hosters
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description (Optional)</Label>
+              <Textarea
+                placeholder="Enter description"
+                value={manualOverview}
+                onChange={(e) => setManualOverview(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category (Optional)</Label>
+              <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {rdStatus && (
+              <div className="space-y-2 p-3 bg-secondary/30 rounded-lg">
+                <p className="text-sm flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {rdStatus}
+                </p>
+                {rdProgress > 0 && rdProgress < 100 && (
+                  <Progress value={rdProgress} className="h-2" />
+                )}
+              </div>
+            )}
+
+            <Button
+              onClick={handleRealDebrid}
+              disabled={isUnrestricting || isAdding}
+              className="w-full"
+            >
+              {isUnrestricting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+              ) : (
+                <><Zap className="w-4 h-4 mr-2" /> Add via Real-Debrid</>
+              )}
             </Button>
           </TabsContent>
 
