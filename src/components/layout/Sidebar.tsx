@@ -47,7 +47,7 @@ export function Sidebar({
     { icon: Home, label: "Home", path: "/" },
     { icon: Film, label: "Movies", path: "/movies" },
     { icon: Tv, label: "TV Shows", path: "/tv-shows" },
-    { icon: Video, label: "Home Movies", path: "/home-movies" },
+    { icon: Video, label: "Home Videos", path: "/home-movies" },
     { icon: FolderOpen, label: "Categories", path: "/categories" },
     { icon: ListVideo, label: "Playlists", path: "/playlists" },
     { icon: Search, label: "Discover", path: "/discover" },

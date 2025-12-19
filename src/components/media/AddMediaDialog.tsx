@@ -433,7 +433,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 <SelectContent>
                   <SelectItem value="movie">Movie</SelectItem>
                   <SelectItem value="tv">TV Show</SelectItem>
-                  <SelectItem value="custom">Custom / Home Movie</SelectItem>
+                  <SelectItem value="custom">Custom / Home Video</SelectItem>
                 </SelectContent>
               </Select>
             </div>

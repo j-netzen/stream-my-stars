@@ -21,12 +21,12 @@ export default function HomeMoviesPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Video className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl font-bold">Home Movies</h1>
+          <h1 className="text-3xl font-bold">Home Videos</h1>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search home movies..."
+            placeholder="Search home videos..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -47,7 +47,7 @@ export default function HomeMoviesPage() {
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Video className="w-16 h-16 text-muted-foreground/50 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">No home movies yet</h2>
+          <h2 className="text-xl font-semibold mb-2">No home videos yet</h2>
           <p className="text-muted-foreground">
             Add your personal videos using the "Add Media" button and select "Custom" type.
           </p>
