@@ -59,6 +59,8 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekValue, setSeekValue] = useState(0);
   
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -117,11 +119,20 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     }
   };
 
-  const handleSeek = (value: number[]) => {
+  const handleSeekStart = () => {
+    setIsSeeking(true);
+  };
+
+  const handleSeekChange = (value: number[]) => {
+    setSeekValue(value[0]);
+  };
+
+  const handleSeekEnd = (value: number[]) => {
     if (videoRef.current) {
       videoRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
     }
+    setIsSeeking(false);
   };
 
   const handleVolumeChange = (value: number[]) => {
@@ -253,10 +264,12 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4">
           {/* Progress Bar */}
           <Slider
-            value={[currentTime]}
+            value={[isSeeking ? seekValue : currentTime]}
             max={duration || 100}
             step={1}
-            onValueChange={handleSeek}
+            onPointerDown={handleSeekStart}
+            onValueChange={handleSeekChange}
+            onValueCommit={handleSeekEnd}
             className="cursor-pointer"
           />
 
