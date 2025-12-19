@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
@@ -21,9 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo } from "lucide-react";
-import { useRef } from "react";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
+import {
+  storeFileHandle,
+  isFileSystemAccessSupported,
+} from "@/lib/fileHandleStore";
+
+// Special marker URL for local files stored via File System Access API
+const LOCAL_FILE_MARKER = "local-file://stored-handle";
 
 interface AddMediaDialogProps {
   open: boolean;
@@ -34,6 +40,8 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
   const { categories } = useCategories();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFileHandleRef = useRef<FileSystemFileHandle | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -45,6 +53,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [manualType, setManualType] = useState<"movie" | "tv" | "custom">("custom");
   const [selectedFileName, setSelectedFileName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [hasStoredHandle, setHasStoredHandle] = useState(false);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -106,8 +115,15 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   };
 
   const handleAddManual = async () => {
-    if (!manualTitle.trim() || !sourceUrl.trim()) {
-      toast.error("Please provide title and source URL");
+    if (!manualTitle.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+
+    // Must have a URL or a stored handle
+    const useStoredHandle = hasStoredHandle && pendingFileHandleRef.current;
+    if (!useStoredHandle && !sourceUrl.trim()) {
+      toast.error("Please provide a source URL or select a local file");
       return;
     }
 
@@ -117,12 +133,19 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         title: manualTitle,
         media_type: manualType,
         source_type: "url",
-        source_url: sourceUrl,
+        // Use marker URL for stored handle; otherwise use whatever user entered
+        source_url: useStoredHandle ? LOCAL_FILE_MARKER : sourceUrl,
         category_id: selectedCategory || undefined,
         overview: manualOverview,
       };
 
-      await addMedia.mutateAsync(input);
+      const created = await addMedia.mutateAsync(input);
+
+      // If we have a pending file handle, store it for persistent playback
+      if (useStoredHandle && created?.id) {
+        await storeFileHandle(created.id, pendingFileHandleRef.current!);
+      }
+
       resetForm();
       onOpenChange(false);
     } catch (error) {
@@ -157,21 +180,68 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
+  // Use File System Access API if supported for persistent handles
+  const handleBrowseFile = async () => {
+    if (isFileSystemAccessSupported()) {
+      try {
+        // @ts-ignore - showOpenFilePicker may not be in TS defs
+        const [handle]: FileSystemFileHandle[] = await window.showOpenFilePicker({
+          types: [
+            {
+              description: "Video Files",
+              accept: { "video/*": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"] },
+            },
+          ],
+          multiple: false,
+        });
+
+        const file = await handle.getFile();
+
+        // Store handle for later
+        pendingFileHandleRef.current = handle;
+        setHasStoredHandle(true);
+        setSelectedFileName(file.name);
+
+        // Auto-fill title
+        if (!manualTitle) {
+          const titleFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/[._-]/g, " ");
+          setManualTitle(titleFromFile);
+        }
+
+        // Create blob URL for immediate preview if needed
+        const blobUrl = URL.createObjectURL(file);
+        setSourceUrl(blobUrl);
+
+        toast.success("File selected – will persist across refresh");
+      } catch (err: any) {
+        // User cancelled or API error
+        if (err.name !== "AbortError") {
+          console.warn("File picker error:", err);
+          // Fallback to regular file input
+          fileInputRef.current?.click();
+        }
+      }
+    } else {
+      // Fallback for browsers without File System Access API
+      fileInputRef.current?.click();
+    }
+  };
+
+  // Fallback handler for regular file input
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Store the file name for display
       setSelectedFileName(file.name);
-      // Create a blob URL for local playback
       const blobUrl = URL.createObjectURL(file);
       setSourceUrl(blobUrl);
-      // Auto-fill the title if empty
+      setHasStoredHandle(false);
+      pendingFileHandleRef.current = null;
+
       if (!manualTitle) {
-        // Remove extension and clean up the filename for title
         const titleFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/[._-]/g, " ");
         setManualTitle(titleFromFile);
       }
-      toast.success("File ready for playback");
+      toast.info("File ready (won't persist after refresh – use Chrome/Edge for persistence)");
     }
   };
 
@@ -185,6 +255,8 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setManualOverview("");
     setManualType("custom");
     setSelectedFileName("");
+    setHasStoredHandle(false);
+    pendingFileHandleRef.current = null;
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -454,7 +526,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handleBrowseFile}
                   className="flex-1"
                 >
                   <FileVideo className="w-4 h-4 mr-2" />
@@ -462,7 +534,9 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Select a video file from your computer for local streaming
+                {hasStoredHandle
+                  ? "✓ File will persist across refresh (Chrome/Edge)"
+                  : "Select a video file from your computer for local streaming"}
               </p>
             </div>
 
