@@ -24,26 +24,10 @@ const qualityRanking: Record<string, number> = {
   "UNKNOWN": 20,
 };
 
-// Parse size string to bytes for sorting
-function parseSizeToBytes(sizeStr: string): number {
-  if (!sizeStr) return Infinity; // No size = sort to end
-  
-  const match = sizeStr.match(/(\d+\.?\d*)\s*(GB|MB)/i);
-  if (!match) return Infinity;
-  
-  const value = parseFloat(match[1]);
-  const unit = match[2].toUpperCase();
-  
-  if (unit === "GB") return value * 1024;
-  if (unit === "MB") return value;
-  return Infinity;
-}
-
 // Parse quality and size info from stream title
 export function parseStreamInfo(stream: TorrentioStream): {
   quality: string;
   size: string;
-  sizeInMB: number;
   seeds?: number;
   source: string;
   qualityRank: number;
@@ -58,7 +42,6 @@ export function parseStreamInfo(stream: TorrentioStream): {
   // Extract size
   const sizeMatch = title.match(/(\d+\.?\d*\s*(GB|MB))/i);
   const size = sizeMatch ? sizeMatch[1] : "";
-  const sizeInMB = parseSizeToBytes(size);
   
   // Extract seeds if available (format: 👤 123 or Seeds: 123)
   const seedsMatch = title.match(/👤\s*(\d+)/);
@@ -70,17 +53,24 @@ export function parseStreamInfo(stream: TorrentioStream): {
   // Get quality rank for sorting
   const qualityRank = qualityRanking[quality] || qualityRanking["UNKNOWN"];
   
-  return { quality, size, sizeInMB, seeds, source, qualityRank };
+  return { quality, size, seeds, source, qualityRank };
 }
 
-// Sort streams by file size (smallest to largest)
+// Sort streams by quality (descending) then by seeds (descending)
 export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   return [...streams].sort((a, b) => {
     const infoA = parseStreamInfo(a);
     const infoB = parseStreamInfo(b);
     
-    // Sort by file size (smallest first)
-    return infoA.sizeInMB - infoB.sizeInMB;
+    // First sort by quality
+    if (infoB.qualityRank !== infoA.qualityRank) {
+      return infoB.qualityRank - infoA.qualityRank;
+    }
+    
+    // Then by seeds (if available)
+    const seedsA = infoA.seeds || 0;
+    const seedsB = infoB.seeds || 0;
+    return seedsB - seedsA;
   });
 }
 
@@ -99,16 +89,6 @@ export async function searchTorrentio(
   // Sort streams by quality and seeds
   const streams = data.streams || [];
   return sortStreams(streams);
-}
-
-// Resolve a Torrentio stream URL to get the actual download link
-export async function resolveTorrentioUrl(url: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("torrentio", {
-    body: { action: "resolve", url },
-  });
-
-  if (error) throw error;
-  return data.url;
 }
 
 // Get IMDB ID from TMDB
