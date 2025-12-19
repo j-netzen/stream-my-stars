@@ -709,6 +709,15 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                         onClick={() => {
                           setRdLink(item.value);
                           setShowRdDropdown(false);
+                          // Auto-fill title from filename (remove [Torrent] or [Download] prefix)
+                          const filename = item.label.replace(/^\[(Torrent|Download)\]\s*/, '');
+                          // Clean up filename: remove extension and common separators
+                          const cleanTitle = filename
+                            .replace(/\.[^/.]+$/, '') // Remove file extension
+                            .replace(/\./g, ' ') // Replace dots with spaces
+                            .replace(/_/g, ' ') // Replace underscores with spaces
+                            .trim();
+                          setManualTitle(cleanTitle);
                         }}
                       >
                         {item.label}
