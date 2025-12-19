@@ -3,7 +3,7 @@ import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream } from "@/lib/torrentio";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink } from "@/lib/torrentio";
 import {
   Dialog,
   DialogContent,
@@ -326,13 +326,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(true);
     let added = 0;
 
-    // Helper to check if URL is already a direct Real-Debrid download link
-    const isDirectRdLink = (url: string): boolean => {
-      return url.includes("real-debrid.com/d/") || 
-             url.includes("rdb.so/") ||
-             url.includes(".rdeb.io/") ||
-             url.includes("download.real-debrid.com/");
-    };
 
     for (const item of readyItems) {
       try {
@@ -558,14 +551,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
-  // Helper to check if URL is already a direct Real-Debrid download link
-  const isDirectRdLink = (url: string): boolean => {
-    // Real-Debrid direct download links have these patterns
-    return url.includes("real-debrid.com/d/") || 
-           url.includes("rdb.so/") ||
-           url.includes(".rdeb.io/") ||
-           url.includes("download.real-debrid.com/");
-  };
 
   // Real-Debrid handler
   const handleRealDebrid = async () => {
@@ -1391,9 +1376,21 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">
-                                {info.quality}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                                  {info.quality}
+                                </span>
+                                {info.isDirectLink ? (
+                                  <span className="text-xs font-medium px-1.5 py-0.5 bg-green-500/20 text-green-500 rounded flex items-center gap-0.5">
+                                    <Zap className="h-3 w-3" />
+                                    RD
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-medium px-1.5 py-0.5 bg-muted text-muted-foreground rounded">
+                                    Magnet
+                                  </span>
+                                )}
+                              </div>
                               {info.size && (
                                 <span className="text-xs text-muted-foreground">{info.size}</span>
                               )}
