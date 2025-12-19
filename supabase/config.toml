@@ -2,3 +2,6 @@ project_id = "azrfvjecmcloaqidrspi"
 
 [functions.tmdb]
 verify_jwt = false
+
+[functions.real-debrid]
+verify_jwt = false
