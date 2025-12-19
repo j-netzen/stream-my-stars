@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface VideoPlayerProps {
   media: Media;
@@ -36,9 +37,42 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const [isBuffering, setIsBuffering] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const filePickerRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const restoredMediaIdRef = useRef<string | null>(null);
+
+  const [src, setSrc] = useState(() => media.source_url || "");
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset player state for new media
+    setSrc(media.source_url || "");
+    setPlaybackError(null);
+
+    // Release any user-picked object URL when switching media
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setDuration(0);
+    durationRef.current = 0;
+    setCurrentTime(0);
+    currentTimeRef.current = 0;
+
+    restoredMediaIdRef.current = null;
+  }, [media.id, media.source_url]);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
 
   // Load saved progress (once per media)
   useEffect(() => {
@@ -87,14 +121,56 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     };
   }, [saveProgressNow]);
 
+  const openFilePicker = () => filePickerRef.current?.click();
+
+  const handleLocalFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = url;
+
+    setSrc(url);
+    setPlaybackError(null);
+    toast.success("Local file loaded");
+
+    requestAnimationFrame(() => {
+      videoRef.current?.play().catch(() => {
+        // ignore; user can press play
+      });
+    });
+  };
+
+  const handleVideoError = () => {
+    const raw = src || media.source_url || "";
+    const isBlob = raw.startsWith("blob:");
+    const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\\\/.test(raw);
+
+    const message = isBlob
+      ? "This looks like a temporary local-file link. Please re-select the video file to play."
+      : looksLikePath
+        ? "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL."
+        : "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
+
+    setPlaybackError(message);
+    toast.error(message);
+  };
+
   const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+    if (!videoRef.current) return;
+
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    const p = videoRef.current.play();
+    if (p) {
+      p.then(() => setIsPlaying(true)).catch(() => handleVideoError());
+    } else {
+      setIsPlaying(true);
     }
   };
 
@@ -191,17 +267,43 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       {/* Video */}
       <video
         ref={videoRef}
-        src={media.source_url || ""}
+        src={src}
         className="w-full h-full object-contain"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onError={handleVideoError}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => setIsBuffering(false)}
         onClick={handlePlayPause}
         poster={backdropUrl || undefined}
+        preload="metadata"
+        playsInline
       />
+
+      <input
+        ref={filePickerRef}
+        type="file"
+        accept="video/*"
+        onChange={handleLocalFileSelected}
+        className="hidden"
+      />
+
+      {playbackError && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-6">
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-lg">
+            <h2 className="text-base font-semibold">Can’t play this video</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{playbackError}</p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button variant="secondary" onClick={onClose}>
+                Close
+              </Button>
+              <Button onClick={openFilePicker}>Choose file</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Buffering Indicator */}
       {isBuffering && (
