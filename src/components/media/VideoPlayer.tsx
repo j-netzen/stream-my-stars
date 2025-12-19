@@ -119,29 +119,31 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     }
   };
 
-  const handleSeekStart = () => {
+  const handleSeekStart = useCallback(() => {
     setIsSeeking(true);
-  };
+  }, []);
 
-  const handleSeekChange = (value: number[]) => {
-    setSeekValue(value[0]);
-  };
+  const handleSeekChange = useCallback((value: number[]) => {
+    if (isSeeking) {
+      setSeekValue(value[0]);
+    }
+  }, [isSeeking]);
 
-  const handleSeekEnd = (value: number[]) => {
+  const handleSeekEnd = useCallback((value: number[]) => {
     if (videoRef.current) {
       videoRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
     }
     setIsSeeking(false);
-  };
+  }, []);
 
-  const handleVolumeChange = (value: number[]) => {
+  const handleVolumeChange = useCallback((value: number[]) => {
     if (videoRef.current) {
       videoRef.current.volume = value[0];
       setVolume(value[0]);
       setIsMuted(value[0] === 0);
     }
-  };
+  }, []);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -262,16 +264,17 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
         {/* Bottom Controls */}
         <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4">
-          {/* Progress Bar */}
-          <Slider
-            value={[isSeeking ? seekValue : currentTime]}
-            max={duration || 100}
-            step={1}
-            onPointerDown={handleSeekStart}
-            onValueChange={handleSeekChange}
-            onValueCommit={handleSeekEnd}
-            className="cursor-pointer"
-          />
+          {duration > 0 && (
+            <Slider
+              value={[isSeeking ? seekValue : currentTime]}
+              max={duration}
+              step={1}
+              onPointerDown={handleSeekStart}
+              onValueChange={handleSeekChange}
+              onValueCommit={handleSeekEnd}
+              className="cursor-pointer"
+            />
+          )}
 
           {/* Control Buttons */}
           <div className="flex items-center justify-between">
