@@ -49,7 +49,7 @@ export default function HomePage() {
     <div className="min-h-screen">
       {/* Hero Section */}
       {featured && (
-        <div className="relative h-[70vh] overflow-hidden">
+        <div className="relative h-[70vh] overflow-hidden z-20">
           {/* Background */}
           <div
             className="absolute inset-0 bg-cover bg-center"
