@@ -634,11 +634,30 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
             <div className="space-y-2">
               <Label>Title *</Label>
-              <Input
-                placeholder="Enter media title"
-                value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter media title"
+                  value={manualTitle}
+                  onChange={(e) => setManualTitle(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    fetchRdItems();
+                    setShowRdDropdown(true);
+                  }}
+                  disabled={isLoadingRdItems}
+                  title="Search Real-Debrid for matching links"
+                >
+                  {isLoadingRdItems ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
