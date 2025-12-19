@@ -1,6 +1,6 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Media } from "@/hooks/useMedia";
-import { useWatchProgress, WatchProgress } from "@/hooks/useWatchProgress";
+import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -22,35 +22,12 @@ interface VideoPlayerProps {
   onClose: () => void;
 }
 
-// Simple cache manager for video chunks
-const CACHE_SIZE_MB = 100;
-const cacheStore = new Map<string, Blob>();
-let currentCacheSize = 0;
-
-function addToCache(key: string, blob: Blob) {
-  const blobSizeMB = blob.size / (1024 * 1024);
-  
-  // Remove oldest entries if cache is full
-  while (currentCacheSize + blobSizeMB > CACHE_SIZE_MB && cacheStore.size > 0) {
-    const firstKey = cacheStore.keys().next().value;
-    if (firstKey) {
-      const removed = cacheStore.get(firstKey);
-      if (removed) {
-        currentCacheSize -= removed.size / (1024 * 1024);
-      }
-      cacheStore.delete(firstKey);
-    }
-  }
-  
-  cacheStore.set(key, blob);
-  currentCacheSize += blobSizeMB;
-}
 
 export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { updateProgress, getProgressForMedia } = useWatchProgress();
-  
+  const { progress, isLoading: progressLoading, updateProgress } = useWatchProgress();
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -61,40 +38,72 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const [isBuffering, setIsBuffering] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
-  
+
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Load saved progress
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const lastUiTimeRef = useRef(0);
+  const restoredMediaIdRef = useRef<string | null>(null);
+
+  const progressSliderValue = useMemo(
+    () => [isSeeking ? seekValue : currentTime],
+    [isSeeking, seekValue, currentTime]
+  );
+
+  const volumeSliderValue = useMemo(
+    () => [isMuted ? 0 : volume],
+    [isMuted, volume]
+  );
+
+  // Load saved progress (once per media)
   useEffect(() => {
-    const savedProgress = getProgressForMedia(media.id);
+    if (progressLoading) return;
+    if (restoredMediaIdRef.current === media.id) return;
+
+    const savedProgress = progress.find(
+      (p) =>
+        p.media_id === media.id &&
+        p.episode_number === null &&
+        p.season_number === null
+    );
+
     if (savedProgress && videoRef.current) {
-      videoRef.current.currentTime = savedProgress.progress_seconds;
+      const t = savedProgress.progress_seconds ?? 0;
+      videoRef.current.currentTime = t;
+      currentTimeRef.current = t;
+      lastUiTimeRef.current = t;
+      setCurrentTime(t);
+      setSeekValue(t);
     }
-  }, [media.id, getProgressForMedia]);
 
-  // Save progress periodically
-  const saveProgress = useCallback(() => {
-    if (videoRef.current && duration > 0) {
-      updateProgress.mutate({
-        mediaId: media.id,
-        progressSeconds: currentTime,
-        durationSeconds: duration,
-        completed: currentTime / duration > 0.95,
-      });
-    }
-  }, [media.id, currentTime, duration, updateProgress]);
+    restoredMediaIdRef.current = media.id;
+  }, [media.id, progress, progressLoading]);
+
+  const saveProgressNow = useCallback(() => {
+    const d = durationRef.current;
+    if (!videoRef.current || d <= 0) return;
+
+    const t = currentTimeRef.current;
+    updateProgress.mutate({
+      mediaId: media.id,
+      progressSeconds: t,
+      durationSeconds: d,
+      completed: t / d > 0.95,
+    });
+  }, [media.id, updateProgress]);
 
   useEffect(() => {
-    const interval = setInterval(saveProgress, 10000); // Save every 10 seconds
-    return () => clearInterval(interval);
-  }, [saveProgress]);
+    const interval = window.setInterval(saveProgressNow, 10000);
+    return () => window.clearInterval(interval);
+  }, [saveProgressNow]);
 
   // Save on unmount
   useEffect(() => {
     return () => {
-      saveProgress();
+      saveProgressNow();
     };
-  }, [saveProgress]);
+  }, [saveProgressNow]);
 
   const handlePlayPause = () => {
     if (videoRef.current) {
@@ -108,32 +117,50 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+    if (!videoRef.current) return;
+
+    const t = videoRef.current.currentTime;
+    currentTimeRef.current = t;
+
+    // Throttle UI updates so sliders don't re-render on every tiny time tick.
+    if (!isSeeking && Math.abs(t - lastUiTimeRef.current) >= 0.25) {
+      lastUiTimeRef.current = t;
+      setCurrentTime(t);
     }
   };
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+      const d = Number.isFinite(videoRef.current.duration)
+        ? videoRef.current.duration
+        : 0;
+      durationRef.current = d;
+      setDuration(d);
     }
   };
 
   const handleSeekStart = useCallback(() => {
     setIsSeeking(true);
+    setSeekValue(currentTimeRef.current);
   }, []);
 
-  const handleSeekChange = useCallback((value: number[]) => {
-    if (isSeeking) {
-      setSeekValue(value[0]);
-    }
-  }, [isSeeking]);
+  const handleSeekChange = useCallback(
+    (value: number[]) => {
+      if (isSeeking) {
+        setSeekValue(value[0]);
+      }
+    },
+    [isSeeking]
+  );
 
   const handleSeekEnd = useCallback((value: number[]) => {
+    const t = value[0];
     if (videoRef.current) {
-      videoRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
+      videoRef.current.currentTime = t;
     }
+    currentTimeRef.current = t;
+    lastUiTimeRef.current = t;
+    setCurrentTime(t);
     setIsSeeking(false);
   }, []);
 
@@ -266,7 +293,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4">
           {duration > 0 && (
             <Slider
-              value={[isSeeking ? seekValue : currentTime]}
+              value={progressSliderValue}
               max={duration}
               step={1}
               onPointerDown={handleSeekStart}
@@ -329,7 +356,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
                   )}
                 </Button>
                 <Slider
-                  value={[isMuted ? 0 : volume]}
+                  value={volumeSliderValue}
                   max={1}
                   step={0.1}
                   onValueChange={handleVolumeChange}
