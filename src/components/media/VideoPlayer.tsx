@@ -241,14 +241,20 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     const isBlob = raw.startsWith("blob:");
     const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\/.test(raw);
     const isLocalMarker = raw === LOCAL_FILE_MARKER;
+    const isMkvFile = raw.toLowerCase().includes('.mkv');
 
-    const message = isLocalMarker
-      ? "Local file handle not found. Please re-select the file."
-      : isBlob
-        ? "This looks like a temporary local-file link. Please re-select the video file to play."
-        : looksLikePath
-          ? "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL."
-          : "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
+    let message: string;
+    if (isLocalMarker) {
+      message = "Local file handle not found. Please re-select the file.";
+    } else if (isBlob) {
+      message = "This looks like a temporary local-file link. Please re-select the video file to play.";
+    } else if (looksLikePath) {
+      message = "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL.";
+    } else if (isMkvFile) {
+      message = "MKV playback failed. Your browser may not support the video codec. Try using Chrome, Edge, or a different browser.";
+    } else {
+      message = "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
+    }
 
     setPlaybackError(message);
     toast.error(message);
@@ -341,6 +347,19 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     }, 3000);
   };
 
+  // Get MIME type based on file extension for better codec handling
+  const getMimeType = (url: string): string => {
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('.mkv')) return 'video/x-matroska';
+    if (lowerUrl.includes('.webm')) return 'video/webm';
+    if (lowerUrl.includes('.mp4')) return 'video/mp4';
+    if (lowerUrl.includes('.m4v')) return 'video/mp4';
+    if (lowerUrl.includes('.mov')) return 'video/quicktime';
+    if (lowerUrl.includes('.avi')) return 'video/x-msvideo';
+    if (lowerUrl.includes('.ogv')) return 'video/ogg';
+    return 'video/mp4'; // Default fallback
+  };
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -376,7 +395,6 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       {/* Video */}
       <video
         ref={videoRef}
-        src={src}
         className="w-full h-full object-contain"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
@@ -389,7 +407,19 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         poster={backdropUrl || undefined}
         preload="metadata"
         playsInline
-      />
+      >
+        {/* Use source element with type hints for better codec support */}
+        {src && (
+          <source 
+            src={src} 
+            type={getMimeType(src)}
+          />
+        )}
+        {/* Fallback for browsers that need direct src */}
+        {src && !src.toLowerCase().includes('.mkv') && (
+          <source src={src} />
+        )}
+      </video>
 
       <input
         ref={filePickerRef}
