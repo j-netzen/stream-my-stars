@@ -1315,7 +1315,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 </div>
               </Label>
               <div className="relative">
-                <Textarea
+                <Input
                   placeholder="magnet:?xt=urn:btih:... or https://..."
                   value={rdLink}
                   onChange={(e) => setRdLink(e.target.value)}
@@ -1326,7 +1326,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                       setShowRdDropdown(true);
                     }
                   }}
-                  className="min-h-[80px] font-mono text-sm"
+                  className="font-mono text-sm"
                 />
                 {/* Torrentio streams dropdown */}
                 {showTorrentioDropdown && torrentioResults.length > 0 && (
