@@ -70,6 +70,18 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [isSearchingTmdbForDebrid, setIsSearchingTmdbForDebrid] = useState(false);
   const [tmdbDebridResults, setTmdbDebridResults] = useState<TMDBSearchResult[]>([]);
   const [showTmdbDebridDropdown, setShowTmdbDebridDropdown] = useState(false);
+  const [selectedTmdbForDebrid, setSelectedTmdbForDebrid] = useState<{
+    tmdb_id: number;
+    poster_path: string | null;
+    backdrop_path: string | null;
+    release_date?: string;
+    rating?: number;
+    genres?: string[];
+    runtime?: number;
+    seasons?: number;
+    episodes?: number;
+    cast_members?: any;
+  } | null>(null);
 
   // TMDB search for Debrid tab
   const handleTmdbSearchForDebrid = async () => {
@@ -106,12 +118,33 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       setManualOverview(result.overview || "");
       setManualType(result.media_type === "movie" ? "movie" : result.media_type === "tv" ? "tv" : "custom");
       
+      // Store TMDB data for when adding media
+      setSelectedTmdbForDebrid({
+        tmdb_id: result.id,
+        poster_path: result.poster_path,
+        backdrop_path: result.backdrop_path,
+        release_date: result.release_date || result.first_air_date,
+        rating: result.vote_average,
+        genres: details?.genres?.map((g: any) => g.name) || [],
+        runtime: details?.runtime,
+        seasons: details?.number_of_seasons,
+        episodes: details?.number_of_episodes,
+        cast_members: details?.credits?.cast?.slice(0, 10) || [],
+      });
+      
       toast.success(`Loaded metadata for "${result.title || result.name}"`);
     } catch (error) {
       // Still use basic info if details fail
       setManualTitle(result.title || result.name || "");
       setManualOverview(result.overview || "");
       setManualType(result.media_type === "movie" ? "movie" : result.media_type === "tv" ? "tv" : "custom");
+      setSelectedTmdbForDebrid({
+        tmdb_id: result.id,
+        poster_path: result.poster_path,
+        backdrop_path: result.backdrop_path,
+        release_date: result.release_date || result.first_air_date,
+        rating: result.vote_average,
+      });
     }
   };
 
@@ -342,6 +375,19 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         source_url: streamUrl,
         category_id: selectedCategory || undefined,
         overview: manualOverview,
+        // Include TMDB metadata if available
+        ...(selectedTmdbForDebrid && {
+          tmdb_id: selectedTmdbForDebrid.tmdb_id,
+          poster_path: selectedTmdbForDebrid.poster_path,
+          backdrop_path: selectedTmdbForDebrid.backdrop_path,
+          release_date: selectedTmdbForDebrid.release_date,
+          rating: selectedTmdbForDebrid.rating,
+          genres: selectedTmdbForDebrid.genres,
+          runtime: selectedTmdbForDebrid.runtime,
+          seasons: selectedTmdbForDebrid.seasons,
+          episodes: selectedTmdbForDebrid.episodes,
+          cast_members: selectedTmdbForDebrid.cast_members,
+        }),
       };
 
       await addMedia.mutateAsync(input);
@@ -437,6 +483,9 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setRdProgress(0);
     setRdStatus(null);
     setShowRdDropdown(false);
+    setSelectedTmdbForDebrid(null);
+    setTmdbDebridResults([]);
+    setShowTmdbDebridDropdown(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
