@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download, Star, Calendar, Clock, X, Check, ListChecks } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
 import {
@@ -94,6 +95,16 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   // TV show episode selection
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
+  
+  // Batch episode queue
+  const [batchQueue, setBatchQueue] = useState<Array<{
+    season: number;
+    episode: number;
+    stream?: TorrentioStream;
+    status: "pending" | "searching" | "ready" | "error";
+  }>>([]);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [isBatchSearching, setIsBatchSearching] = useState(false);
 
   // TMDB search for Debrid tab
   const handleTmdbSearchForDebrid = async () => {
@@ -233,6 +244,126 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const handleSelectTorrentioStream = (stream: TorrentioStream) => {
     setRdLink(stream.url);
     setShowTorrentioDropdown(false);
+  };
+
+  // Add episode to batch queue
+  const addToBatchQueue = (season: number, episode: number) => {
+    const exists = batchQueue.some(q => q.season === season && q.episode === episode);
+    if (!exists) {
+      setBatchQueue(prev => [...prev, { season, episode, status: "pending" }]);
+    }
+  };
+
+  // Remove episode from batch queue
+  const removeFromBatchQueue = (season: number, episode: number) => {
+    setBatchQueue(prev => prev.filter(q => !(q.season === season && q.episode === episode)));
+  };
+
+  // Toggle episode in batch queue
+  const toggleBatchEpisode = (season: number, episode: number) => {
+    const exists = batchQueue.some(q => q.season === season && q.episode === episode);
+    if (exists) {
+      removeFromBatchQueue(season, episode);
+    } else {
+      addToBatchQueue(season, episode);
+    }
+  };
+
+  // Search streams for all queued episodes
+  const handleBatchSearch = async () => {
+    if (!selectedTmdbForDebrid || batchQueue.length === 0) return;
+    
+    setIsBatchSearching(true);
+    
+    let imdbId = selectedTmdbForDebrid.imdb_id;
+    if (!imdbId) {
+      imdbId = await getImdbIdFromTmdb(
+        selectedTmdbForDebrid.tmdb_id,
+        selectedTmdbForDebrid.media_type
+      ) || undefined;
+      
+      if (!imdbId) {
+        toast.error("Could not find IMDB ID");
+        setIsBatchSearching(false);
+        return;
+      }
+      setSelectedTmdbForDebrid(prev => prev ? { ...prev, imdb_id: imdbId } : null);
+    }
+
+    const updatedQueue = [...batchQueue];
+    
+    for (let i = 0; i < updatedQueue.length; i++) {
+      const item = updatedQueue[i];
+      updatedQueue[i] = { ...item, status: "searching" };
+      setBatchQueue([...updatedQueue]);
+      
+      try {
+        const streams = await searchTorrentio(imdbId!, "series", item.season, item.episode);
+        if (streams.length > 0) {
+          updatedQueue[i] = { ...item, stream: streams[0], status: "ready" };
+        } else {
+          updatedQueue[i] = { ...item, status: "error" };
+        }
+      } catch {
+        updatedQueue[i] = { ...item, status: "error" };
+      }
+      setBatchQueue([...updatedQueue]);
+    }
+    
+    const readyCount = updatedQueue.filter(q => q.status === "ready").length;
+    toast.success(`Found streams for ${readyCount}/${updatedQueue.length} episodes`);
+    setIsBatchSearching(false);
+  };
+
+  // Add all queued episodes to library
+  const handleBatchAdd = async () => {
+    const readyItems = batchQueue.filter(q => q.status === "ready" && q.stream);
+    if (readyItems.length === 0) {
+      toast.error("No episodes ready to add");
+      return;
+    }
+
+    setIsAdding(true);
+    let added = 0;
+
+    for (const item of readyItems) {
+      try {
+        const unrestricted = await unrestrictLink(item.stream!.url);
+        const episodeTitle = `${manualTitle} - S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
+        
+        const input: CreateMediaInput = {
+          title: episodeTitle,
+          media_type: "tv",
+          source_type: "url",
+          source_url: unrestricted.download,
+          category_id: selectedCategory || undefined,
+          overview: manualOverview,
+          ...(selectedTmdbForDebrid && {
+            tmdb_id: selectedTmdbForDebrid.tmdb_id,
+            poster_path: selectedTmdbForDebrid.poster_path,
+            backdrop_path: selectedTmdbForDebrid.backdrop_path,
+            release_date: selectedTmdbForDebrid.release_date,
+            rating: selectedTmdbForDebrid.rating,
+            genres: selectedTmdbForDebrid.genres,
+            seasons: selectedTmdbForDebrid.seasons,
+            episodes: selectedTmdbForDebrid.episodes,
+            cast_members: selectedTmdbForDebrid.cast_members,
+          }),
+        };
+
+        await addMedia.mutateAsync(input);
+        added++;
+      } catch (error) {
+        console.error(`Failed to add episode S${item.season}E${item.episode}:`, error);
+      }
+    }
+
+    toast.success(`Added ${added}/${readyItems.length} episodes to library`);
+    if (added > 0) {
+      resetForm();
+      onOpenChange(false);
+    }
+    setIsAdding(false);
   };
 
   const fetchRdItems = useCallback(async () => {
@@ -577,6 +708,8 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setShowTorrentioDropdown(false);
     setSelectedSeason(1);
     setSelectedEpisode(1);
+    setBatchQueue([]);
+    setIsBatchMode(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -892,6 +1025,87 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               </div>
             </div>
 
+            {/* TMDB Preview Card */}
+            {selectedTmdbForDebrid && (
+              <div className="relative flex gap-4 p-4 bg-secondary/30 border border-border rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTmdbForDebrid(null);
+                    setManualTitle("");
+                    setManualOverview("");
+                    setTorrentioResults([]);
+                    setBatchQueue([]);
+                  }}
+                  className="absolute top-2 right-2 p-1 hover:bg-accent rounded transition-colors"
+                  title="Clear selection"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                {selectedTmdbForDebrid.poster_path ? (
+                  <img
+                    src={getImageUrl(selectedTmdbForDebrid.poster_path, "w200") || ""}
+                    alt={manualTitle}
+                    className="w-20 h-28 object-cover rounded-md shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-28 bg-muted rounded-md flex items-center justify-center shrink-0">
+                    {selectedTmdbForDebrid.media_type === "movie" ? (
+                      <Film className="w-8 h-8 text-muted-foreground" />
+                    ) : (
+                      <Tv className="w-8 h-8 text-muted-foreground" />
+                    )}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-lg leading-tight truncate">{manualTitle}</h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      {selectedTmdbForDebrid.media_type === "movie" ? (
+                        <Film className="w-3 h-3" />
+                      ) : (
+                        <Tv className="w-3 h-3" />
+                      )}
+                      {selectedTmdbForDebrid.media_type === "movie" ? "Movie" : "TV Series"}
+                    </span>
+                    {selectedTmdbForDebrid.release_date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {selectedTmdbForDebrid.release_date.slice(0, 4)}
+                      </span>
+                    )}
+                    {selectedTmdbForDebrid.rating && selectedTmdbForDebrid.rating > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Star className="w-3 h-3 text-yellow-500" />
+                        {selectedTmdbForDebrid.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {selectedTmdbForDebrid.runtime && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {selectedTmdbForDebrid.runtime}m
+                      </span>
+                    )}
+                    {selectedTmdbForDebrid.seasons && (
+                      <span>{selectedTmdbForDebrid.seasons} season{selectedTmdbForDebrid.seasons > 1 ? "s" : ""}</span>
+                    )}
+                  </div>
+                  {selectedTmdbForDebrid.genres && selectedTmdbForDebrid.genres.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedTmdbForDebrid.genres.slice(0, 3).map((genre) => (
+                        <span key={genre} className="px-2 py-0.5 text-xs bg-primary/10 text-primary rounded-full">
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {manualOverview && (
+                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{manualOverview}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Type</Label>
               <Select value={manualType} onValueChange={(v) => setManualType(v as any)}>
@@ -908,47 +1122,163 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
             {/* Season/Episode picker for TV shows */}
             {selectedTmdbForDebrid?.media_type === "tv" && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Season</Label>
-                  <Select 
-                    value={selectedSeason.toString()} 
-                    onValueChange={(v) => {
-                      setSelectedSeason(parseInt(v));
-                      setSelectedEpisode(1);
-                      setTorrentioResults([]);
-                      setShowTorrentioDropdown(false);
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Episode Selection</Label>
+                  <Button
+                    type="button"
+                    variant={isBatchMode ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setIsBatchMode(!isBatchMode);
+                      if (!isBatchMode) {
+                        setBatchQueue([]);
+                      }
                     }}
+                    className="h-7 gap-1"
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: selectedTmdbForDebrid.seasons || 1 }, (_, i) => i + 1).map((s) => (
-                        <SelectItem key={s} value={s.toString()}>
-                          Season {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <ListChecks className="w-3 h-3" />
+                    <span className="text-xs">{isBatchMode ? "Single Mode" : "Batch Mode"}</span>
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Episode</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={selectedEpisode}
-                    onChange={(e) => {
-                      setSelectedEpisode(parseInt(e.target.value) || 1);
-                      setTorrentioResults([]);
-                      setShowTorrentioDropdown(false);
-                    }}
-                    placeholder="Episode number"
-                  />
-                </div>
+
+                {!isBatchMode ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Season</Label>
+                      <Select 
+                        value={selectedSeason.toString()} 
+                        onValueChange={(v) => {
+                          setSelectedSeason(parseInt(v));
+                          setSelectedEpisode(1);
+                          setTorrentioResults([]);
+                          setShowTorrentioDropdown(false);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: selectedTmdbForDebrid.seasons || 1 }, (_, i) => i + 1).map((s) => (
+                            <SelectItem key={s} value={s.toString()}>
+                              Season {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Episode</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={selectedEpisode}
+                        onChange={(e) => {
+                          setSelectedEpisode(parseInt(e.target.value) || 1);
+                          setTorrentioResults([]);
+                          setShowTorrentioDropdown(false);
+                        }}
+                        placeholder="Episode number"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Season</Label>
+                      <Select 
+                        value={selectedSeason.toString()} 
+                        onValueChange={(v) => setSelectedSeason(parseInt(v))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: selectedTmdbForDebrid.seasons || 1 }, (_, i) => i + 1).map((s) => (
+                            <SelectItem key={s} value={s.toString()}>
+                              Season {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Select Episodes</Label>
+                        <span className="text-xs text-muted-foreground">
+                          {batchQueue.filter(q => q.season === selectedSeason).length} selected
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2 p-3 bg-muted/30 rounded-lg max-h-32 overflow-y-auto">
+                        {Array.from({ length: 20 }, (_, i) => i + 1).map((ep) => {
+                          const isSelected = batchQueue.some(q => q.season === selectedSeason && q.episode === ep);
+                          const queueItem = batchQueue.find(q => q.season === selectedSeason && q.episode === ep);
+                          return (
+                            <button
+                              key={ep}
+                              type="button"
+                              onClick={() => toggleBatchEpisode(selectedSeason, ep)}
+                              className={`
+                                relative h-9 rounded-md text-sm font-medium transition-colors
+                                ${isSelected 
+                                  ? "bg-primary text-primary-foreground" 
+                                  : "bg-background hover:bg-accent border border-border"
+                                }
+                              `}
+                            >
+                              {ep}
+                              {queueItem?.status === "ready" && (
+                                <Check className="absolute top-0.5 right-0.5 w-3 h-3" />
+                              )}
+                              {queueItem?.status === "searching" && (
+                                <Loader2 className="absolute top-0.5 right-0.5 w-3 h-3 animate-spin" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {batchQueue.length > 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleBatchSearch}
+                          disabled={isBatchSearching}
+                          className="flex-1"
+                        >
+                          {isBatchSearching ? (
+                            <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Searching...</>
+                          ) : (
+                            <><Download className="w-3 h-3 mr-1" /> Find All Streams ({batchQueue.length})</>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={handleBatchAdd}
+                          disabled={isAdding || batchQueue.filter(q => q.status === "ready").length === 0}
+                          className="flex-1"
+                        >
+                          {isAdding ? (
+                            <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Adding...</>
+                          ) : (
+                            <><Zap className="w-3 h-3 mr-1" /> Add {batchQueue.filter(q => q.status === "ready").length} Ready</>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
+            {/* Hide single-item controls when in batch mode */}
+            {!isBatchMode && (
             <div className="space-y-2">
               <Label className="flex items-center justify-between">
                 <span>Magnet Link or Download URL *</span>
@@ -1082,6 +1412,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                     : "Supported: Magnet links, torrent URLs, or any link from supported hosters"}
               </p>
             </div>
+            )}
 
             <div className="space-y-2">
               <Label>Description (Optional)</Label>
