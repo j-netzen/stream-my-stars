@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
-import { unrestrictLink, addMagnetAndWait, getTorrentInfo } from "@/lib/realDebrid";
+import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +62,69 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [rdProgress, setRdProgress] = useState(0);
   const [rdStatus, setRdStatus] = useState<string | null>(null);
   const [isUnrestricting, setIsUnrestricting] = useState(false);
+  const [rdTorrents, setRdTorrents] = useState<RealDebridTorrent[]>([]);
+  const [rdDownloadsList, setRdDownloadsList] = useState<RealDebridUnrestrictedLink[]>([]);
+  const [filteredRdItems, setFilteredRdItems] = useState<{ label: string; value: string; type: "torrent" | "download" }[]>([]);
+  const [isLoadingRdItems, setIsLoadingRdItems] = useState(false);
+  const [showRdDropdown, setShowRdDropdown] = useState(false);
+
+  // Fetch Real-Debrid items when dialog opens
+  const fetchRdItems = useCallback(async () => {
+    setIsLoadingRdItems(true);
+    try {
+      const [torrents, downloads] = await Promise.all([
+        listTorrents().catch(() => []),
+        listDownloads().catch(() => [])
+      ]);
+      setRdTorrents(torrents);
+      setRdDownloadsList(downloads);
+    } catch (error) {
+      console.error("Failed to fetch Real-Debrid items:", error);
+    }
+    setIsLoadingRdItems(false);
+  }, []);
+
+  // Filter RD items based on title
+  useEffect(() => {
+    if (!manualTitle.trim()) {
+      setFilteredRdItems([]);
+      return;
+    }
+
+    const searchTerm = manualTitle.toLowerCase();
+    const items: { label: string; value: string; type: "torrent" | "download" }[] = [];
+
+    // Filter torrents - use first link from each torrent
+    rdTorrents
+      .filter(t => t.filename.toLowerCase().includes(searchTerm) && t.links.length > 0)
+      .forEach(t => {
+        items.push({
+          label: `[Torrent] ${t.filename}`,
+          value: t.links[0], // First link from torrent
+          type: "torrent"
+        });
+      });
+
+    // Filter downloads
+    rdDownloadsList
+      .filter(d => d.filename.toLowerCase().includes(searchTerm))
+      .forEach(d => {
+        items.push({
+          label: `[Download] ${d.filename}`,
+          value: d.link,
+          type: "download"
+        });
+      });
+
+    setFilteredRdItems(items);
+  }, [manualTitle, rdTorrents, rdDownloadsList]);
+
+  // Fetch RD items when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchRdItems();
+    }
+  }, [open, fetchRdItems]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -332,6 +395,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setRdLink("");
     setRdProgress(0);
     setRdStatus(null);
+    setShowRdDropdown(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -597,15 +661,40 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             </div>
 
             <div className="space-y-2">
-              <Label>Magnet Link or Download URL *</Label>
-              <Textarea
-                placeholder="magnet:?xt=urn:btih:... or https://..."
-                value={rdLink}
-                onChange={(e) => setRdLink(e.target.value)}
-                className="min-h-[80px] font-mono text-sm"
-              />
+              <Label className="flex items-center justify-between">
+                <span>Magnet Link or Download URL *</span>
+                {isLoadingRdItems && <Loader2 className="w-3 h-3 animate-spin" />}
+              </Label>
+              <div className="relative">
+                <Textarea
+                  placeholder="magnet:?xt=urn:btih:... or https://..."
+                  value={rdLink}
+                  onChange={(e) => setRdLink(e.target.value)}
+                  onFocus={() => setShowRdDropdown(true)}
+                  className="min-h-[80px] font-mono text-sm"
+                />
+                {showRdDropdown && filteredRdItems.length > 0 && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {filteredRdItems.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent truncate"
+                        onClick={() => {
+                          setRdLink(item.value);
+                          setShowRdDropdown(false);
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Supported: Magnet links, torrent URLs, or any link from supported hosters
+                {filteredRdItems.length > 0 
+                  ? `${filteredRdItems.length} matching Real-Debrid item(s) found - click to select`
+                  : "Supported: Magnet links, torrent URLs, or any link from supported hosters"}
               </p>
             </div>
 
