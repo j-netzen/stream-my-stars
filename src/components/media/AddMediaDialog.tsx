@@ -160,15 +160,18 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Store the file path for display (browser only gives us the filename for security)
+      // Store the file name for display
       setSelectedFileName(file.name);
+      // Create a blob URL for local playback
+      const blobUrl = URL.createObjectURL(file);
+      setSourceUrl(blobUrl);
       // Auto-fill the title if empty
       if (!manualTitle) {
         // Remove extension and clean up the filename for title
         const titleFromFile = file.name.replace(/\.[^/.]+$/, "").replace(/[._-]/g, " ");
         setManualTitle(titleFromFile);
       }
-      toast.info("File selected. Note: For local files to work, you may need to run a local media server or use a network path.");
+      toast.success("File ready for playback");
     }
   };
 
@@ -459,8 +462,14 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Select a video file from your computer
+                Select a video file from your computer for local streaming
               </p>
+            </div>
+
+            <div className="relative flex items-center gap-4 py-2">
+              <div className="flex-1 border-t border-border" />
+              <span className="text-xs text-muted-foreground">OR</span>
+              <div className="flex-1 border-t border-border" />
             </div>
 
             <div className="space-y-2">
