@@ -14,12 +14,23 @@ export interface TorrentioResult {
   streams: TorrentioStream[];
 }
 
+// Quality ranking for sorting (higher = better)
+const qualityRanking: Record<string, number> = {
+  "2160P": 100,
+  "4K": 100,
+  "1080P": 80,
+  "720P": 60,
+  "480P": 40,
+  "UNKNOWN": 20,
+};
+
 // Parse quality and size info from stream title
 export function parseStreamInfo(stream: TorrentioStream): {
   quality: string;
   size: string;
-  seeds?: string;
+  seeds?: number;
   source: string;
+  qualityRank: number;
 } {
   const title = stream.title || "";
   const name = stream.name || "";
@@ -32,26 +43,52 @@ export function parseStreamInfo(stream: TorrentioStream): {
   const sizeMatch = title.match(/(\d+\.?\d*\s*(GB|MB))/i);
   const size = sizeMatch ? sizeMatch[1] : "";
   
-  // Extract seeds if available
+  // Extract seeds if available (format: 👤 123 or Seeds: 123)
   const seedsMatch = title.match(/👤\s*(\d+)/);
-  const seeds = seedsMatch ? seedsMatch[1] : undefined;
+  const seeds = seedsMatch ? parseInt(seedsMatch[1], 10) : undefined;
   
   // Get source name from stream name (first line typically)
   const source = name.split("\n")[0] || "Unknown";
   
-  return { quality, size, seeds, source };
+  // Get quality rank for sorting
+  const qualityRank = qualityRanking[quality] || qualityRanking["UNKNOWN"];
+  
+  return { quality, size, seeds, source, qualityRank };
+}
+
+// Sort streams by quality (descending) then by seeds (descending)
+export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
+  return [...streams].sort((a, b) => {
+    const infoA = parseStreamInfo(a);
+    const infoB = parseStreamInfo(b);
+    
+    // First sort by quality
+    if (infoB.qualityRank !== infoA.qualityRank) {
+      return infoB.qualityRank - infoA.qualityRank;
+    }
+    
+    // Then by seeds (if available)
+    const seedsA = infoA.seeds || 0;
+    const seedsB = infoB.seeds || 0;
+    return seedsB - seedsA;
+  });
 }
 
 export async function searchTorrentio(
   imdbId: string,
-  type: "movie" | "series"
+  type: "movie" | "series",
+  season?: number,
+  episode?: number
 ): Promise<TorrentioStream[]> {
   const { data, error } = await supabase.functions.invoke("torrentio", {
-    body: { action: "search", imdbId, type },
+    body: { action: "search", imdbId, type, season, episode },
   });
 
   if (error) throw error;
-  return data.streams || [];
+  
+  // Sort streams by quality and seeds
+  const streams = data.streams || [];
+  return sortStreams(streams);
 }
 
 // Get IMDB ID from TMDB

@@ -90,6 +90,10 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [isSearchingTorrentio, setIsSearchingTorrentio] = useState(false);
   const [torrentioResults, setTorrentioResults] = useState<TorrentioStream[]>([]);
   const [showTorrentioDropdown, setShowTorrentioDropdown] = useState(false);
+  
+  // TV show episode selection
+  const [selectedSeason, setSelectedSeason] = useState<number>(1);
+  const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
 
   // TMDB search for Debrid tab
   const handleTmdbSearchForDebrid = async () => {
@@ -172,6 +176,12 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       return;
     }
 
+    // For TV shows, require season/episode selection
+    if (selectedTmdbForDebrid.media_type === "tv" && (!selectedSeason || !selectedEpisode)) {
+      toast.error("Please select a season and episode");
+      return;
+    }
+
     setIsSearchingTorrentio(true);
     setShowTorrentioDropdown(false);
     
@@ -196,14 +206,21 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       }
 
       const type = selectedTmdbForDebrid.media_type === "movie" ? "movie" : "series";
-      const streams = await searchTorrentio(imdbId, type);
+      
+      // For TV shows, pass season and episode
+      const streams = await searchTorrentio(
+        imdbId, 
+        type,
+        type === "series" ? selectedSeason : undefined,
+        type === "series" ? selectedEpisode : undefined
+      );
       
       if (streams.length === 0) {
         toast.info("No streams found for this title");
       } else {
         setTorrentioResults(streams);
         setShowTorrentioDropdown(true);
-        toast.success(`Found ${streams.length} stream(s)`);
+        toast.success(`Found ${streams.length} stream(s) - sorted by quality`);
       }
     } catch (error: any) {
       console.error("Torrentio search error:", error);
@@ -558,6 +575,8 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setShowTmdbDebridDropdown(false);
     setTorrentioResults([]);
     setShowTorrentioDropdown(false);
+    setSelectedSeason(1);
+    setSelectedEpisode(1);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -886,6 +905,49 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Season/Episode picker for TV shows */}
+            {selectedTmdbForDebrid?.media_type === "tv" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Season</Label>
+                  <Select 
+                    value={selectedSeason.toString()} 
+                    onValueChange={(v) => {
+                      setSelectedSeason(parseInt(v));
+                      setSelectedEpisode(1);
+                      setTorrentioResults([]);
+                      setShowTorrentioDropdown(false);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: selectedTmdbForDebrid.seasons || 1 }, (_, i) => i + 1).map((s) => (
+                        <SelectItem key={s} value={s.toString()}>
+                          Season {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Episode</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={selectedEpisode}
+                    onChange={(e) => {
+                      setSelectedEpisode(parseInt(e.target.value) || 1);
+                      setTorrentioResults([]);
+                      setShowTorrentioDropdown(false);
+                    }}
+                    placeholder="Episode number"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label className="flex items-center justify-between">

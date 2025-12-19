@@ -15,8 +15,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, imdbId, type } = await req.json();
-    console.log("Torrentio request:", { action, imdbId, type });
+    const { action, imdbId, type, season, episode } = await req.json();
+    console.log("Torrentio request:", { action, imdbId, type, season, episode });
 
     if (action === "search") {
       if (!imdbId || !type) {
@@ -29,17 +29,23 @@ serve(async (req) => {
       // Get Real-Debrid API key for authenticated streams
       const rdApiKey = Deno.env.get('REAL_DEBRID_API_KEY');
       
+      // Build the stream ID - for series, include season:episode
+      let streamId = imdbId;
+      if (type === "series" && season !== undefined && episode !== undefined) {
+        streamId = `${imdbId}:${season}:${episode}`;
+      }
+      
       // Build Torrentio URL with Real-Debrid provider if available
       let torrentioUrl: string;
       if (rdApiKey) {
         // Use realdebrid provider for direct streaming links
-        torrentioUrl = `${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${imdbId}.json`;
+        torrentioUrl = `${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`;
       } else {
         // Fallback to regular torrents (magnet links)
-        torrentioUrl = `${TORRENTIO_BASE}/stream/${type}/${imdbId}.json`;
+        torrentioUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
       }
 
-      console.log("Fetching from Torrentio...");
+      console.log("Fetching from Torrentio:", torrentioUrl.replace(rdApiKey || '', '***'));
       const response = await fetch(torrentioUrl);
       
       if (!response.ok) {
