@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
 import {
@@ -663,7 +663,19 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             <div className="space-y-2">
               <Label className="flex items-center justify-between">
                 <span>Magnet Link or Download URL *</span>
-                {isLoadingRdItems && <Loader2 className="w-3 h-3 animate-spin" />}
+                <button
+                  type="button"
+                  onClick={() => fetchRdItems()}
+                  disabled={isLoadingRdItems}
+                  className="p-1 hover:bg-accent rounded transition-colors disabled:opacity-50"
+                  title="Refresh Real-Debrid items"
+                >
+                  {isLoadingRdItems ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3" />
+                  )}
+                </button>
               </Label>
               <div className="relative">
                 <Textarea
