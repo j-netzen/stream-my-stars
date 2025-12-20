@@ -52,6 +52,12 @@ serve(async (req) => {
         url = `${TMDB_BASE_URL}/${endpoint}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
         break;
       }
+      case "get_videos": {
+        // Get videos (trailers, teasers, etc.)
+        const endpoint = media_type === "movie" ? "movie" : "tv";
+        url = `${TMDB_BASE_URL}/${endpoint}/${id}/videos?api_key=${TMDB_API_KEY}`;
+        break;
+      }
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action" }),
