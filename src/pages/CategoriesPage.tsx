@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { FolderOpen, Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
+import { FolderOpen, Plus, Trash2, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -75,9 +75,12 @@ export default function CategoriesPage() {
   };
 
   const selectedCategoryData = categories.find((c) => c.id === selectedCategory);
-  const categoryMedia = selectedCategory
-    ? media.filter((m) => m.category_id === selectedCategory)
-    : [];
+  const uncategorizedMedia = media.filter((m) => !m.category_id);
+  const categoryMedia = selectedCategory === "uncategorized"
+    ? uncategorizedMedia
+    : selectedCategory
+      ? media.filter((m) => m.category_id === selectedCategory)
+      : [];
 
   if (isLoading) {
     return (
@@ -158,7 +161,29 @@ export default function CategoriesPage() {
       <div className="flex gap-6">
         {/* Categories List */}
         <div className="w-64 flex-shrink-0 space-y-2">
-          {categories.length === 0 ? (
+          {/* Uncategorized filter */}
+          {uncategorizedMedia.length > 0 && (
+            <button
+              onClick={() => setSelectedCategory("uncategorized")}
+              className={`w-full p-3 rounded-lg text-left transition-colors ${
+                selectedCategory === "uncategorized"
+                  ? "bg-amber-500/20 border border-amber-500"
+                  : "bg-amber-500/10 hover:bg-amber-500/20"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <div>
+                  <p className="font-medium text-amber-600 dark:text-amber-400">Uncategorized</p>
+                  <p className="text-xs text-muted-foreground">
+                    {uncategorizedMedia.length} items need categorization
+                  </p>
+                </div>
+              </div>
+            </button>
+          )}
+          
+          {categories.length === 0 && uncategorizedMedia.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FolderOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No categories yet</p>
@@ -203,7 +228,31 @@ export default function CategoriesPage() {
 
         {/* Category Content */}
         <div className="flex-1">
-          {selectedCategory && selectedCategoryData ? (
+          {selectedCategory === "uncategorized" ? (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400">Uncategorized Media</h2>
+              <p className="text-sm text-muted-foreground">
+                These items don't have genres or weren't auto-categorized. Click "Update Categories" to categorize them based on their genres.
+              </p>
+              {uncategorizedMedia.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {uncategorizedMedia.map((item) => (
+                    <MediaCard
+                      key={item.id}
+                      media={item}
+                      progress={progress.find((p) => p.media_id === item.id)}
+                      onPlay={setActiveMedia}
+                      onDelete={(m) => deleteMedia.mutate(m.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>All media has been categorized!</p>
+                </div>
+              )}
+            </div>
+          ) : selectedCategory && selectedCategoryData ? (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">{selectedCategoryData.name}</h2>
               {categoryMedia.length > 0 ? (
