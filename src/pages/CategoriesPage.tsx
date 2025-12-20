@@ -14,10 +14,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { FolderOpen, Plus, Trash2, Loader2 } from "lucide-react";
+import { FolderOpen, Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function CategoriesPage() {
+  const queryClient = useQueryClient();
   const { categories, isLoading, addCategory, deleteCategory } = useCategories();
   const { media, deleteMedia } = useMedia();
   const { progress } = useWatchProgress();
@@ -26,6 +29,34 @@ export default function CategoriesPage() {
   const [newCategoryDesc, setNewCategoryDesc] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isUpdatingCategories, setIsUpdatingCategories] = useState(false);
+
+  const handleUpdateCategories = async () => {
+    setIsUpdatingCategories(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("categorize-media");
+      
+      if (error) {
+        throw error;
+      }
+
+      const result = data as { categorized: number; newCategories: number; message: string };
+      
+      if (result.categorized > 0) {
+        toast.success(`Categorized ${result.categorized} media items${result.newCategories > 0 ? `, created ${result.newCategories} new categories` : ""}`);
+        // Refetch data to show updates
+        queryClient.invalidateQueries({ queryKey: ["media"] });
+        queryClient.invalidateQueries({ queryKey: ["categories"] });
+      } else {
+        toast.info("All media is already categorized");
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Error updating categories:", errorMessage);
+      toast.error("Failed to update categories");
+    }
+    setIsUpdatingCategories(false);
+  };
 
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -72,40 +103,56 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              New Category
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Category</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  placeholder="e.g., 80s Classics"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description (optional)</Label>
-                <Input
-                  placeholder="Enter a description"
-                  value={newCategoryDesc}
-                  onChange={(e) => setNewCategoryDesc(e.target.value)}
-                />
-              </div>
-              <Button onClick={handleCreateCategory} className="w-full">
-                Create Category
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleUpdateCategories}
+            disabled={isUpdatingCategories}
+          >
+            {isUpdatingCategories ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Update Categories
+          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Category
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Category</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Name</Label>
+                  <Input
+                    placeholder="e.g., 80s Classics"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description (optional)</Label>
+                  <Input
+                    placeholder="Enter a description"
+                    value={newCategoryDesc}
+                    onChange={(e) => setNewCategoryDesc(e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleCreateCategory} className="w-full">
+                  Create Category
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="flex gap-6">
