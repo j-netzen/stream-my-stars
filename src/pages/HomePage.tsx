@@ -4,6 +4,7 @@ import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useCategories } from "@/hooks/useCategories";
 import { MediaRow } from "@/components/media/MediaRow";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info, Loader2 } from "lucide-react";
@@ -13,6 +14,7 @@ export default function HomePage() {
   const { progress, getContinueWatching } = useWatchProgress();
   const { categories } = useCategories();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
+  const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
 
   const continueWatching = getContinueWatching();
   const continueWatchingMedia = media.filter((m) =>
@@ -82,7 +84,12 @@ export default function HomePage() {
                   <Play className="w-5 h-5 fill-current" />
                   Play
                 </Button>
-                <Button size="lg" variant="secondary" className="gap-2">
+                <Button 
+                  size="lg" 
+                  variant="secondary" 
+                  className="gap-2"
+                  onClick={() => setDetailsMedia(featured)}
+                >
                   <Info className="w-5 h-5" />
                   More Info
                 </Button>
@@ -166,6 +173,14 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Media Details Dialog */}
+      <MediaDetailsDialog
+        media={detailsMedia}
+        open={!!detailsMedia}
+        onOpenChange={(open) => !open && setDetailsMedia(null)}
+        onPlay={handlePlay}
+      />
 
       {/* Video Player */}
       {activeMedia && (
