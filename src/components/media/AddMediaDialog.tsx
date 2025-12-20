@@ -798,19 +798,19 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           <DialogTitle className="text-xl">Add Media</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="tmdb" className="w-full">
+        <Tabs defaultValue="debrid" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="tmdb" className="gap-2">
-              <Search className="w-4 h-4" />
-              TMDB
+            <TabsTrigger value="debrid" className="gap-2">
+              <Zap className="w-4 h-4" />
+              Debrid
             </TabsTrigger>
             <TabsTrigger value="manual" className="gap-2">
               <LinkIcon className="w-4 h-4" />
               URL
             </TabsTrigger>
-            <TabsTrigger value="debrid" className="gap-2">
-              <Zap className="w-4 h-4" />
-              Debrid
+            <TabsTrigger value="tmdb" className="gap-2">
+              <Search className="w-4 h-4" />
+              TMDB
             </TabsTrigger>
             <TabsTrigger value="network" className="gap-2">
               <FolderOpen className="w-4 h-4" />
