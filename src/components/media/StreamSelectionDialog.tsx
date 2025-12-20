@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -48,18 +48,39 @@ export function StreamSelectionDialog({
   const [resolveStatus, setResolveStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [qualityFilter, setQualityFilter] = useState<string>("all");
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Auto-focus first stream when list loads
+  // Filter streams based on quality selection
+  const filteredStreams = streams.filter((stream) => {
+    if (qualityFilter === "all") return true;
+    const info = parseStreamInfo(stream);
+    const quality = info.quality?.toLowerCase() || "";
+    
+    switch (qualityFilter) {
+      case "4k":
+        return quality.includes("2160") || quality.includes("4k");
+      case "1080p":
+        return quality.includes("1080");
+      case "720p":
+        return quality.includes("720");
+      case "480p":
+        return quality.includes("480") || quality.includes("sd");
+      default:
+        return true;
+    }
+  });
+
+  // Auto-focus first stream when list loads or filter changes
   useEffect(() => {
-    if (streams.length > 0 && !isSearching) {
+    if (filteredStreams.length > 0 && !isSearching) {
       setFocusedIndex(0);
       // Focus the first stream button for TV navigation
       setTimeout(() => {
         streamButtonsRef.current[0]?.focus();
       }, 100);
     }
-  }, [streams, isSearching]);
+  }, [filteredStreams.length, isSearching, qualityFilter]);
 
   // Keyboard navigation for TV remotes
   const handleKeyDown = (e: React.KeyboardEvent, index: number, stream: TorrentioStream) => {
@@ -68,7 +89,7 @@ export function StreamSelectionDialog({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        const nextIndex = Math.min(index + 1, streams.length - 1);
+        const nextIndex = Math.min(index + 1, filteredStreams.length - 1);
         setFocusedIndex(nextIndex);
         streamButtonsRef.current[nextIndex]?.focus();
         break;
@@ -93,6 +114,7 @@ export function StreamSelectionDialog({
       setError(null);
       setSelectedSeason(1);
       setSelectedEpisode(1);
+      setQualityFilter("all");
       // Auto-search when dialog opens
       handleSearch();
     }
@@ -369,13 +391,38 @@ export function StreamSelectionDialog({
             "flex-1 overflow-y-auto min-h-0",
             isTVMode ? "space-y-3" : "space-y-2"
           )}>
-            <p className={cn(
-              "text-muted-foreground mb-2",
-              isTVMode ? "text-base" : "text-xs"
-            )}>
-              {streams.length} stream(s) found - use ↑↓ arrows to navigate, Enter to select
-            </p>
-            {streams.map((stream, index) => {
+            {/* Quality filter and count */}
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className={cn(
+                "text-muted-foreground",
+                isTVMode ? "text-base" : "text-xs"
+              )}>
+                {filteredStreams.length} of {streams.length} stream(s)
+              </p>
+              <div className="flex items-center gap-2">
+                <Filter className="w-3 h-3 text-muted-foreground" />
+                <Select value={qualityFilter} onValueChange={setQualityFilter}>
+                  <SelectTrigger className={cn("w-[100px]", isTVMode ? "h-10" : "h-8")}>
+                    <SelectValue placeholder="Quality" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="4k">4K</SelectItem>
+                    <SelectItem value="1080p">1080p</SelectItem>
+                    <SelectItem value="720p">720p</SelectItem>
+                    <SelectItem value="480p">480p/SD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {filteredStreams.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No streams match the selected quality filter.
+              </p>
+            )}
+            
+            {filteredStreams.map((stream, index) => {
               const info = parseStreamInfo(stream);
               const isCurrentlyResolving = resolvingStream === stream.url;
               const isFocused = focusedIndex === index;
