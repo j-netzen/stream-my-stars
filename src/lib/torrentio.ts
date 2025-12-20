@@ -26,6 +26,12 @@ const qualityRanking: Record<string, number> = {
 
 // Check if URL is already a direct Real-Debrid download link or cached debrid link
 export function isDirectRdLink(url: string): boolean {
+  // NEVER treat Torrentio resolve URLs as direct - they need to be resolved first
+  if (url.includes("torrentio.strem.fun/resolve/") || 
+      url.includes("torrentio.strem.fun/stream/")) {
+    return false;
+  }
+  
   // Common Real-Debrid direct download patterns
   if (url.includes("real-debrid.com/d/") || 
       url.includes("rdb.so/") ||
@@ -43,6 +49,11 @@ export function isDirectRdLink(url: string): boolean {
   
   // Check for direct HTTP video file links (already unrestricted)
   // These are typically .mkv, .mp4, etc. on CDN domains
+  // But exclude any strem.fun URLs as those need resolution
+  if (url.includes("strem.fun")) {
+    return false;
+  }
+  
   const videoExtensions = ['.mkv', '.mp4', '.avi', '.m4v', '.webm'];
   const isVideoFile = videoExtensions.some(ext => url.toLowerCase().includes(ext));
   const isHttps = url.startsWith('https://');
