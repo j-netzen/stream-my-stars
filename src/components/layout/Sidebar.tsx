@@ -68,7 +68,7 @@ export function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const { signOut } = useAuth();
-  const { status: rdStatus, user: rdUser } = useRealDebridStatus();
+  const { status: rdStatus, user: rdUser, refresh: refreshRdStatus } = useRealDebridStatus();
   
   // Load saved order from localStorage
   const [navItems, setNavItems] = useState<NavItemData[]>(() => {
@@ -302,9 +302,11 @@ export function Sidebar({
           {collapsed && !mobileOpen ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div
+                <button
+                  onClick={refreshRdStatus}
+                  disabled={rdStatus === "loading"}
                   className={cn(
-                    "flex items-center justify-center px-2 py-2 rounded-lg text-sm",
+                    "flex items-center justify-center px-2 py-2 rounded-lg text-sm transition-colors hover:bg-secondary/50",
                     rdStatus === "connected" && "text-green-500",
                     rdStatus === "disconnected" && "text-yellow-500",
                     rdStatus === "error" && "text-destructive",
@@ -315,36 +317,43 @@ export function Sidebar({
                   {rdStatus === "connected" && <Cloud className="w-4 h-4" />}
                   {rdStatus === "disconnected" && <CloudOff className="w-4 h-4" />}
                   {rdStatus === "error" && <AlertCircle className="w-4 h-4" />}
-                </div>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="right">
                 {rdStatus === "loading" && "Checking Real-Debrid..."}
-                {rdStatus === "connected" && `Real-Debrid: ${rdUser?.username || "Connected"}`}
-                {rdStatus === "disconnected" && "Real-Debrid: No Premium"}
-                {rdStatus === "error" && "Real-Debrid: Connection Error"}
+                {rdStatus === "connected" && `Real-Debrid: ${rdUser?.username || "Connected"} (Click to refresh)`}
+                {rdStatus === "disconnected" && "Real-Debrid: No Premium (Click to refresh)"}
+                {rdStatus === "error" && "Real-Debrid: Connection Error (Click to retry)"}
               </TooltipContent>
             </Tooltip>
           ) : (
-            <div
+            <button
+              onClick={refreshRdStatus}
+              disabled={rdStatus === "loading"}
               className={cn(
-                "flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-medium",
-                rdStatus === "connected" && "text-green-500 bg-green-500/10",
-                rdStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10",
-                rdStatus === "error" && "text-destructive bg-destructive/10",
+                "w-full flex items-center justify-between gap-3 px-4 py-2 rounded-lg text-xs font-medium transition-colors",
+                rdStatus === "connected" && "text-green-500 bg-green-500/10 hover:bg-green-500/20",
+                rdStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20",
+                rdStatus === "error" && "text-destructive bg-destructive/10 hover:bg-destructive/20",
                 rdStatus === "loading" && "text-muted-foreground bg-secondary/50"
               )}
             >
-              {rdStatus === "loading" && <Loader2 className="w-4 h-4 animate-spin" />}
-              {rdStatus === "connected" && <Cloud className="w-4 h-4" />}
-              {rdStatus === "disconnected" && <CloudOff className="w-4 h-4" />}
-              {rdStatus === "error" && <AlertCircle className="w-4 h-4" />}
-              <span>
-                {rdStatus === "loading" && "Checking RD..."}
-                {rdStatus === "connected" && `RD: ${rdUser?.username || "Connected"}`}
-                {rdStatus === "disconnected" && "RD: No Premium"}
-                {rdStatus === "error" && "RD: Error"}
-              </span>
-            </div>
+              <div className="flex items-center gap-3">
+                {rdStatus === "loading" && <Loader2 className="w-4 h-4 animate-spin" />}
+                {rdStatus === "connected" && <Cloud className="w-4 h-4" />}
+                {rdStatus === "disconnected" && <CloudOff className="w-4 h-4" />}
+                {rdStatus === "error" && <AlertCircle className="w-4 h-4" />}
+                <span>
+                  {rdStatus === "loading" && "Checking RD..."}
+                  {rdStatus === "connected" && `RD: ${rdUser?.username || "Connected"}`}
+                  {rdStatus === "disconnected" && "RD: No Premium"}
+                  {rdStatus === "error" && "RD: Error"}
+                </span>
+              </div>
+              {rdStatus !== "loading" && (
+                <span className="text-[10px] opacity-60">Refresh</span>
+              )}
+            </button>
           )}
           
           {/* Settings - not reorderable */}
