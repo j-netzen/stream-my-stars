@@ -14,6 +14,7 @@ import {
   SkipForward,
   X,
   Loader2,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -544,6 +545,22 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Copy URL for external players */}
+              {src && !src.startsWith('blob:') && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(src);
+                    toast.success("Stream URL copied! Paste in VLC or another player.");
+                  }}
+                  className="text-white hover:bg-white/20"
+                  title="Copy stream URL for VLC"
+                >
+                  <Copy className="w-5 h-5" />
+                </Button>
+              )}
+
               {/* Volume */}
               <div className="flex items-center gap-2">
                 <Button
