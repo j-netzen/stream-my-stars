@@ -139,6 +139,7 @@ export default function HomePage() {
             title="Movies"
             media={movies}
             progress={progress}
+            showContinue={false}
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
@@ -163,6 +164,7 @@ export default function HomePage() {
             title="Recently Added"
             media={recentlyAdded}
             progress={progress}
+            showContinue={false}
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
@@ -175,6 +177,7 @@ export default function HomePage() {
             title="TV Shows"
             media={tvShows}
             progress={progress}
+            showContinue={false}
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
@@ -194,6 +197,7 @@ export default function HomePage() {
               title={category.name}
               media={categoryMedia}
               progress={progress}
+              showContinue={false}
               onPlay={handlePlay}
               onDelete={handleDelete}
               onMoreInfo={setDetailsMedia}
