@@ -101,6 +101,17 @@ export default function HomePage() {
 
       {/* Content Rows */}
       <div className="space-y-8 pb-12 mt-4 md:-mt-24 relative z-10">
+        {movies.length > 0 && (
+          <MediaRow
+            title="Movies"
+            media={movies}
+            progress={progress}
+            onPlay={handlePlay}
+            onDelete={handleDelete}
+            onMoreInfo={setDetailsMedia}
+          />
+        )}
+
         {continueWatchingMedia.length > 0 && (
           <MediaRow
             title="Continue Watching"
@@ -116,17 +127,6 @@ export default function HomePage() {
           <MediaRow
             title="Recently Added"
             media={recentlyAdded}
-            progress={progress}
-            onPlay={handlePlay}
-            onDelete={handleDelete}
-            onMoreInfo={setDetailsMedia}
-          />
-        )}
-
-        {movies.length > 0 && (
-          <MediaRow
-            title="Movies"
-            media={movies}
             progress={progress}
             onPlay={handlePlay}
             onDelete={handleDelete}
