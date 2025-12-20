@@ -144,20 +144,6 @@ export function MediaCard({
           </DropdownMenu>
         )}
 
-        {/* Media Type Badge */}
-        <div
-          className={cn(
-            "absolute top-2 left-2 px-2 py-1 rounded font-medium uppercase",
-            isTVMode ? "text-sm px-3 py-1.5" : "text-xs",
-            media.media_type === "movie"
-              ? "bg-blue-500/80"
-              : media.media_type === "tv"
-              ? "bg-green-500/80"
-              : "bg-orange-500/80"
-          )}
-        >
-          {media.media_type}
-        </div>
       </div>
 
       {/* Info */}
