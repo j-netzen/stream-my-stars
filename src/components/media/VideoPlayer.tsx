@@ -1,10 +1,21 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import Artplayer from "artplayer";
 import { Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { X, Loader2 } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
+  SkipBack,
+  SkipForward,
+  X,
+  Loader2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   getFileHandle,
@@ -22,19 +33,29 @@ interface VideoPlayerProps {
 }
 
 export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const artRef = useRef<Artplayer | null>(null);
   const { progress, isLoading: progressLoading, updateProgress } = useWatchProgress();
 
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [isRestoringHandle, setIsRestoringHandle] = useState(false);
-  const [src, setSrc] = useState("");
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
+  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const filePickerRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const restoredMediaIdRef = useRef<string | null>(null);
-  const filePickerRef = useRef<HTMLInputElement>(null);
+
+  const [src, setSrc] = useState("");
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   // Attempt to restore file handle on mount or media change
   useEffect(() => {
@@ -81,7 +102,11 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
+    setIsPlaying(false);
+    setIsBuffering(false);
+    setDuration(0);
     durationRef.current = 0;
+    setCurrentTime(0);
     currentTimeRef.current = 0;
     restoredMediaIdRef.current = null;
 
@@ -92,17 +117,37 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     };
   }, [media.id, media.source_url]);
 
-  // Cleanup object URLs on unmount
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
 
-  // Save progress callback
+  // Load saved progress (once per media)
+  useEffect(() => {
+    if (progressLoading) return;
+    if (restoredMediaIdRef.current === media.id) return;
+
+    const savedProgress = progress.find(
+      (p) =>
+        p.media_id === media.id &&
+        p.episode_number === null &&
+        p.season_number === null
+    );
+
+    if (savedProgress && videoRef.current) {
+      const t = savedProgress.progress_seconds ?? 0;
+      videoRef.current.currentTime = t;
+      currentTimeRef.current = t;
+      setCurrentTime(t);
+    }
+
+    restoredMediaIdRef.current = media.id;
+  }, [media.id, progress, progressLoading]);
+
   const saveProgressNow = useCallback(() => {
     const d = durationRef.current;
-    if (d <= 0) return;
+    if (!videoRef.current || d <= 0) return;
 
     const t = currentTimeRef.current;
     updateProgress.mutate({
@@ -111,183 +156,25 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       durationSeconds: d,
       completed: t / d > 0.95,
     });
-  }, [media.id, updateProgress]);
+  }, [media.id, updateProgress.mutate]);
 
-  // Keep the latest callback in a ref
+  // Keep the latest callback in a ref so effects don't re-run every render
   const saveProgressNowRef = useRef(saveProgressNow);
   useEffect(() => {
     saveProgressNowRef.current = saveProgressNow;
   }, [saveProgressNow]);
 
-  // Periodic save
   useEffect(() => {
     const interval = window.setInterval(() => saveProgressNowRef.current(), 10000);
     return () => window.clearInterval(interval);
   }, []);
 
-  // Save on unmount
+  // Save on unmount only
   useEffect(() => {
     return () => {
       saveProgressNowRef.current();
     };
   }, []);
-
-  // Initialize ArtPlayer when src changes
-  useEffect(() => {
-    if (!containerRef.current || !src) return;
-
-    // Destroy previous instance
-    if (artRef.current) {
-      artRef.current.destroy();
-      artRef.current = null;
-    }
-
-    const backdropUrl = media.backdrop_path
-      ? getImageUrl(media.backdrop_path, "original")
-      : undefined;
-
-    // Determine video type for better handling
-    const getVideoType = (url: string): string => {
-      const lowerUrl = url.toLowerCase();
-      if (lowerUrl.includes('.mkv')) return 'video/x-matroska';
-      if (lowerUrl.includes('.avi')) return 'video/x-msvideo';
-      if (lowerUrl.includes('.webm')) return 'video/webm';
-      if (lowerUrl.includes('.mov')) return 'video/quicktime';
-      if (lowerUrl.includes('.m4v')) return 'video/mp4';
-      if (lowerUrl.includes('.flv')) return 'video/x-flv';
-      if (lowerUrl.includes('.wmv')) return 'video/x-ms-wmv';
-      return 'video/mp4';
-    };
-
-    try {
-      const art = new Artplayer({
-        container: containerRef.current,
-        url: src,
-        type: getVideoType(src),
-        poster: backdropUrl,
-        volume: 1,
-        isLive: false,
-        muted: false,
-        autoplay: false,
-        pip: true,
-        autoSize: false,
-        autoMini: false,
-        screenshot: true,
-        setting: true,
-        loop: false,
-        flip: true,
-        playbackRate: true,
-        aspectRatio: true,
-        fullscreen: true,
-        fullscreenWeb: true,
-        subtitleOffset: false,
-        miniProgressBar: true,
-        mutex: true,
-        backdrop: true,
-        playsInline: true,
-        autoPlayback: true, // Remember playback position
-        airplay: true,
-        theme: 'hsl(var(--primary))',
-        lang: 'en',
-        moreVideoAttr: {
-          crossOrigin: 'anonymous',
-          playsInline: true,
-        },
-        settings: [
-          {
-            html: 'Playback Speed',
-            selector: [
-              { html: '0.5x', value: 0.5 },
-              { html: '0.75x', value: 0.75 },
-              { html: 'Normal', value: 1, default: true },
-              { html: '1.25x', value: 1.25 },
-              { html: '1.5x', value: 1.5 },
-              { html: '2x', value: 2 },
-            ],
-            onSelect: function (item) {
-              art.playbackRate = item.value as number;
-              return item.html;
-            },
-          },
-        ],
-        controls: [
-          {
-            name: 'fast-rewind',
-            position: 'left',
-            html: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>',
-            tooltip: 'Rewind 10s',
-            click: function () {
-              art.seek = art.currentTime - 10;
-            },
-          },
-          {
-            name: 'fast-forward',
-            position: 'left',
-            html: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>',
-            tooltip: 'Forward 10s',
-            click: function () {
-              art.seek = art.currentTime + 10;
-            },
-          },
-        ],
-      });
-
-      art.on('video:timeupdate', () => {
-        currentTimeRef.current = art.currentTime;
-        durationRef.current = art.duration;
-      });
-
-      art.on('ready', () => {
-        durationRef.current = art.duration;
-        
-        // Restore saved progress
-        if (!progressLoading && restoredMediaIdRef.current !== media.id) {
-          const savedProgress = progress.find(
-            (p) =>
-              p.media_id === media.id &&
-              p.episode_number === null &&
-              p.season_number === null
-          );
-
-          if (savedProgress && savedProgress.progress_seconds) {
-            art.seek = savedProgress.progress_seconds;
-            currentTimeRef.current = savedProgress.progress_seconds;
-          }
-
-          restoredMediaIdRef.current = media.id;
-        }
-      });
-
-      art.on('error', () => {
-        const isMkv = src.toLowerCase().includes('.mkv');
-        const isAvi = src.toLowerCase().includes('.avi');
-        
-        let message: string;
-        if (isMkv || isAvi) {
-          message = `${isMkv ? 'MKV' : 'AVI'} playback failed. Your browser may not support the video codec. Try Chrome/Edge, or consider transcoding the file.`;
-        } else {
-          message = "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
-        }
-        
-        setPlaybackError(message);
-        toast.error(message);
-      });
-
-      artRef.current = art;
-    } catch (err) {
-      console.error('ArtPlayer initialization error:', err);
-      setPlaybackError("Failed to initialize video player.");
-      toast.error("Failed to initialize video player.");
-    }
-
-    return () => {
-      if (artRef.current) {
-        saveProgressNowRef.current();
-        artRef.current.destroy();
-        artRef.current = null;
-      }
-    };
-  }, [src, media.id, media.title, media.backdrop_path, progress, progressLoading]);
 
   const openFilePicker = async () => {
     // Try File System Access API first for persistence
@@ -298,7 +185,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
           types: [
             {
               description: "Video Files",
-              accept: { "video/*": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v", ".flv", ".wmv"] },
+              accept: { "video/*": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"] },
             },
           ],
           multiple: false,
@@ -316,6 +203,10 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         setSrc(url);
         setPlaybackError(null);
         toast.success("File loaded – will persist across refresh");
+
+        requestAnimationFrame(() => {
+          videoRef.current?.play().catch(() => {});
+        });
         return;
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -339,7 +230,149 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     setSrc(url);
     setPlaybackError(null);
     toast.info("File loaded (won't persist after refresh)");
+
+    requestAnimationFrame(() => {
+      videoRef.current?.play().catch(() => {});
+    });
   };
+
+  const handleVideoError = () => {
+    const raw = src || media.source_url || "";
+    const isBlob = raw.startsWith("blob:");
+    const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\/.test(raw);
+    const isLocalMarker = raw === LOCAL_FILE_MARKER;
+    const isMkvFile = raw.toLowerCase().includes('.mkv');
+
+    let message: string;
+    if (isLocalMarker) {
+      message = "Local file handle not found. Please re-select the file.";
+    } else if (isBlob) {
+      message = "This looks like a temporary local-file link. Please re-select the video file to play.";
+    } else if (looksLikePath) {
+      message = "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL.";
+    } else if (isMkvFile) {
+      message = "MKV playback failed. Your browser may not support the video codec. Try using Chrome, Edge, or a different browser.";
+    } else {
+      message = "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
+    }
+
+    setPlaybackError(message);
+    toast.error(message);
+  };
+
+  const handlePlayPause = () => {
+    if (!videoRef.current) return;
+
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    const p = videoRef.current.play();
+    if (p) {
+      p.then(() => setIsPlaying(true)).catch(() => handleVideoError());
+    } else {
+      setIsPlaying(true);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current) return;
+    const t = videoRef.current.currentTime;
+    currentTimeRef.current = t;
+    setCurrentTime(t);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      const d = Number.isFinite(videoRef.current.duration)
+        ? videoRef.current.duration
+        : 0;
+      durationRef.current = d;
+      setDuration(d);
+    }
+  };
+
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = parseFloat(e.target.value);
+    if (videoRef.current) {
+      videoRef.current.currentTime = t;
+    }
+    currentTimeRef.current = t;
+    setCurrentTime(t);
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    if (videoRef.current) {
+      videoRef.current.volume = v;
+    }
+    setVolume(v);
+    setIsMuted(v === 0);
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      await containerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      await document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const skipTime = (seconds: number) => {
+    if (videoRef.current) {
+      videoRef.current.currentTime += seconds;
+    }
+  };
+
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) setShowControls(false);
+    }, 3000);
+  };
+
+  // Get MIME type based on file extension for better codec handling
+  const getMimeType = (url: string): string => {
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('.mkv')) return 'video/x-matroska';
+    if (lowerUrl.includes('.webm')) return 'video/webm';
+    if (lowerUrl.includes('.mp4')) return 'video/mp4';
+    if (lowerUrl.includes('.m4v')) return 'video/mp4';
+    if (lowerUrl.includes('.mov')) return 'video/quicktime';
+    if (lowerUrl.includes('.avi')) return 'video/x-msvideo';
+    if (lowerUrl.includes('.ogv')) return 'video/ogg';
+    return 'video/mp4'; // Default fallback
+  };
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    }
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const backdropUrl = media.backdrop_path
+    ? getImageUrl(media.backdrop_path, "original")
+    : null;
 
   // Show loading state while restoring file handle
   if (isRestoringHandle) {
@@ -354,47 +387,50 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
-      {/* Close button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => {
-          saveProgressNowRef.current();
-          onClose();
-        }}
-        className="absolute top-4 right-4 z-[100] text-white hover:bg-white/20"
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-50 bg-black"
+      onMouseMove={handleMouseMove}
+    >
+      {/* Video */}
+      <video
+        ref={videoRef}
+        className="w-full h-full object-contain"
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onError={handleVideoError}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => setIsBuffering(false)}
+        onClick={handlePlayPause}
+        poster={backdropUrl || undefined}
+        preload="metadata"
+        playsInline
       >
-        <X className="w-6 h-6" />
-      </Button>
-
-      {/* Title overlay */}
-      <div className="absolute top-4 left-4 z-[100] pointer-events-none">
-        <h1 className="text-xl font-bold text-white text-shadow">{media.title}</h1>
-        {media.release_date && (
-          <p className="text-sm text-white/70">
-            {media.release_date.split("-")[0]}
-          </p>
+        {/* Use source element with type hints for better codec support */}
+        {src && (
+          <source 
+            src={src} 
+            type={getMimeType(src)}
+          />
         )}
-      </div>
-
-      {/* ArtPlayer container */}
-      <div 
-        ref={containerRef} 
-        className="w-full h-full"
-        style={{ aspectRatio: '16/9' }}
-      />
+        {/* Fallback for browsers that need direct src */}
+        {src && !src.toLowerCase().includes('.mkv') && (
+          <source src={src} />
+        )}
+      </video>
 
       <input
         ref={filePickerRef}
         type="file"
-        accept="video/*,.mkv,.avi,.mov,.wmv,.flv"
+        accept="video/*"
         onChange={handleLocalFileSelected}
         className="hidden"
       />
 
       {playbackError && (
-        <div className="absolute inset-0 z-[110] grid place-items-center bg-background/80 backdrop-blur-sm p-6">
+        <div className="absolute inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-6">
           <div className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-lg">
             <h2 className="text-base font-semibold">Can't play this video</h2>
             <p className="mt-1 text-sm text-muted-foreground">{playbackError}</p>
@@ -407,6 +443,149 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
           </div>
         </div>
       )}
+
+      {/* Buffering Indicator */}
+      {isBuffering && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Controls Overlay */}
+      <div
+        className={cn(
+          "absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 transition-opacity duration-300",
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+      >
+        {/* Top Bar */}
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-shadow">{media.title}</h1>
+            {media.release_date && (
+              <p className="text-sm text-white/70">
+                {media.release_date.split("-")[0]}
+              </p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-white hover:bg-white/20"
+          >
+            <X className="w-6 h-6" />
+          </Button>
+        </div>
+
+        {/* Center Play Button */}
+        {!isPlaying && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Button
+              size="lg"
+              onClick={handlePlayPause}
+              className="w-20 h-20 rounded-full bg-primary/90 hover:bg-primary"
+            >
+              <Play className="w-10 h-10 fill-current" />
+            </Button>
+          </div>
+        )}
+
+        {/* Bottom Controls */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4">
+          {/* Progress Bar - Native range input */}
+          {duration > 0 && (
+            <input
+              type="range"
+              min={0}
+              max={duration}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeekChange}
+              className="w-full h-2 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+            />
+          )}
+
+          {/* Control Buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => skipTime(-10)}
+                className="text-white hover:bg-white/20"
+              >
+                <SkipBack className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePlayPause}
+                className="text-white hover:bg-white/20"
+              >
+                {isPlaying ? (
+                  <Pause className="w-6 h-6" />
+                ) : (
+                  <Play className="w-6 h-6" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => skipTime(10)}
+                className="text-white hover:bg-white/20"
+              >
+                <SkipForward className="w-5 h-5" />
+              </Button>
+
+              <span className="text-sm text-white/90 ml-2">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Volume */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleMute}
+                  className="text-white hover:bg-white/20"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-5 h-5" />
+                  ) : (
+                    <Volume2 className="w-5 h-5" />
+                  )}
+                </Button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="w-20 h-2 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+                />
+              </div>
+
+              {/* Fullscreen */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleFullscreen}
+                className="text-white hover:bg-white/20"
+              >
+                {isFullscreen ? (
+                  <Minimize className="w-5 h-5" />
+                ) : (
+                  <Maximize className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
