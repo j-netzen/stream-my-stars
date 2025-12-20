@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.real-debrid]
 verify_jwt = false
+
+[functions.categorize-media]
+verify_jwt = false
+
+[functions.torrentio]
+verify_jwt = false
