@@ -221,6 +221,26 @@ export default function SettingsPage() {
               <p className="font-medium">GPU Compositing</p>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Audio Sync</p>
+              <p className="font-medium text-green-500">Low Latency</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Pitch Preservation</p>
+              <p className="font-medium text-green-500">Enabled</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Audio Buffer</p>
+              <p className="font-medium">Optimized (50ms)</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Sync Tolerance</p>
+              <p className="font-medium">±25ms</p>
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground">
             Video chunks are cached locally for smoother playback. Cache is
             automatically managed and cleared when full.

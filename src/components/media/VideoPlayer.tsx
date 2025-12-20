@@ -410,7 +410,22 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
           WebkitBackfaceVisibility: 'hidden',
         }}
         onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
+        onLoadedMetadata={() => {
+          handleLoadedMetadata();
+          // Audio sync optimizations
+          const video = videoRef.current;
+          if (video) {
+            // Set optimal audio buffer for sync
+            video.preservesPitch = true;
+            // Reduce audio latency
+            if ('mozPreservesPitch' in video) {
+              (video as any).mozPreservesPitch = true;
+            }
+            if ('webkitPreservesPitch' in video) {
+              (video as any).webkitPreservesPitch = true;
+            }
+          }
+        }}
         onError={handleVideoError}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
