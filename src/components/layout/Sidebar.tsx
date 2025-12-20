@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { cn } from "@/lib/utils";
 import {
   Home,
@@ -19,6 +20,10 @@ import {
   ChevronDown,
   Menu,
   X,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +68,7 @@ export function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const { signOut } = useAuth();
+  const { status: rdStatus, user: rdUser } = useRealDebridStatus();
   
   // Load saved order from localStorage
   const [navItems, setNavItems] = useState<NavItemData[]>(() => {
@@ -292,6 +298,55 @@ export function Sidebar({
 
         {/* Bottom Actions */}
         <div className="p-2 border-t border-border space-y-1">
+          {/* Real-Debrid Status Indicator */}
+          {collapsed && !mobileOpen ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    "flex items-center justify-center px-2 py-2 rounded-lg text-sm",
+                    rdStatus === "connected" && "text-green-500",
+                    rdStatus === "disconnected" && "text-yellow-500",
+                    rdStatus === "error" && "text-destructive",
+                    rdStatus === "loading" && "text-muted-foreground"
+                  )}
+                >
+                  {rdStatus === "loading" && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {rdStatus === "connected" && <Cloud className="w-4 h-4" />}
+                  {rdStatus === "disconnected" && <CloudOff className="w-4 h-4" />}
+                  {rdStatus === "error" && <AlertCircle className="w-4 h-4" />}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {rdStatus === "loading" && "Checking Real-Debrid..."}
+                {rdStatus === "connected" && `Real-Debrid: ${rdUser?.username || "Connected"}`}
+                {rdStatus === "disconnected" && "Real-Debrid: No Premium"}
+                {rdStatus === "error" && "Real-Debrid: Connection Error"}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <div
+              className={cn(
+                "flex items-center gap-3 px-4 py-2 rounded-lg text-xs font-medium",
+                rdStatus === "connected" && "text-green-500 bg-green-500/10",
+                rdStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10",
+                rdStatus === "error" && "text-destructive bg-destructive/10",
+                rdStatus === "loading" && "text-muted-foreground bg-secondary/50"
+              )}
+            >
+              {rdStatus === "loading" && <Loader2 className="w-4 h-4 animate-spin" />}
+              {rdStatus === "connected" && <Cloud className="w-4 h-4" />}
+              {rdStatus === "disconnected" && <CloudOff className="w-4 h-4" />}
+              {rdStatus === "error" && <AlertCircle className="w-4 h-4" />}
+              <span>
+                {rdStatus === "loading" && "Checking RD..."}
+                {rdStatus === "connected" && `RD: ${rdUser?.username || "Connected"}`}
+                {rdStatus === "disconnected" && "RD: No Premium"}
+                {rdStatus === "error" && "RD: Error"}
+              </span>
+            </div>
+          )}
+          
           {/* Settings - not reorderable */}
           {collapsed && !mobileOpen ? (
             <Tooltip>
