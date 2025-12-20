@@ -1050,22 +1050,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                       <Sparkles className="w-4 h-4" />
                     )}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      fetchRdItems();
-                      setShowRdDropdown(true);
-                    }}
-                    disabled={isLoadingRdItems}
-                    title="Search Real-Debrid for matching links"
-                  >
-                    {isLoadingRdItems ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                  </Button>
                 </div>
                 {showTmdbDebridDropdown && tmdbDebridResults.length > 0 && (
                   <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-64 overflow-y-auto">
