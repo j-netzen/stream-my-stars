@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -267,6 +267,12 @@ export function StreamSelectionDialog({
                   <span className="flex items-center gap-1">
                     <Star className="w-3 h-3 text-yellow-500" />
                     {media.rating.toFixed(1)}
+                  </span>
+                )}
+                {media.runtime && media.runtime > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {Math.floor(media.runtime / 60) > 0 ? `${Math.floor(media.runtime / 60)}h ` : ''}{media.runtime % 60}m
                   </span>
                 )}
               </div>
