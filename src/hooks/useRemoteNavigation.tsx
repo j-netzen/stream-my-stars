@@ -1,4 +1,5 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface UseRemoteNavigationOptions {
   containerRef: React.RefObject<HTMLElement>;
@@ -100,8 +101,30 @@ export function useRemoteNavigation({
 
 // Global navigation hook for page-level navigation
 export function useGlobalRemoteNavigation() {
+  const navigate = useNavigate();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Handle Back button (Escape or Backspace)
+      if (e.key === "Escape" || e.key === "Backspace") {
+        // Don't interfere with inputs
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA") {
+          return;
+        }
+        
+        // Check if there's an open dialog/modal - close it first
+        const openDialog = document.querySelector('[role="dialog"][data-state="open"]');
+        if (openDialog) {
+          // Let the dialog handle the escape key
+          return;
+        }
+        
+        e.preventDefault();
+        navigate(-1);
+        return;
+      }
+
       const focusableSelector = "[data-focusable], button:not([disabled]), [tabindex]:not([tabindex='-1']), a[href], input:not([disabled]), select:not([disabled])";
       const focusableElements = Array.from(document.querySelectorAll<HTMLElement>(focusableSelector))
         .filter(el => {
@@ -199,5 +222,53 @@ export function useGlobalRemoteNavigation() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
+}
+
+// Hook to track focused element info for indicator
+export function useFocusIndicator() {
+  const [focusedInfo, setFocusedInfo] = useState<{
+    label: string;
+    hint: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleFocus = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Get label from aria-label, data-label, or text content
+      const label = target.getAttribute("aria-label") 
+        || target.getAttribute("data-label")
+        || target.closest("[data-focusable]")?.getAttribute("aria-label")
+        || target.textContent?.trim().slice(0, 50)
+        || "";
+      
+      if (label && (target.hasAttribute("data-focusable") || target.closest("[data-focusable]"))) {
+        setFocusedInfo({
+          label,
+          hint: "Press Enter to select"
+        });
+      }
+    };
+
+    const handleBlur = () => {
+      // Small delay to check if focus moved to another element
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (!activeEl || activeEl === document.body) {
+          setFocusedInfo(null);
+        }
+      }, 100);
+    };
+
+    document.addEventListener("focusin", handleFocus);
+    document.addEventListener("focusout", handleBlur);
+    
+    return () => {
+      document.removeEventListener("focusin", handleFocus);
+      document.removeEventListener("focusout", handleBlur);
+    };
   }, []);
+
+  return focusedInfo;
 }
