@@ -62,7 +62,7 @@ export function StreamSelectionDialog({
   }, [streams, isSearching]);
 
   // Keyboard navigation for TV remotes
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, stream: TorrentioStream) => {
     if (isResolving) return;
 
     switch (e.key) {
@@ -81,10 +81,10 @@ export function StreamSelectionDialog({
       case 'Enter':
       case ' ':
         e.preventDefault();
-        handleStreamSelect(streams[index]);
+        handleStreamSelect(stream);
         break;
     }
-  }, [streams, isResolving]);
+  };
 
   // Reset state when dialog opens with new media
   useEffect(() => {
@@ -379,7 +379,7 @@ export function StreamSelectionDialog({
                   key={index}
                   ref={(el) => (streamButtonsRef.current[index] = el)}
                   onClick={() => handleStreamSelect(stream)}
-                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  onKeyDown={(e) => handleKeyDown(e, index, stream)}
                   onFocus={() => setFocusedIndex(index)}
                   disabled={isResolving}
                   className={cn(
