@@ -181,7 +181,7 @@ export default function PlaylistsPage() {
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">{selectedPlaylistData.name}</h2>
               {playlistMedia.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   {playlistMedia.map((item) => (
                     <MediaCard
                       key={item.id}
