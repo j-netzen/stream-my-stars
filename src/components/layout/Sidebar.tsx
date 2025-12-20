@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Menu,
   X,
 } from "lucide-react";
@@ -24,6 +27,24 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+interface NavItemData {
+  icon: any;
+  label: string;
+  path: string;
+}
+
+const defaultNavItems: NavItemData[] = [
+  { icon: Home, label: "Home", path: "/" },
+  { icon: Film, label: "Movies", path: "/movies" },
+  { icon: Tv, label: "TV Shows", path: "/tv-shows" },
+  { icon: Video, label: "Home Videos", path: "/home-movies" },
+  { icon: FolderOpen, label: "Categories", path: "/categories" },
+  { icon: ListVideo, label: "Playlists", path: "/playlists" },
+  { icon: Search, label: "Discover", path: "/discover" },
+];
+
+const STORAGE_KEY = "sidebar-nav-order";
 
 interface SidebarProps {
   onAddMedia?: () => void;
@@ -42,48 +63,129 @@ export function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const { signOut } = useAuth();
+  
+  // Load saved order from localStorage
+  const [navItems, setNavItems] = useState<NavItemData[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const savedOrder = JSON.parse(saved) as string[];
+        // Reorder defaultNavItems based on saved paths
+        const reordered = savedOrder
+          .map(path => defaultNavItems.find(item => item.path === path))
+          .filter((item): item is NavItemData => item !== undefined);
+        // Add any new items that weren't in saved order
+        defaultNavItems.forEach(item => {
+          if (!reordered.some(r => r.path === item.path)) {
+            reordered.push(item);
+          }
+        });
+        return reordered;
+      }
+    } catch (e) {
+      console.error("Failed to load nav order:", e);
+    }
+    return defaultNavItems;
+  });
 
-  const navItems = [
-    { icon: Home, label: "Home", path: "/" },
-    { icon: Film, label: "Movies", path: "/movies" },
-    { icon: Tv, label: "TV Shows", path: "/tv-shows" },
-    { icon: Video, label: "Home Videos", path: "/home-movies" },
-    { icon: FolderOpen, label: "Categories", path: "/categories" },
-    { icon: ListVideo, label: "Playlists", path: "/playlists" },
-    { icon: Search, label: "Discover", path: "/discover" },
-  ];
+  // Save order to localStorage when it changes
+  useEffect(() => {
+    const order = navItems.map(item => item.path);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+  }, [navItems]);
+
+  const moveItem = (index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= navItems.length) return;
+    
+    const newItems = [...navItems];
+    [newItems[index], newItems[newIndex]] = [newItems[newIndex], newItems[index]];
+    setNavItems(newItems);
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
   const handleNavClick = () => {
-    // Close mobile menu on navigation
     if (mobileOpen) {
       onMobileOpenChange(false);
     }
   };
 
-  const NavItem = ({ icon: Icon, label, path }: { icon: any; label: string; path: string }) => {
+  const NavItem = ({ icon: Icon, label, path, index }: { icon: any; label: string; path: string; index: number }) => {
     const content = (
-      <Link
-        to={path}
-        onClick={handleNavClick}
-        className={cn(
-          "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
-          collapsed && !mobileOpen ? "justify-center px-2" : "",
-          isActive(path)
-            ? "sidebar-active"
-            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+      <div className="group relative flex items-center">
+        <Link
+          to={path}
+          onClick={handleNavClick}
+          className={cn(
+            "flex-1 flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
+            collapsed && !mobileOpen ? "justify-center px-2" : "",
+            isActive(path)
+              ? "sidebar-active"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          )}
+        >
+          <Icon className="w-5 h-5 flex-shrink-0" />
+          {(!collapsed || mobileOpen) && <span>{label}</span>}
+        </Link>
+        
+        {/* Move buttons - only show when not collapsed */}
+        {(!collapsed || mobileOpen) && (
+          <div className="absolute right-1 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                moveItem(index, "up");
+              }}
+              disabled={index === 0}
+              className={cn(
+                "p-0.5 rounded hover:bg-secondary transition-colors",
+                index === 0 ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+              )}
+              title="Move up"
+            >
+              <ChevronUp className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                moveItem(index, "down");
+              }}
+              disabled={index === navItems.length - 1}
+              className={cn(
+                "p-0.5 rounded hover:bg-secondary transition-colors",
+                index === navItems.length - 1 ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+              )}
+              title="Move down"
+            >
+              <ChevronDown className="w-3 h-3" />
+            </button>
+          </div>
         )}
-      >
-        <Icon className="w-5 h-5 flex-shrink-0" />
-        {(!collapsed || mobileOpen) && <span>{label}</span>}
-      </Link>
+      </div>
     );
 
     if (collapsed && !mobileOpen) {
       return (
         <Tooltip>
-          <TooltipTrigger asChild>{content}</TooltipTrigger>
+          <TooltipTrigger asChild>
+            <Link
+              to={path}
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center justify-center px-2 py-3 rounded-lg text-sm font-medium transition-all",
+                isActive(path)
+                  ? "sidebar-active"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              )}
+            >
+              <Icon className="w-5 h-5 flex-shrink-0" />
+            </Link>
+          </TooltipTrigger>
           <TooltipContent side="right">{label}</TooltipContent>
         </Tooltip>
       );
@@ -180,9 +282,9 @@ export function Sidebar({
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2 py-2">
           <ul className="space-y-1">
-            {navItems.map((item) => (
+            {navItems.map((item, index) => (
               <li key={item.path}>
-                <NavItem {...item} />
+                <NavItem {...item} index={index} />
               </li>
             ))}
           </ul>
@@ -190,7 +292,40 @@ export function Sidebar({
 
         {/* Bottom Actions */}
         <div className="p-2 border-t border-border space-y-1">
-          <NavItem icon={Settings} label="Settings" path="/settings" />
+          {/* Settings - not reorderable */}
+          {collapsed && !mobileOpen ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  to="/settings"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center justify-center px-2 py-3 rounded-lg text-sm font-medium transition-all",
+                    isActive("/settings")
+                      ? "sidebar-active"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  )}
+                >
+                  <Settings className="w-5 h-5 flex-shrink-0" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">Settings</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link
+              to="/settings"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
+                isActive("/settings")
+                  ? "sidebar-active"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              )}
+            >
+              <Settings className="w-5 h-5 flex-shrink-0" />
+              <span>Settings</span>
+            </Link>
+          )}
           
           {collapsed && !mobileOpen ? (
             <Tooltip>
