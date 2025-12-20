@@ -57,6 +57,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
   const [src, setSrc] = useState("");
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [showCopyUrl, setShowCopyUrl] = useState(false);
 
   // Attempt to restore file handle on mount or media change
   useEffect(() => {
@@ -99,6 +100,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
     // Reset state
     setPlaybackError(null);
+    setShowCopyUrl(false);
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -237,6 +239,14 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     });
   };
 
+  const copyUrlToClipboard = async () => {
+    const url = src || media.source_url || "";
+    if (url && !url.startsWith("blob:") && url !== LOCAL_FILE_MARKER) {
+      await navigator.clipboard.writeText(url);
+      toast.success("URL copied! Open in VLC or another media player for better MKV support.");
+    }
+  };
+
   const handleVideoError = () => {
     const raw = src || media.source_url || "";
     const isBlob = raw.startsWith("blob:");
@@ -245,6 +255,8 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     const isMkvFile = raw.toLowerCase().includes('.mkv');
 
     let message: string;
+    let showCopyOption = false;
+    
     if (isLocalMarker) {
       message = "Local file handle not found. Please re-select the file.";
     } else if (isBlob) {
@@ -252,12 +264,15 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     } else if (looksLikePath) {
       message = "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL.";
     } else if (isMkvFile) {
-      message = "MKV playback failed. Your browser may not support the video codec. Try using Chrome, Edge, or a different browser.";
+      message = "MKV playback requires codec support. Try Chrome/Edge, or copy the URL to play in VLC.";
+      showCopyOption = true;
     } else {
       message = "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
+      showCopyOption = !isBlob && !isLocalMarker;
     }
 
     setPlaybackError(message);
+    setShowCopyUrl(showCopyOption);
     toast.error(message);
   };
 
@@ -464,6 +479,12 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
             <h2 className="text-base font-semibold">Can't play this video</h2>
             <p className="mt-1 text-sm text-muted-foreground">{playbackError}</p>
             <div className="mt-4 flex items-center justify-end gap-2">
+              {showCopyUrl && (
+                <Button variant="outline" onClick={copyUrlToClipboard} className="gap-2">
+                  <Copy className="w-4 h-4" />
+                  Copy URL
+                </Button>
+              )}
               <Button variant="secondary" onClick={onClose}>
                 Close
               </Button>

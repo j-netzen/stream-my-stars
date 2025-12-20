@@ -42,6 +42,8 @@ export function StreamSelectionDialog({
   const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
   const [isResolving, setIsResolving] = useState(false);
   const [resolvingStream, setResolvingStream] = useState<string | null>(null);
+  const [resolveProgress, setResolveProgress] = useState<number>(0);
+  const [resolveStatus, setResolveStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
   // Reset state when dialog opens with new media
@@ -104,19 +106,32 @@ export function StreamSelectionDialog({
     
     setIsResolving(true);
     setResolvingStream(stream.url);
+    setResolveProgress(0);
+    setResolveStatus("Starting...");
     
     try {
       let downloadUrl: string;
       const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
       
+      const handleProgress = (progress: number) => {
+        setResolveProgress(progress);
+        if (progress < 100) {
+          setResolveStatus(`Downloading: ${progress}%`);
+        } else {
+          setResolveStatus("Finalizing...");
+        }
+      };
+      
       if (isDirectRdLink(stream.url)) {
         // Already a direct link
+        setResolveStatus("Using cached stream...");
         downloadUrl = stream.url;
       } else if (isMagnetLink(stream.url)) {
         // Magnet link - add to RD and wait
-        toast.info("Adding magnet to Real-Debrid...");
-        const torrent = await addMagnetAndWait(stream.url, () => {});
+        setResolveStatus("Adding to Real-Debrid...");
+        const torrent = await addMagnetAndWait(stream.url, handleProgress);
         if (torrent.links && torrent.links.length > 0) {
+          setResolveStatus("Generating download link...");
           const unrestricted = await unrestrictLink(torrent.links[0]);
           downloadUrl = unrestricted.download;
         } else {
@@ -127,9 +142,10 @@ export function StreamSelectionDialog({
         console.log("Torrentio resolve URL detected, extracting magnet...");
         const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
         if (magnetLink) {
-          toast.info("Preparing stream from torrent...");
-          const torrent = await addMagnetAndWait(magnetLink, () => {});
+          setResolveStatus("Preparing stream...");
+          const torrent = await addMagnetAndWait(magnetLink, handleProgress);
           if (torrent.links && torrent.links.length > 0) {
+            setResolveStatus("Generating download link...");
             const unrestricted = await unrestrictLink(torrent.links[0]);
             downloadUrl = unrestricted.download;
           } else {
@@ -140,6 +156,7 @@ export function StreamSelectionDialog({
         }
       } else {
         // Try to unrestrict the link directly
+        setResolveStatus("Unrestricting link...");
         const unrestricted = await unrestrictLink(stream.url);
         downloadUrl = unrestricted.download;
       }
@@ -163,6 +180,8 @@ export function StreamSelectionDialog({
     
     setIsResolving(false);
     setResolvingStream(null);
+    setResolveProgress(0);
+    setResolveStatus("");
   };
 
   const posterUrl = media?.poster_path
@@ -357,9 +376,22 @@ export function StreamSelectionDialog({
                         {stream.title || stream.name}
                       </p>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex flex-col items-end gap-1">
                       {isCurrentlyResolving ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                        <div className="flex flex-col items-end gap-1">
+                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                          {resolveStatus && (
+                            <span className="text-xs text-primary">{resolveStatus}</span>
+                          )}
+                          {resolveProgress > 0 && resolveProgress < 100 && (
+                            <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${resolveProgress}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <Play className="w-5 h-5 text-muted-foreground" />
                       )}
