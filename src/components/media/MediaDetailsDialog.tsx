@@ -6,7 +6,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Play, X, Star, Calendar, Clock, Film, Tv, Youtube } from "lucide-react";
+import { Play, X, Star, Calendar, Clock, Film, Tv, Youtube, ArrowLeft } from "lucide-react";
 
 interface MediaDetailsDialogProps {
   media: Media | null;
@@ -18,10 +18,12 @@ interface MediaDetailsDialogProps {
 export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaDetailsDialogProps) {
   const [trailer, setTrailer] = useState<TMDBVideo | null>(null);
   const [loadingTrailer, setLoadingTrailer] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
 
   useEffect(() => {
     if (open && media?.tmdb_id) {
       setLoadingTrailer(true);
+      setShowTrailer(false);
       getVideos(media.tmdb_id, media.media_type as "movie" | "tv")
         .then((videos) => {
           // Prefer official trailers, then teasers, then any video
@@ -34,6 +36,7 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
         .finally(() => setLoadingTrailer(false));
     } else {
       setTrailer(null);
+      setShowTrailer(false);
     }
   }, [open, media?.tmdb_id, media?.media_type]);
 
@@ -49,11 +52,36 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
 
   const castMembers = Array.isArray(media.cast_members) ? media.cast_members : [];
 
-  const openTrailer = () => {
-    if (trailer) {
-      window.open(`https://www.youtube.com/watch?v=${trailer.key}`, "_blank");
-    }
-  };
+  // Trailer view
+  if (showTrailer && trailer) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background border-border">
+          <div className="relative">
+            <div className="flex items-center gap-3 p-4 border-b border-border">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTrailer(false)}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <h3 className="font-semibold">{trailer.name}</h3>
+            </div>
+            <div className="aspect-video">
+              <iframe
+                src={`https://www.youtube.com/embed/${trailer.key}?autoplay=1`}
+                title={trailer.name}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -91,7 +119,7 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
                 Play
               </Button>
               {trailer && (
-                <Button size="lg" variant="secondary" className="gap-2" onClick={openTrailer}>
+                <Button size="lg" variant="secondary" className="gap-2" onClick={() => setShowTrailer(true)}>
                   <Youtube className="w-5 h-5" />
                   Trailer
                 </Button>
