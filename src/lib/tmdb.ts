@@ -86,3 +86,20 @@ export async function getTrending(mediaType: "all" | "movie" | "tv" = "all"): Pr
   if (error) throw error;
   return data.results || [];
 }
+
+export interface TMDBVideo {
+  id: string;
+  key: string;
+  name: string;
+  site: string;
+  type: string;
+}
+
+export async function getVideos(id: number, mediaType: "movie" | "tv"): Promise<TMDBVideo[]> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "get_videos", id, media_type: mediaType },
+  });
+
+  if (error) throw error;
+  return data.results || [];
+}

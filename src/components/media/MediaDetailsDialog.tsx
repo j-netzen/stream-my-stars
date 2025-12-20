@@ -1,11 +1,12 @@
+import { useState, useEffect } from "react";
 import { Media } from "@/hooks/useMedia";
-import { getImageUrl } from "@/lib/tmdb";
+import { getImageUrl, getVideos, TMDBVideo } from "@/lib/tmdb";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Play, X, Star, Calendar, Clock, Film, Tv } from "lucide-react";
+import { Play, X, Star, Calendar, Clock, Film, Tv, Youtube } from "lucide-react";
 
 interface MediaDetailsDialogProps {
   media: Media | null;
@@ -15,6 +16,27 @@ interface MediaDetailsDialogProps {
 }
 
 export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaDetailsDialogProps) {
+  const [trailer, setTrailer] = useState<TMDBVideo | null>(null);
+  const [loadingTrailer, setLoadingTrailer] = useState(false);
+
+  useEffect(() => {
+    if (open && media?.tmdb_id) {
+      setLoadingTrailer(true);
+      getVideos(media.tmdb_id, media.media_type as "movie" | "tv")
+        .then((videos) => {
+          // Prefer official trailers, then teasers, then any video
+          const trailer = videos.find(v => v.site === "YouTube" && v.type === "Trailer") 
+            || videos.find(v => v.site === "YouTube" && v.type === "Teaser")
+            || videos.find(v => v.site === "YouTube");
+          setTrailer(trailer || null);
+        })
+        .catch(() => setTrailer(null))
+        .finally(() => setLoadingTrailer(false));
+    } else {
+      setTrailer(null);
+    }
+  }, [open, media?.tmdb_id, media?.media_type]);
+
   if (!media) return null;
 
   const backdropUrl = media.backdrop_path
@@ -26,6 +48,12 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
     : null;
 
   const castMembers = Array.isArray(media.cast_members) ? media.cast_members : [];
+
+  const openTrailer = () => {
+    if (trailer) {
+      window.open(`https://www.youtube.com/watch?v=${trailer.key}`, "_blank");
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,13 +82,21 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
           {/* Title and Play */}
           <div className="absolute bottom-0 left-0 right-0 p-6">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">{media.title}</h2>
-            <Button size="lg" className="gap-2" onClick={() => {
-              onOpenChange(false);
-              onPlay(media);
-            }}>
-              <Play className="w-5 h-5 fill-current" />
-              Play
-            </Button>
+            <div className="flex gap-3">
+              <Button size="lg" className="gap-2" onClick={() => {
+                onOpenChange(false);
+                onPlay(media);
+              }}>
+                <Play className="w-5 h-5 fill-current" />
+                Play
+              </Button>
+              {trailer && (
+                <Button size="lg" variant="secondary" className="gap-2" onClick={openTrailer}>
+                  <Youtube className="w-5 h-5" />
+                  Trailer
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
