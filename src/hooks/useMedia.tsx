@@ -88,6 +88,26 @@ export function useMedia() {
     },
   });
 
+  const updateMedia = useMutation({
+    mutationFn: async (input: { id: string; source_url?: string }) => {
+      const { data, error } = await supabase
+        .from("media")
+        .update({ source_url: input.source_url, updated_at: new Date().toISOString() })
+        .eq("id", input.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["media"] });
+    },
+    onError: (error) => {
+      toast.error("Failed to update media: " + error.message);
+    },
+  });
+
   const deleteMedia = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("media").delete().eq("id", id);
@@ -102,5 +122,5 @@ export function useMedia() {
     },
   });
 
-  return { media, isLoading, addMedia, deleteMedia };
+  return { media, isLoading, addMedia, updateMedia, deleteMedia };
 }

@@ -5,6 +5,7 @@ import { MediaCard } from "@/components/media/MediaCard";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
+import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
 import { Input } from "@/components/ui/input";
 import { Search, Film, Loader2 } from "lucide-react";
 
@@ -15,6 +16,7 @@ export default function MoviesPage() {
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
+  const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
 
   const movies = media
     .filter((m) => m.media_type === "movie")
@@ -23,6 +25,18 @@ export default function MoviesPage() {
   const filteredMovies = movies.filter((m) =>
     m.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handlePlay = (item: Media) => {
+    if (!item.source_url && item.tmdb_id) {
+      setStreamSelectMedia(item);
+    } else {
+      setActiveMedia(item);
+    }
+  };
+
+  const handleStreamSelected = (updatedMedia: Media) => {
+    setActiveMedia(updatedMedia);
+  };
 
   if (isLoading) {
     return (
@@ -68,7 +82,7 @@ export default function MoviesPage() {
               key={movie.id}
               media={movie}
               progress={progress.find((p) => p.media_id === movie.id)}
-              onPlay={setActiveMedia}
+              onPlay={handlePlay}
               onDelete={(m) => deleteMedia.mutate(m.id)}
               onMoreInfo={setDetailsMedia}
               onAddToPlaylist={setPlaylistMedia}
@@ -89,12 +103,20 @@ export default function MoviesPage() {
         </div>
       )}
 
+      {/* Stream Selection Dialog */}
+      <StreamSelectionDialog
+        media={streamSelectMedia}
+        open={!!streamSelectMedia}
+        onOpenChange={(open) => !open && setStreamSelectMedia(null)}
+        onStreamSelected={handleStreamSelected}
+      />
+
       {/* Media Details Dialog */}
       <MediaDetailsDialog
         media={detailsMedia}
         open={!!detailsMedia}
         onOpenChange={(open) => !open && setDetailsMedia(null)}
-        onPlay={setActiveMedia}
+        onPlay={handlePlay}
       />
 
       {/* Add to Playlist Dialog */}
