@@ -7,6 +7,7 @@ import { MediaRow } from "@/components/media/MediaRow";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
+import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info, Loader2 } from "lucide-react";
@@ -20,6 +21,7 @@ export default function HomePage() {
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
+  const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
 
   const continueWatching = getContinueWatching();
   const continueWatchingMedia = media.filter((m) =>
@@ -37,7 +39,16 @@ export default function HomePage() {
     : null;
 
   const handlePlay = (item: Media) => {
-    setActiveMedia(item);
+    // If media has no source URL but has TMDB ID, show stream selection
+    if (!item.source_url && item.tmdb_id) {
+      setStreamSelectMedia(item);
+    } else {
+      setActiveMedia(item);
+    }
+  };
+
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string) => {
+    setActiveMedia(updatedMedia);
   };
 
   const handleDelete = (item: Media) => {
@@ -213,6 +224,14 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Stream Selection Dialog */}
+      <StreamSelectionDialog
+        media={streamSelectMedia}
+        open={!!streamSelectMedia}
+        onOpenChange={(open) => !open && setStreamSelectMedia(null)}
+        onStreamSelected={handleStreamSelected}
+      />
 
       {/* Media Details Dialog */}
       <MediaDetailsDialog

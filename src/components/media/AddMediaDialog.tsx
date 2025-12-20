@@ -587,7 +587,52 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   };
 
 
-  // Real-Debrid handler
+  // Add media with just TMDB metadata (stream selected at play time)
+  const handleAddWithMetadata = async () => {
+    if (!manualTitle.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+
+    if (!selectedTmdbForDebrid) {
+      toast.error("Please search and select a title from TMDB first");
+      return;
+    }
+
+    setIsAdding(true);
+
+    try {
+      const input: CreateMediaInput = {
+        title: manualTitle,
+        media_type: manualType,
+        source_type: "url",
+        source_url: null, // No URL - will be selected at play time
+        category_id: selectedCategory || undefined,
+        overview: manualOverview,
+        tmdb_id: selectedTmdbForDebrid.tmdb_id,
+        poster_path: selectedTmdbForDebrid.poster_path,
+        backdrop_path: selectedTmdbForDebrid.backdrop_path,
+        release_date: selectedTmdbForDebrid.release_date,
+        rating: selectedTmdbForDebrid.rating,
+        genres: selectedTmdbForDebrid.genres,
+        runtime: selectedTmdbForDebrid.runtime,
+        seasons: selectedTmdbForDebrid.seasons,
+        episodes: selectedTmdbForDebrid.episodes,
+        cast_members: selectedTmdbForDebrid.cast_members,
+      };
+
+      await addMedia.mutateAsync(input);
+      toast.success("Added to library! Select a stream when you play.");
+      resetForm();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Add media error:", error);
+      toast.error(error.message || "Failed to add media");
+    }
+    setIsAdding(false);
+  };
+
+  // Real-Debrid handler (for manual magnet/URL entry)
   const handleRealDebrid = async () => {
     if (!rdLink.trim()) {
       toast.error("Please enter a link or magnet");
@@ -1337,153 +1382,17 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               </div>
             )}
 
-            {/* Hide single-item controls when in batch mode */}
-            {!isBatchMode && (
-            <div className="space-y-2">
-              <Label className="flex items-center justify-between">
-                <span>Magnet Link or Download URL *</span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTorrentioSearch}
-                    disabled={isSearchingTorrentio || !selectedTmdbForDebrid}
-                    title={selectedTmdbForDebrid ? "Search for streams based on selected title" : "Select a title from TMDB first"}
-                    className="h-7 px-2 gap-1"
-                  >
-                    {isSearchingTorrentio ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Download className="w-3 h-3" />
-                    )}
-                    <span className="text-xs">Find Streams</span>
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => fetchRdItems()}
-                    disabled={isLoadingRdItems}
-                    className="p-1 hover:bg-accent rounded transition-colors disabled:opacity-50"
-                    title="Refresh Real-Debrid items"
-                  >
-                    {isLoadingRdItems ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3 h-3" />
-                    )}
-                  </button>
-                </div>
-              </Label>
-              <div className="relative">
-                <Textarea
-                  placeholder="magnet:?xt=urn:btih:... or https://..."
-                  value={rdLink}
-                  onChange={(e) => setRdLink(e.target.value)}
-                  onFocus={() => {
-                    if (torrentioResults.length > 0) {
-                      setShowTorrentioDropdown(true);
-                    } else {
-                      setShowRdDropdown(true);
-                    }
-                  }}
-                  className="min-h-[80px] font-mono text-sm"
-                />
-                {/* Torrentio streams dropdown */}
-                {showTorrentioDropdown && torrentioResults.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-64 overflow-y-auto">
-                    <div className="sticky top-0 bg-muted px-3 py-2 border-b border-border flex items-center justify-between">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {torrentioResults.length} stream(s) found
-                      </span>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          setShowTorrentioDropdown(false);
-                          setTorrentioResults([]);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                    {torrentioResults.map((stream, idx) => {
-                      const info = parseStreamInfo(stream);
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          className="w-full px-3 py-2 text-left hover:bg-accent border-b border-border/50 last:border-b-0"
-                          onClick={() => handleSelectTorrentioStream(stream)}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{stream.name}</p>
-                              <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
-                                {stream.title}
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">
-                                  {info.quality}
-                                </span>
-                                {info.isDirectLink ? (
-                                  <span className="text-xs font-medium px-1.5 py-0.5 bg-green-500/20 text-green-500 rounded flex items-center gap-0.5">
-                                    <Zap className="h-3 w-3" />
-                                    RD
-                                  </span>
-                                ) : (
-                                  <span className="text-xs font-medium px-1.5 py-0.5 bg-muted text-muted-foreground rounded">
-                                    Magnet
-                                  </span>
-                                )}
-                              </div>
-                              {info.size && (
-                                <span className="text-xs text-muted-foreground">{info.size}</span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {/* RD items dropdown (fallback when no torrentio results) */}
-                {showRdDropdown && !showTorrentioDropdown && filteredRdItems.length > 0 && (
-                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                    {filteredRdItems.map((item, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent truncate"
-                        onClick={() => {
-                          setRdLink(item.value);
-                          setShowRdDropdown(false);
-                          // Auto-fill title from filename (remove [Torrent] or [Download] prefix)
-                          const filename = item.label.replace(/^\[(Torrent|Download)\]\s*/, '');
-                          // Clean up filename: remove extension and common separators
-                          const cleanTitle = filename
-                            .replace(/\.[^/.]+$/, '') // Remove file extension
-                            .replace(/\./g, ' ') // Replace dots with spaces
-                            .replace(/_/g, ' ') // Replace underscores with spaces
-                            .trim();
-                          setManualTitle(cleanTitle);
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {/* Simplified: No stream selection here - done at play time */}
+            {!isBatchMode && selectedTmdbForDebrid && (
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                <p className="text-sm text-primary flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Stream will be selected when you click Play
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This saves the metadata to your library. When you play, you'll choose from available streams.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {selectedTmdbForDebrid 
-                  ? 'Click "Find Streams" to search for available sources, or enter a link manually'
-                  : filteredRdItems.length > 0 
-                    ? `${filteredRdItems.length} matching Real-Debrid item(s) found - click to select`
-                    : "Supported: Magnet links, torrent URLs, or any link from supported hosters"}
-              </p>
-            </div>
             )}
 
             <div className="space-y-2">
@@ -1512,27 +1421,15 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               </Select>
             </div>
 
-            {rdStatus && (
-              <div className="space-y-2 p-3 bg-secondary/30 rounded-lg">
-                <p className="text-sm flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {rdStatus}
-                </p>
-                {rdProgress > 0 && rdProgress < 100 && (
-                  <Progress value={rdProgress} className="h-2" />
-                )}
-              </div>
-            )}
-
             <Button
-              onClick={handleRealDebrid}
-              disabled={isUnrestricting || isAdding}
+              onClick={handleAddWithMetadata}
+              disabled={isAdding || !selectedTmdbForDebrid}
               className="w-full"
             >
-              {isUnrestricting ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+              {isAdding ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</>
               ) : (
-                <><Zap className="w-4 h-4 mr-2" /> Add via Real-Debrid</>
+                <><Zap className="w-4 h-4 mr-2" /> Add to Library</>
               )}
             </Button>
           </TabsContent>
