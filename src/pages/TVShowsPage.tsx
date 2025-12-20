@@ -4,6 +4,7 @@ import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "@/components/media/MediaCard";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
+import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { Input } from "@/components/ui/input";
 import { Search, Tv, Loader2 } from "lucide-react";
 
@@ -13,6 +14,7 @@ export default function TVShowsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
+  const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
 
   const tvShows = media
     .filter((m) => m.media_type === "tv")
@@ -69,6 +71,7 @@ export default function TVShowsPage() {
               onPlay={setActiveMedia}
               onDelete={(m) => deleteMedia.mutate(m.id)}
               onMoreInfo={setDetailsMedia}
+              onAddToPlaylist={setPlaylistMedia}
             />
           ))}
         </div>
@@ -92,6 +95,13 @@ export default function TVShowsPage() {
         open={!!detailsMedia}
         onOpenChange={(open) => !open && setDetailsMedia(null)}
         onPlay={setActiveMedia}
+      />
+
+      {/* Add to Playlist Dialog */}
+      <AddToPlaylistDialog
+        media={playlistMedia}
+        open={!!playlistMedia}
+        onOpenChange={(open) => !open && setPlaylistMedia(null)}
       />
 
       {/* Video Player */}

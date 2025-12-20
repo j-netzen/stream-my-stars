@@ -5,6 +5,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { MediaRow } from "@/components/media/MediaRow";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
+import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info, Loader2 } from "lucide-react";
@@ -15,6 +16,7 @@ export default function HomePage() {
   const { categories } = useCategories();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
+  const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
 
   const continueWatching = getContinueWatching();
   const continueWatchingMedia = media.filter((m) =>
@@ -109,6 +111,7 @@ export default function HomePage() {
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
+            onAddToPlaylist={setPlaylistMedia}
           />
         )}
 
@@ -120,6 +123,7 @@ export default function HomePage() {
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
+            onAddToPlaylist={setPlaylistMedia}
           />
         )}
 
@@ -131,6 +135,7 @@ export default function HomePage() {
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
+            onAddToPlaylist={setPlaylistMedia}
           />
         )}
 
@@ -142,6 +147,7 @@ export default function HomePage() {
             onPlay={handlePlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
+            onAddToPlaylist={setPlaylistMedia}
           />
         )}
 
@@ -160,6 +166,7 @@ export default function HomePage() {
               onPlay={handlePlay}
               onDelete={handleDelete}
               onMoreInfo={setDetailsMedia}
+              onAddToPlaylist={setPlaylistMedia}
             />
           );
         })}
@@ -185,6 +192,13 @@ export default function HomePage() {
         open={!!detailsMedia}
         onOpenChange={(open) => !open && setDetailsMedia(null)}
         onPlay={handlePlay}
+      />
+
+      {/* Add to Playlist Dialog */}
+      <AddToPlaylistDialog
+        media={playlistMedia}
+        open={!!playlistMedia}
+        onOpenChange={(open) => !open && setPlaylistMedia(null)}
       />
 
       {/* Video Player */}
