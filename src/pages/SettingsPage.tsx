@@ -211,6 +211,16 @@ export default function SettingsPage() {
               <p className="font-medium">Auto (Full Buffer)</p>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Hardware Acceleration</p>
+              <p className="font-medium text-green-500">Enabled (GPU)</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Rendering</p>
+              <p className="font-medium">GPU Compositing</p>
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground">
             Video chunks are cached locally for smoother playback. Cache is
             automatically managed and cleared when full.
