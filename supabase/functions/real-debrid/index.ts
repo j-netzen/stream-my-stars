@@ -7,10 +7,71 @@ const corsHeaders = {
 
 const RD_API_BASE = "https://api.real-debrid.com/rest/1.0";
 
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxRequests: 30,      // 30 requests
+  windowMs: 60 * 1000,  // per minute
+};
+
+// Simple in-memory rate limiter
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return req.headers.get("x-real-ip") || "unknown";
+}
+
+function checkRateLimit(req: Request): { allowed: boolean; remaining: number; retryAfterMs?: number } {
+  const now = Date.now();
+  const ip = getClientIp(req);
+  const key = `realdebrid:${ip}`;
+  
+  let entry = rateLimitStore.get(key);
+  
+  if (!entry || entry.resetAt <= now) {
+    entry = { count: 0, resetAt: now + RATE_LIMIT.windowMs };
+  }
+  
+  entry.count++;
+  rateLimitStore.set(key, entry);
+  
+  const remaining = Math.max(0, RATE_LIMIT.maxRequests - entry.count);
+  const allowed = entry.count <= RATE_LIMIT.maxRequests;
+  
+  return {
+    allowed,
+    remaining,
+    retryAfterMs: allowed ? undefined : entry.resetAt - now,
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Check rate limit
+  const rateLimit = checkRateLimit(req);
+  if (!rateLimit.allowed) {
+    console.warn("Rate limit exceeded for Real-Debrid function");
+    return new Response(
+      JSON.stringify({
+        error: "Rate limit exceeded",
+        retryAfterMs: rateLimit.retryAfterMs,
+        message: `Too many requests. Please try again in ${Math.ceil((rateLimit.retryAfterMs || 0) / 1000)} seconds.`,
+      }),
+      {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Retry-After": String(Math.ceil((rateLimit.retryAfterMs || 0) / 1000)),
+          "X-RateLimit-Remaining": String(rateLimit.remaining),
+        },
+      }
+    );
   }
 
   try {
@@ -156,7 +217,11 @@ serve(async (req) => {
 
     console.log("Real-Debrid response success");
     return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        "X-RateLimit-Remaining": String(rateLimit.remaining),
+      },
     });
 
   } catch (error: unknown) {
