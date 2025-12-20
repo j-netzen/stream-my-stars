@@ -201,16 +201,11 @@ export function StreamSelectionDialog({
         downloadUrl = unrestricted.download;
       }
       
-      // Update the media with the new source URL
-      await updateMedia.mutateAsync({
-        id: media.id,
-        source_url: downloadUrl,
-      });
-      
+      // Don't save the URL to database - always prompt for stream selection
       toast.success("Stream ready!");
       onOpenChange(false);
       
-      // Pass the updated media with the stream URL to play
+      // Pass the media with the stream URL to play (without persisting)
       onStreamSelected({ ...media, source_url: downloadUrl }, downloadUrl);
       
     } catch (err: any) {

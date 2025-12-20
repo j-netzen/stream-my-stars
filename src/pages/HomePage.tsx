@@ -39,8 +39,8 @@ export default function HomePage() {
     : null;
 
   const handlePlay = (item: Media) => {
-    // If media has no source URL but has TMDB ID, show stream selection
-    if (!item.source_url && item.tmdb_id) {
+    // Always show stream selection for media with TMDB ID
+    if (item.tmdb_id) {
       setStreamSelectMedia(item);
     } else {
       setActiveMedia(item);
