@@ -67,7 +67,7 @@ export default function HomePage() {
           </div>
 
           {/* Content */}
-          <div className="relative z-20 h-full flex items-end pb-16 px-6">
+          <div className="relative z-40 h-full flex items-end pb-16 px-6">
             <div className="max-w-2xl space-y-4">
               <h1 className="text-5xl font-bold text-shadow">{featured.title}</h1>
               {featured.overview && (
