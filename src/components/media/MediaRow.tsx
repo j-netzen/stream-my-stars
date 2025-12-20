@@ -12,6 +12,7 @@ interface MediaRowProps {
   onPlay?: (media: Media) => void;
   onDelete?: (media: Media) => void;
   onAddToPlaylist?: (media: Media) => void;
+  onMoreInfo?: (media: Media) => void;
 }
 
 export function MediaRow({
@@ -21,6 +22,7 @@ export function MediaRow({
   onPlay,
   onDelete,
   onAddToPlaylist,
+  onMoreInfo,
 }: MediaRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +74,7 @@ export function MediaRow({
               onPlay={onPlay}
               onDelete={onDelete}
               onAddToPlaylist={onAddToPlaylist}
+              onMoreInfo={onMoreInfo}
             />
           </div>
         ))}

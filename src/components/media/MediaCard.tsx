@@ -2,7 +2,7 @@ import { Media } from "@/hooks/useMedia";
 import { WatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
-import { Play, MoreVertical } from "lucide-react";
+import { Play, MoreVertical, Info } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,7 @@ interface MediaCardProps {
   onPlay?: (media: Media) => void;
   onDelete?: (media: Media) => void;
   onAddToPlaylist?: (media: Media) => void;
+  onMoreInfo?: (media: Media) => void;
 }
 
 export function MediaCard({
@@ -25,6 +26,7 @@ export function MediaCard({
   onPlay,
   onDelete,
   onAddToPlaylist,
+  onMoreInfo,
 }: MediaCardProps) {
   const posterUrl = media.poster_path
     ? getImageUrl(media.poster_path, "w300")
@@ -53,14 +55,24 @@ export function MediaCard({
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-          <Button
-            onClick={() => onPlay?.(media)}
-            className="w-full gap-2 mb-2"
-            size="sm"
-          >
-            <Play className="w-4 h-4" />
-            {progress && progressPercent > 0 ? "Continue" : "Play"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => onPlay?.(media)}
+              className="flex-1 gap-2"
+              size="sm"
+            >
+              <Play className="w-4 h-4" />
+              {progress && progressPercent > 0 ? "Continue" : "Play"}
+            </Button>
+            <Button
+              onClick={() => onMoreInfo?.(media)}
+              variant="secondary"
+              size="sm"
+              title="More Info"
+            >
+              <Info className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -87,6 +99,9 @@ export function MediaCard({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onPlay?.(media)}>
               Play
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onMoreInfo?.(media)}>
+              More Info
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onAddToPlaylist?.(media)}>
               Add to Playlist
