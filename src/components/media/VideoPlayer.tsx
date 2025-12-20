@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
+import { useTVMode } from "@/hooks/useTVMode";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,8 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { progress, isLoading: progressLoading, updateProgress } = useWatchProgress();
+  const { isTVMode } = useTVMode();
+  const [focusedControl, setFocusedControl] = useState<string>("play");
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -363,6 +366,100 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     }, 3000);
   };
 
+  // TV remote keyboard navigation
+  const controlOrder = ["skipBack", "play", "skipForward", "volume", "copy", "fullscreen", "close"];
+  
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const currentIndex = controlOrder.indexOf(focusedControl);
+    
+    switch (e.key) {
+      case "ArrowLeft":
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setFocusedControl(controlOrder[currentIndex - 1]);
+        } else {
+          skipTime(-10);
+        }
+        setShowControls(true);
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        if (currentIndex < controlOrder.length - 1) {
+          setFocusedControl(controlOrder[currentIndex + 1]);
+        } else {
+          skipTime(10);
+        }
+        setShowControls(true);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (focusedControl === "volume") {
+          const newVol = Math.min(1, volume + 0.1);
+          if (videoRef.current) videoRef.current.volume = newVol;
+          setVolume(newVol);
+          setIsMuted(false);
+        } else {
+          skipTime(30);
+        }
+        setShowControls(true);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        if (focusedControl === "volume") {
+          const newVol = Math.max(0, volume - 0.1);
+          if (videoRef.current) videoRef.current.volume = newVol;
+          setVolume(newVol);
+          setIsMuted(newVol === 0);
+        } else {
+          skipTime(-30);
+        }
+        setShowControls(true);
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        setShowControls(true);
+        switch (focusedControl) {
+          case "play":
+            handlePlayPause();
+            break;
+          case "skipBack":
+            skipTime(-10);
+            break;
+          case "skipForward":
+            skipTime(10);
+            break;
+          case "volume":
+            toggleMute();
+            break;
+          case "fullscreen":
+            toggleFullscreen();
+            break;
+          case "close":
+            onClose();
+            break;
+          case "copy":
+            if (src && !src.startsWith('blob:')) {
+              navigator.clipboard.writeText(src);
+              toast.success("Stream URL copied!");
+            }
+            break;
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        onClose();
+        break;
+    }
+  }, [focusedControl, volume, src, isPlaying]);
+
+  useEffect(() => {
+    if (isTVMode) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isTVMode, handleKeyDown]);
+
   // Get MIME type based on file extension for better codec handling
   const getMimeType = (url: string): string => {
     const lowerUrl = url.toLowerCase();
@@ -497,22 +594,35 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         )}
       >
         {/* Top Bar */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+        <div className={cn(
+          "absolute top-0 left-0 right-0 flex items-center justify-between",
+          isTVMode ? "p-6" : "p-4"
+        )}>
           <div>
-            <h1 className="text-xl font-bold text-shadow">{media.title}</h1>
+            <h1 className={cn(
+              "font-bold text-shadow",
+              isTVMode ? "text-3xl" : "text-xl"
+            )}>{media.title}</h1>
             {media.release_date && (
-              <p className="text-sm text-white/70">
+              <p className={cn(
+                "text-white/70",
+                isTVMode ? "text-lg" : "text-sm"
+              )}>
                 {media.release_date.split("-")[0]}
               </p>
             )}
           </div>
           <Button
             variant="ghost"
-            size="icon"
+            size={isTVMode ? "lg" : "icon"}
             onClick={onClose}
-            className="text-white hover:bg-white/20"
+            className={cn(
+              "text-white hover:bg-white/20",
+              isTVMode && focusedControl === "close" && "ring-4 ring-primary bg-white/20",
+              isTVMode && "w-14 h-14"
+            )}
           >
-            <X className="w-6 h-6" />
+            <X className={cn(isTVMode ? "w-8 h-8" : "w-6 h-6")} />
           </Button>
         </div>
 
@@ -522,15 +632,22 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
             <Button
               size="lg"
               onClick={handlePlayPause}
-              className="w-20 h-20 rounded-full bg-primary/90 hover:bg-primary"
+              className={cn(
+                "rounded-full bg-primary/90 hover:bg-primary",
+                isTVMode ? "w-32 h-32" : "w-20 h-20",
+                isTVMode && focusedControl === "play" && "ring-4 ring-white"
+              )}
             >
-              <Play className="w-10 h-10 fill-current" />
+              <Play className={cn(isTVMode ? "w-16 h-16" : "w-10 h-10", "fill-current")} />
             </Button>
           </div>
         )}
 
         {/* Bottom Controls */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4">
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 space-y-4",
+          isTVMode ? "p-8" : "p-4"
+        )}>
           {/* Progress Bar - Native range input */}
           {duration > 0 && (
             <input
@@ -540,76 +657,105 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
               step={0.1}
               value={currentTime}
               onChange={handleSeekChange}
-              className="w-full h-2 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+              className={cn(
+                "w-full bg-white/30 rounded-full appearance-none cursor-pointer accent-primary",
+                isTVMode 
+                  ? "h-3 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6" 
+                  : "h-2 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4",
+                "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+              )}
             />
           )}
 
           {/* Control Buttons */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center", isTVMode ? "gap-4" : "gap-2")}>
               <Button
                 variant="ghost"
-                size="icon"
+                size={isTVMode ? "lg" : "icon"}
                 onClick={() => skipTime(-10)}
-                className="text-white hover:bg-white/20"
+                className={cn(
+                  "text-white hover:bg-white/20",
+                  isTVMode && "w-16 h-16",
+                  isTVMode && focusedControl === "skipBack" && "ring-4 ring-primary bg-white/20"
+                )}
               >
-                <SkipBack className="w-5 h-5" />
+                <SkipBack className={cn(isTVMode ? "w-8 h-8" : "w-5 h-5")} />
               </Button>
               <Button
                 variant="ghost"
-                size="icon"
+                size={isTVMode ? "lg" : "icon"}
                 onClick={handlePlayPause}
-                className="text-white hover:bg-white/20"
+                className={cn(
+                  "text-white hover:bg-white/20",
+                  isTVMode && "w-20 h-20",
+                  isTVMode && focusedControl === "play" && "ring-4 ring-primary bg-white/20"
+                )}
               >
                 {isPlaying ? (
-                  <Pause className="w-6 h-6" />
+                  <Pause className={cn(isTVMode ? "w-10 h-10" : "w-6 h-6")} />
                 ) : (
-                  <Play className="w-6 h-6" />
+                  <Play className={cn(isTVMode ? "w-10 h-10" : "w-6 h-6")} />
                 )}
               </Button>
               <Button
                 variant="ghost"
-                size="icon"
+                size={isTVMode ? "lg" : "icon"}
                 onClick={() => skipTime(10)}
-                className="text-white hover:bg-white/20"
+                className={cn(
+                  "text-white hover:bg-white/20",
+                  isTVMode && "w-16 h-16",
+                  isTVMode && focusedControl === "skipForward" && "ring-4 ring-primary bg-white/20"
+                )}
               >
-                <SkipForward className="w-5 h-5" />
+                <SkipForward className={cn(isTVMode ? "w-8 h-8" : "w-5 h-5")} />
               </Button>
 
-              <span className="text-sm text-white/90 ml-2">
+              <span className={cn(
+                "text-white/90 ml-2",
+                isTVMode ? "text-xl" : "text-sm"
+              )}>
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center", isTVMode ? "gap-4" : "gap-2")}>
               {/* Copy URL for external players */}
               {src && !src.startsWith('blob:') && (
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={isTVMode ? "lg" : "icon"}
                   onClick={() => {
                     navigator.clipboard.writeText(src);
                     toast.success("Stream URL copied! Paste in VLC or another player.");
                   }}
-                  className="text-white hover:bg-white/20"
+                  className={cn(
+                    "text-white hover:bg-white/20",
+                    isTVMode && "w-14 h-14",
+                    isTVMode && focusedControl === "copy" && "ring-4 ring-primary bg-white/20"
+                  )}
                   title="Copy stream URL for VLC"
                 >
-                  <Copy className="w-5 h-5" />
+                  <Copy className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                 </Button>
               )}
 
               {/* Volume */}
-              <div className="flex items-center gap-2">
+              <div className={cn("flex items-center", isTVMode ? "gap-3" : "gap-2")}>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size={isTVMode ? "lg" : "icon"}
                   onClick={toggleMute}
-                  className="text-white hover:bg-white/20"
+                  className={cn(
+                    "text-white hover:bg-white/20",
+                    isTVMode && "w-14 h-14",
+                    isTVMode && focusedControl === "volume" && "ring-4 ring-primary bg-white/20"
+                  )}
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeX className="w-5 h-5" />
+                    <VolumeX className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                   ) : (
-                    <Volume2 className="w-5 h-5" />
+                    <Volume2 className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                   )}
                 </Button>
                 <input
@@ -619,21 +765,31 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
                   step={0.1}
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
-                  className="w-20 h-2 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+                  className={cn(
+                    "bg-white/30 rounded-full appearance-none cursor-pointer accent-primary",
+                    isTVMode 
+                      ? "w-32 h-3 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5" 
+                      : "w-20 h-2 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3",
+                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+                  )}
                 />
               </div>
 
               {/* Fullscreen */}
               <Button
                 variant="ghost"
-                size="icon"
+                size={isTVMode ? "lg" : "icon"}
                 onClick={toggleFullscreen}
-                className="text-white hover:bg-white/20"
+                className={cn(
+                  "text-white hover:bg-white/20",
+                  isTVMode && "w-14 h-14",
+                  isTVMode && focusedControl === "fullscreen" && "ring-4 ring-primary bg-white/20"
+                )}
               >
                 {isFullscreen ? (
-                  <Minimize className="w-5 h-5" />
+                  <Minimize className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                 ) : (
-                  <Maximize className="w-5 h-5" />
+                  <Maximize className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                 )}
               </Button>
             </div>
