@@ -11,6 +11,7 @@ interface MediaRowProps {
   title: string;
   media: Media[];
   progress?: WatchProgress[];
+  showContinue?: boolean;
   onPlay?: (media: Media) => void;
   onDelete?: (media: Media) => void;
   onAddToPlaylist?: (media: Media) => void;
@@ -21,6 +22,7 @@ export function MediaRow({
   title,
   media,
   progress = [],
+  showContinue = true,
   onPlay,
   onDelete,
   onAddToPlaylist,
@@ -95,6 +97,7 @@ export function MediaRow({
             <MediaCard
               media={item}
               progress={progress.find((p) => p.media_id === item.id)}
+              showContinue={showContinue}
               onPlay={onPlay}
               onDelete={onDelete}
               onAddToPlaylist={onAddToPlaylist}

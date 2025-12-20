@@ -15,6 +15,7 @@ import { useTVMode } from "@/hooks/useTVMode";
 interface MediaCardProps {
   media: Media;
   progress?: WatchProgress;
+  showContinue?: boolean;
   onPlay?: (media: Media) => void;
   onDelete?: (media: Media) => void;
   onAddToPlaylist?: (media: Media) => void;
@@ -24,6 +25,7 @@ interface MediaCardProps {
 export function MediaCard({
   media,
   progress,
+  showContinue = true,
   onPlay,
   onDelete,
   onAddToPlaylist,
@@ -87,7 +89,7 @@ export function MediaCard({
               tabIndex={-1}
             >
               <Play className={cn("w-4 h-4", isTVMode && "w-6 h-6")} />
-              {progress && progressPercent > 0 ? "Continue" : "Play"}
+              {showContinue && progress && progressPercent > 0 ? "Continue" : "Play"}
             </Button>
             <Button
               onClick={() => onMoreInfo?.(media)}
