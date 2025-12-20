@@ -107,6 +107,7 @@ export function StreamSelectionDialog({
     
     try {
       let downloadUrl: string;
+      const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
       
       if (isDirectRdLink(stream.url)) {
         // Already a direct link
@@ -121,33 +122,26 @@ export function StreamSelectionDialog({
         } else {
           throw new Error("No download links available from torrent");
         }
-      } else {
-        // Try to unrestrict the link
-        try {
-          const unrestricted = await unrestrictLink(stream.url);
-          downloadUrl = unrestricted.download;
-        } catch (unrestrictError: any) {
-          // Try magnet fallback
-          const errorMessage = unrestrictError?.message || '';
-          if (errorMessage.includes('hoster_unsupported') || errorMessage.includes('400')) {
-            console.log("Unrestrict failed, trying magnet fallback...");
-            const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
-            if (magnetLink) {
-              toast.info("Extracting from torrent...");
-              const torrent = await addMagnetAndWait(magnetLink, () => {});
-              if (torrent.links && torrent.links.length > 0) {
-                const unrestricted = await unrestrictLink(torrent.links[0]);
-                downloadUrl = unrestricted.download;
-              } else {
-                throw new Error("No download links available from torrent");
-              }
-            } else {
-              throw new Error("Link not supported and no magnet hash found");
-            }
+      } else if (isTorrentioResolveUrl) {
+        // Torrentio resolve URLs can't be unrestricted directly - extract magnet and use that
+        console.log("Torrentio resolve URL detected, extracting magnet...");
+        const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
+        if (magnetLink) {
+          toast.info("Preparing stream from torrent...");
+          const torrent = await addMagnetAndWait(magnetLink, () => {});
+          if (torrent.links && torrent.links.length > 0) {
+            const unrestricted = await unrestrictLink(torrent.links[0]);
+            downloadUrl = unrestricted.download;
           } else {
-            throw unrestrictError;
+            throw new Error("No download links available from torrent");
           }
+        } else {
+          throw new Error("Could not extract torrent hash from URL");
         }
+      } else {
+        // Try to unrestrict the link directly
+        const unrestricted = await unrestrictLink(stream.url);
+        downloadUrl = unrestricted.download;
       }
       
       // Update the media with the new source URL
