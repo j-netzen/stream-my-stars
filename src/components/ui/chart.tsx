@@ -65,26 +65,46 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
-      }}
-    />
-  );
+  // Build CSS custom properties safely without dangerouslySetInnerHTML
+  const buildCssVariables = React.useCallback(() => {
+    const cssRules: string[] = [];
+    
+    Object.entries(THEMES).forEach(([theme, prefix]) => {
+      // Sanitize id to alphanumeric, hyphens, and underscores only
+      const sanitizedId = id.replace(/[^a-zA-Z0-9-_]/g, '');
+      
+      const colorVars = colorConfig
+        .map(([key, itemConfig]) => {
+          const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+          if (!color) return null;
+          // Validate color format (hex, rgb, hsl, or CSS color names)
+          const validColorPattern = /^(#[0-9a-fA-F]{3,8}|rgb\(|rgba\(|hsl\(|hsla\(|[a-zA-Z]+)[\s\S]*$/;
+          if (!validColorPattern.test(color)) return null;
+          // Sanitize key to alphanumeric, hyphens, and underscores only
+          const sanitizedKey = key.replace(/[^a-zA-Z0-9-_]/g, '');
+          return `  --color-${sanitizedKey}: ${color};`;
+        })
+        .filter(Boolean)
+        .join('\n');
+      
+      if (colorVars) {
+        cssRules.push(`${prefix} [data-chart=${sanitizedId}] {\n${colorVars}\n}`);
+      }
+    });
+    
+    return cssRules.join('\n');
+  }, [id, colorConfig]);
+
+  // Use a style element with textContent for safety
+  const styleRef = React.useRef<HTMLStyleElement>(null);
+  
+  React.useEffect(() => {
+    if (styleRef.current) {
+      styleRef.current.textContent = buildCssVariables();
+    }
+  }, [buildCssVariables]);
+
+  return <style ref={styleRef} />;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
