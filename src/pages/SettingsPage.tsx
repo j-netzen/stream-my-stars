@@ -187,14 +187,28 @@ export default function SettingsPage() {
           <CardDescription>Video caching information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Max Resolution</p>
+              <p className="font-medium">4K / 2160p</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Frame Rate</p>
+              <p className="font-medium">60 FPS</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Max Bitrate</p>
+              <p className="font-medium">50 Mbps</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 pt-2">
             <div>
               <p className="text-sm text-muted-foreground">Cache Limit</p>
               <p className="font-medium">128 MB</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Frame Rate</p>
-              <p className="font-medium">60 FPS</p>
+              <p className="text-sm text-muted-foreground">Preload Mode</p>
+              <p className="font-medium">Auto (Full Buffer)</p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">

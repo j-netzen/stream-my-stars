@@ -406,8 +406,9 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         onPlaying={() => setIsBuffering(false)}
         onClick={handlePlayPause}
         poster={backdropUrl || undefined}
-        preload="metadata"
+        preload="auto"
         playsInline
+        crossOrigin="anonymous"
       >
         {/* Use source element with type hints for better codec support */}
         {src && (
