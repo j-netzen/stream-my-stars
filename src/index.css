@@ -111,34 +111,8 @@ All colors MUST be HSL.
   }
 }
 
-/* Focus styles for remote/keyboard navigation */
+/* TV Mode focus styles - high visibility for remote navigation */
 @layer components {
-  /* General focus ring for all focusable elements */
-  [data-focusable]:focus-visible,
-  .media-card:focus-visible {
-    outline: 3px solid hsl(var(--primary));
-    outline-offset: 2px;
-    border-radius: var(--radius);
-  }
-
-  .media-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .media-card:focus-visible,
-  .media-card:focus-within {
-    transform: scale(1.05);
-    z-index: 10;
-    box-shadow: 0 0 0 3px hsl(var(--primary)), 
-                0 20px 40px -10px rgba(0, 0, 0, 0.4);
-  }
-
-  .media-card:focus-visible .group-hover\:opacity-100,
-  .media-card:focus-within .group-hover\:opacity-100 {
-    opacity: 1;
-  }
-
-  /* TV Mode focus styles - high visibility for remote navigation */
   .tv-mode *:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
     outline-offset: 2px;
@@ -150,7 +124,6 @@ All colors MUST be HSL.
   }
 
   .tv-mode .media-card:focus-within,
-  .tv-mode .media-card:focus-visible,
   .tv-mode .media-card:hover {
     transform: scale(1.08);
     z-index: 10;
@@ -158,8 +131,7 @@ All colors MUST be HSL.
                 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
 
-  .tv-mode .media-card:focus-within .group-hover\:opacity-100,
-  .tv-mode .media-card:focus-visible .group-hover\:opacity-100 {
+  .tv-mode .media-card:focus-within .group-hover\:opacity-100 {
     opacity: 1;
   }
 

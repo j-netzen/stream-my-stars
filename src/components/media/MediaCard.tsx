@@ -53,7 +53,6 @@ export function MediaCard({
       role="button"
       aria-label={`Play ${media.title}`}
       onKeyDown={handleKeyDown}
-      data-focusable
     >
       {/* Poster */}
       <div className={cn(

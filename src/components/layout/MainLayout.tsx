@@ -1,13 +1,11 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar, MobileMenuTrigger } from "./Sidebar";
 import { AddMediaDialog } from "@/components/media/AddMediaDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { FocusIndicator } from "@/components/FocusIndicator";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useGlobalRemoteNavigation } from "@/hooks/useRemoteNavigation";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -18,9 +16,6 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [isAddMediaOpen, setIsAddMediaOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Enable global arrow key navigation for TV remotes
-  useGlobalRemoteNavigation();
 
   if (loading) {
     return (
@@ -63,9 +58,6 @@ export function MainLayout({ children }: MainLayoutProps) {
       </main>
       
       <AddMediaDialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen} />
-      
-      {/* Focus indicator for TV remote navigation */}
-      <FocusIndicator />
     </div>
   );
 }
