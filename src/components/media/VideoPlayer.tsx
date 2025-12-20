@@ -416,6 +416,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       {/* Video - Hardware accelerated */}
       <video
         ref={videoRef}
+        src={src || undefined}
         className="w-full h-full object-contain gpu-accelerated"
         style={{
           transform: 'translate3d(0, 0, 0)',
@@ -450,20 +451,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         poster={backdropUrl || undefined}
         preload="auto"
         playsInline
-        crossOrigin="anonymous"
-      >
-        {/* Use source element with type hints for better codec support */}
-        {src && (
-          <source 
-            src={src} 
-            type={getMimeType(src)}
-          />
-        )}
-        {/* Fallback for browsers that need direct src */}
-        {src && !src.toLowerCase().includes('.mkv') && (
-          <source src={src} />
-        )}
-      </video>
+      />
 
       <input
         ref={filePickerRef}
