@@ -90,7 +90,7 @@ export async function getSupportedHosts(): Promise<Record<string, unknown>> {
   return invokeRealDebrid({ action: "hosts" });
 }
 
-// Helper to add a magnet and wait for it to be ready
+// Helper to add a magnet and wait for links to be available (not full download)
 export async function addMagnetAndWait(
   magnet: string,
   onProgress?: (progress: number) => void
@@ -101,13 +101,24 @@ export async function addMagnetAndWait(
   // Select all files
   await selectTorrentFiles(id);
   
-  // Poll for status
-  let torrent: RealDebridTorrent;
+  // Wait a moment for RD to process
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  
+  // Check torrent info - links may be available immediately if cached
+  let torrent = await getTorrentInfo(id);
+  
+  // If links are already available (cached), return immediately
+  if (torrent.links && torrent.links.length > 0) {
+    if (onProgress) onProgress(100);
+    return torrent;
+  }
+  
+  // Poll for links to become available (not full download)
   let attempts = 0;
-  const maxAttempts = 60; // 5 minutes max
+  const maxAttempts = 30; // 30 seconds max wait for links
   
   do {
-    await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
     torrent = await getTorrentInfo(id);
     
     if (onProgress && torrent.progress) {
@@ -119,10 +130,16 @@ export async function addMagnetAndWait(
     if (torrent.status === "error" || torrent.status === "dead") {
       throw new Error(`Torrent failed with status: ${torrent.status}`);
     }
-  } while (torrent.status !== "downloaded" && attempts < maxAttempts);
+    
+    // Links become available once downloading starts, not when complete
+    if (torrent.links && torrent.links.length > 0) {
+      return torrent;
+    }
+  } while (attempts < maxAttempts);
   
-  if (torrent.status !== "downloaded") {
-    throw new Error("Torrent download timed out");
+  // If still no links after waiting, throw error
+  if (!torrent.links || torrent.links.length === 0) {
+    throw new Error("Could not get streaming links. The torrent may not be cached. Try a different stream.");
   }
   
   return torrent;
