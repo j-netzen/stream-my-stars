@@ -187,9 +187,15 @@ export default function SettingsPage() {
           <CardDescription>Video caching information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Cache Limit</p>
-            <p className="font-medium">100 MB</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Cache Limit</p>
+              <p className="font-medium">128 MB</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Frame Rate</p>
+              <p className="font-medium">60 FPS</p>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
             Video chunks are cached locally for smoother playback. Cache is
