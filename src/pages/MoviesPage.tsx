@@ -27,7 +27,8 @@ export default function MoviesPage() {
   );
 
   const handlePlay = (item: Media) => {
-    if (!item.source_url && item.tmdb_id) {
+    // Always show stream selection for media with TMDB ID
+    if (item.tmdb_id) {
       setStreamSelectMedia(item);
     } else {
       setActiveMedia(item);
