@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Media, useMedia } from "@/hooks/useMedia";
+import { useTVMode } from "@/hooks/useTVMode";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Play, Film, Tv, Download, RefreshCw, Star, Calendar, Clock, Zap, Check, AlertCircle } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,7 @@ export function StreamSelectionDialog({
   onStreamSelected,
 }: StreamSelectionDialogProps) {
   const { updateMedia } = useMedia();
+  const { isTVMode } = useTVMode();
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -45,6 +47,44 @@ export function StreamSelectionDialog({
   const [resolveProgress, setResolveProgress] = useState<number>(0);
   const [resolveStatus, setResolveStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Auto-focus first stream when list loads
+  useEffect(() => {
+    if (streams.length > 0 && !isSearching) {
+      setFocusedIndex(0);
+      // Focus the first stream button for TV navigation
+      setTimeout(() => {
+        streamButtonsRef.current[0]?.focus();
+      }, 100);
+    }
+  }, [streams, isSearching]);
+
+  // Keyboard navigation for TV remotes
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
+    if (isResolving) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        const nextIndex = Math.min(index + 1, streams.length - 1);
+        setFocusedIndex(nextIndex);
+        streamButtonsRef.current[nextIndex]?.focus();
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        const prevIndex = Math.max(index - 1, 0);
+        setFocusedIndex(prevIndex);
+        streamButtonsRef.current[prevIndex]?.focus();
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        handleStreamSelect(streams[index]);
+        break;
+    }
+  }, [streams, isResolving]);
 
   // Reset state when dialog opens with new media
   useEffect(() => {
@@ -324,33 +364,57 @@ export function StreamSelectionDialog({
 
         {/* Stream list */}
         {streams.length > 0 && !isSearching && (
-          <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-            <p className="text-xs text-muted-foreground mb-2">
-              {streams.length} stream(s) found - sorted by quality
+          <div className={cn(
+            "flex-1 overflow-y-auto min-h-0",
+            isTVMode ? "space-y-3" : "space-y-2"
+          )}>
+            <p className={cn(
+              "text-muted-foreground mb-2",
+              isTVMode ? "text-base" : "text-xs"
+            )}>
+              {streams.length} stream(s) found - use ↑↓ arrows to navigate, Enter to select
             </p>
             {streams.map((stream, index) => {
               const info = parseStreamInfo(stream);
               const isCurrentlyResolving = resolvingStream === stream.url;
+              const isFocused = focusedIndex === index;
               
               return (
                 <button
                   key={index}
+                  ref={(el) => (streamButtonsRef.current[index] = el)}
                   onClick={() => handleStreamSelect(stream)}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  onFocus={() => setFocusedIndex(index)}
                   disabled={isResolving}
                   className={cn(
-                    "w-full text-left p-3 rounded-lg border transition-colors",
+                    "w-full text-left rounded-lg border transition-all duration-200",
+                    // Base padding - larger for TV
+                    isTVMode ? "p-5" : "p-3",
+                    // Focus/selection states - very visible for TV
                     isCurrentlyResolving
-                      ? "border-primary bg-primary/10"
+                      ? "border-primary bg-primary/20 ring-2 ring-primary"
+                      : isFocused
+                      ? "border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]"
                       : "border-border hover:border-primary/50 hover:bg-accent/50",
+                    // Focused state styling
+                    "focus:outline-none focus:border-primary focus:bg-primary/10 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02]",
                     isResolving && !isCurrentlyResolving && "opacity-50"
                   )}
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className={cn(
+                    "flex items-center justify-between",
+                    isTVMode ? "gap-4" : "gap-3"
+                  )}>
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className={cn(
+                        "flex flex-wrap items-center",
+                        isTVMode ? "gap-3" : "gap-2"
+                      )}>
                         {info.quality && (
                           <span className={cn(
-                            "px-2 py-0.5 text-xs font-medium rounded",
+                            "font-semibold rounded",
+                            isTVMode ? "px-3 py-1 text-base" : "px-2 py-0.5 text-xs",
                             info.quality.includes("2160") || info.quality.includes("4K")
                               ? "bg-purple-500/20 text-purple-400"
                               : info.quality.includes("1080")
@@ -363,28 +427,46 @@ export function StreamSelectionDialog({
                           </span>
                         )}
                         {info.size && (
-                          <span className="text-xs text-muted-foreground">{info.size}</span>
+                          <span className={cn(
+                            "text-muted-foreground",
+                            isTVMode ? "text-base" : "text-xs"
+                          )}>{info.size}</span>
                         )}
                         {info.isDirectLink && (
-                          <span className="px-1.5 py-0.5 text-xs bg-green-500/20 text-green-400 rounded flex items-center gap-1">
-                            <Zap className="w-3 h-3" />
+                          <span className={cn(
+                            "bg-green-500/20 text-green-400 rounded flex items-center gap-1",
+                            isTVMode ? "px-2 py-1 text-sm" : "px-1.5 py-0.5 text-xs"
+                          )}>
+                            <Zap className={cn(isTVMode ? "w-4 h-4" : "w-3 h-3")} />
                             Cached
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1 truncate">
+                      <p className={cn(
+                        "text-muted-foreground mt-1 truncate",
+                        isTVMode ? "text-base" : "text-sm"
+                      )}>
                         {stream.title || stream.name}
                       </p>
                     </div>
                     <div className="shrink-0 flex flex-col items-end gap-1">
                       {isCurrentlyResolving ? (
                         <div className="flex flex-col items-end gap-1">
-                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                          <Loader2 className={cn(
+                            "animate-spin text-primary",
+                            isTVMode ? "w-8 h-8" : "w-5 h-5"
+                          )} />
                           {resolveStatus && (
-                            <span className="text-xs text-primary">{resolveStatus}</span>
+                            <span className={cn(
+                              "text-primary",
+                              isTVMode ? "text-sm" : "text-xs"
+                            )}>{resolveStatus}</span>
                           )}
                           {resolveProgress > 0 && resolveProgress < 100 && (
-                            <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className={cn(
+                              "bg-muted rounded-full overflow-hidden",
+                              isTVMode ? "w-28 h-2" : "w-20 h-1.5"
+                            )}>
                               <div 
                                 className="h-full bg-primary transition-all duration-300"
                                 style={{ width: `${resolveProgress}%` }}
@@ -393,7 +475,10 @@ export function StreamSelectionDialog({
                           )}
                         </div>
                       ) : (
-                        <Play className="w-5 h-5 text-muted-foreground" />
+                        <Play className={cn(
+                          isTVMode ? "w-8 h-8" : "w-5 h-5",
+                          isFocused ? "text-primary" : "text-muted-foreground"
+                        )} />
                       )}
                     </div>
                   </div>
