@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sidebar, MobileMenuTrigger } from "./Sidebar";
 import { AddMediaDialog } from "@/components/media/AddMediaDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { FocusIndicator } from "@/components/FocusIndicator";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGlobalRemoteNavigation } from "@/hooks/useRemoteNavigation";
@@ -62,6 +63,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       </main>
       
       <AddMediaDialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen} />
+      
+      {/* Focus indicator for TV remote navigation */}
+      <FocusIndicator />
     </div>
   );
 }
