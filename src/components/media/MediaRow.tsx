@@ -4,6 +4,8 @@ import { WatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "./MediaCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTVMode } from "@/hooks/useTVMode";
+import { cn } from "@/lib/utils";
 
 interface MediaRowProps {
   title: string;
@@ -25,6 +27,7 @@ export function MediaRow({
   onMoreInfo,
 }: MediaRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { isTVMode } = useTVMode();
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -39,35 +42,56 @@ export function MediaRow({
   if (media.length === 0) return null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between px-4 md:px-6">
-        <h2 className="text-xl font-semibold">{title}</h2>
-        <div className="flex gap-2">
+    <div className={cn("space-y-4", isTVMode && "space-y-6")}>
+      <div className={cn(
+        "flex items-center justify-between",
+        isTVMode ? "px-8" : "px-4 md:px-6"
+      )}>
+        <h2 className={cn(
+          "font-semibold",
+          isTVMode ? "tv-row-title text-2xl" : "text-xl"
+        )}>
+          {title}
+        </h2>
+        <div className={cn("flex", isTVMode ? "gap-3" : "gap-2")}>
           <Button
             variant="ghost"
-            size="icon"
+            size={isTVMode ? "default" : "icon"}
             onClick={() => scroll("left")}
-            className="h-8 w-8"
+            className={cn(isTVMode ? "tv-button-icon h-12 w-12" : "h-8 w-8")}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />
           </Button>
           <Button
             variant="ghost"
-            size="icon"
+            size={isTVMode ? "default" : "icon"}
             onClick={() => scroll("right")}
-            className="h-8 w-8"
+            className={cn(isTVMode ? "tv-button-icon h-12 w-12" : "h-8 w-8")}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />
           </Button>
         </div>
       </div>
 
       <div
         ref={scrollRef}
-        className="flex gap-3 md:gap-4 overflow-x-auto scrollbar-hide px-4 md:px-6 pb-4 snap-x snap-mandatory"
+        className={cn(
+          "flex overflow-x-auto scrollbar-hide snap-x snap-mandatory",
+          isTVMode 
+            ? "gap-6 px-8 pb-6" 
+            : "gap-3 md:gap-4 px-4 md:px-6 pb-4"
+        )}
       >
         {media.map((item) => (
-          <div key={item.id} className="flex-shrink-0 w-32 sm:w-36 md:w-40 lg:w-44 snap-start">
+          <div 
+            key={item.id} 
+            className={cn(
+              "flex-shrink-0 snap-start",
+              isTVMode 
+                ? "w-[var(--tv-card-width)]" 
+                : "w-32 sm:w-36 md:w-40 lg:w-44"
+            )}
+          >
             <MediaCard
               media={item}
               progress={progress.find((p) => p.media_id === item.id)}
