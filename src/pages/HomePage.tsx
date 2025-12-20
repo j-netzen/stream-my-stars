@@ -108,6 +108,7 @@ export default function HomePage() {
             progress={progress}
             onPlay={handlePlay}
             onDelete={handleDelete}
+            onMoreInfo={setDetailsMedia}
           />
         )}
 
@@ -118,6 +119,7 @@ export default function HomePage() {
             progress={progress}
             onPlay={handlePlay}
             onDelete={handleDelete}
+            onMoreInfo={setDetailsMedia}
           />
         )}
 
@@ -128,6 +130,7 @@ export default function HomePage() {
             progress={progress}
             onPlay={handlePlay}
             onDelete={handleDelete}
+            onMoreInfo={setDetailsMedia}
           />
         )}
 
@@ -138,6 +141,7 @@ export default function HomePage() {
             progress={progress}
             onPlay={handlePlay}
             onDelete={handleDelete}
+            onMoreInfo={setDetailsMedia}
           />
         )}
 
@@ -155,6 +159,7 @@ export default function HomePage() {
               progress={progress}
               onPlay={handlePlay}
               onDelete={handleDelete}
+              onMoreInfo={setDetailsMedia}
             />
           );
         })}
