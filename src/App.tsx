@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "next-themes";
+import { TVModeProvider } from "@/hooks/useTVMode";
 import { MainLayout } from "@/components/layout/MainLayout";
 import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
@@ -22,82 +23,84 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <AuthProvider>
-        <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<AuthPage />} />
-            <Route
-              path="/"
-              element={
-                <MainLayout>
-                  <HomePage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/movies"
-              element={
-                <MainLayout>
-                  <MoviesPage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/tv-shows"
-              element={
-                <MainLayout>
-                  <TVShowsPage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/home-movies"
-              element={
-                <MainLayout>
-                  <HomeMoviesPage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/categories"
-              element={
-                <MainLayout>
-                  <CategoriesPage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/playlists"
-              element={
-                <MainLayout>
-                  <PlaylistsPage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/discover"
-              element={
-                <MainLayout>
-                  <DiscoverPage />
-                </MainLayout>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <MainLayout>
-                  <SettingsPage />
-                </MainLayout>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
+      <TVModeProvider>
+        <AuthProvider>
+          <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<AuthPage />} />
+              <Route
+                path="/"
+                element={
+                  <MainLayout>
+                    <HomePage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/movies"
+                element={
+                  <MainLayout>
+                    <MoviesPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/tv-shows"
+                element={
+                  <MainLayout>
+                    <TVShowsPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/home-movies"
+                element={
+                  <MainLayout>
+                    <HomeMoviesPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/categories"
+                element={
+                  <MainLayout>
+                    <CategoriesPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/playlists"
+                element={
+                  <MainLayout>
+                    <PlaylistsPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/discover"
+                element={
+                  <MainLayout>
+                    <DiscoverPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <MainLayout>
+                    <SettingsPage />
+                  </MainLayout>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </TVModeProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

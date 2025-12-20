@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useCategories } from "@/hooks/useCategories";
+import { useTVMode } from "@/hooks/useTVMode";
 import { MediaRow } from "@/components/media/MediaRow";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
@@ -9,11 +10,13 @@ import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const { media, isLoading: mediaLoading, deleteMedia } = useMedia();
   const { progress, getContinueWatching } = useWatchProgress();
   const { categories } = useCategories();
+  const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
@@ -44,7 +47,7 @@ export default function HomePage() {
   if (mediaLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Loader2 className={cn("animate-spin text-primary", isTVMode ? "w-12 h-12" : "w-8 h-8")} />
       </div>
     );
   }
@@ -53,7 +56,10 @@ export default function HomePage() {
     <div className="min-h-screen">
       {/* Hero Section */}
       {featured && (
-        <div className="relative h-[70vh] overflow-hidden z-20">
+        <div className={cn(
+          "relative overflow-hidden z-20",
+          isTVMode ? "h-[80vh]" : "h-[70vh]"
+        )}>
           {/* Background */}
           <div
             className="absolute inset-0 bg-cover bg-center"
@@ -69,30 +75,41 @@ export default function HomePage() {
           </div>
 
           {/* Content */}
-          <div className="relative z-40 h-full flex items-end pb-16 px-6">
-            <div className="max-w-2xl space-y-4">
-              <h1 className="text-5xl font-bold text-shadow">{featured.title}</h1>
+          <div className={cn(
+            "relative z-40 h-full flex items-end",
+            isTVMode ? "pb-24 px-12" : "pb-16 px-6"
+          )}>
+            <div className={cn("space-y-4", isTVMode ? "max-w-3xl space-y-6" : "max-w-2xl")}>
+              <h1 className={cn(
+                "font-bold text-shadow",
+                isTVMode ? "tv-title text-6xl" : "text-5xl"
+              )}>
+                {featured.title}
+              </h1>
               {featured.overview && (
-                <p className="text-lg text-white/80 line-clamp-3 text-shadow">
+                <p className={cn(
+                  "text-white/80 line-clamp-3 text-shadow",
+                  isTVMode ? "tv-subtitle text-xl" : "text-lg"
+                )}>
                   {featured.overview}
                 </p>
               )}
-              <div className="flex gap-3">
+              <div className={cn("flex", isTVMode ? "gap-4" : "gap-3")}>
                 <Button
-                  size="lg"
+                  size={isTVMode ? "tv-lg" : "lg"}
                   className="gap-2"
                   onClick={() => handlePlay(featured)}
                 >
-                  <Play className="w-5 h-5 fill-current" />
+                  <Play className={cn("fill-current", isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                   Play
                 </Button>
                 <Button 
-                  size="lg" 
+                  size={isTVMode ? "tv-lg" : "lg"}
                   variant="secondary" 
                   className="gap-2"
                   onClick={() => setDetailsMedia(featured)}
                 >
-                  <Info className="w-5 h-5" />
+                  <Info className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                   More Info
                 </Button>
               </div>
@@ -102,7 +119,10 @@ export default function HomePage() {
       )}
 
       {/* Content Rows */}
-      <div className="space-y-8 pb-12 mt-4 md:-mt-8 relative z-30">
+      <div className={cn(
+        "pb-12 relative z-30",
+        isTVMode ? "space-y-12 mt-6" : "space-y-8 mt-4 md:-mt-8"
+      )}>
         {movies.length > 0 && (
           <MediaRow
             title="Movies"
@@ -173,12 +193,20 @@ export default function HomePage() {
 
         {/* Empty State */}
         {media.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-24 h-24 bg-secondary rounded-full flex items-center justify-center mb-6">
-              <Play className="w-12 h-12 text-muted-foreground" />
+          <div className={cn(
+            "flex flex-col items-center justify-center text-center",
+            isTVMode ? "py-32" : "py-20"
+          )}>
+            <div className={cn(
+              "bg-secondary rounded-full flex items-center justify-center mb-6",
+              isTVMode ? "w-32 h-32" : "w-24 h-24"
+            )}>
+              <Play className={cn("text-muted-foreground", isTVMode ? "w-16 h-16" : "w-12 h-12")} />
             </div>
-            <h2 className="text-2xl font-semibold mb-2">Your library is empty</h2>
-            <p className="text-muted-foreground max-w-md">
+            <h2 className={cn("font-semibold mb-2", isTVMode ? "text-4xl" : "text-2xl")}>
+              Your library is empty
+            </h2>
+            <p className={cn("text-muted-foreground max-w-md", isTVMode && "text-xl")}>
               Click "Add Media" in the sidebar to start building your personal
               streaming library with movies and TV shows.
             </p>

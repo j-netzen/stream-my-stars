@@ -39,20 +39,18 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* TV Mode variables */
+    --tv-card-width: 11rem;
+    --tv-focus-ring: 217.2 91.2% 59.8%;
+    --tv-focus-ring-width: 4px;
   }
 
   .dark {
@@ -91,6 +89,15 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --tv-focus-ring: 217.2 91.2% 70%;
+  }
+
+  /* TV Mode - larger everything for 10-foot UI */
+  .tv-mode {
+    --tv-card-width: 16rem;
+    --tv-focus-ring-width: 6px;
+    font-size: 18px;
   }
 }
 
@@ -101,5 +108,93 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* TV Mode focus styles - high visibility for remote navigation */
+@layer components {
+  .tv-mode *:focus-visible {
+    outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+
+  .tv-mode .media-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .tv-mode .media-card:focus-within,
+  .tv-mode .media-card:hover {
+    transform: scale(1.08);
+    z-index: 10;
+    box-shadow: 0 0 0 var(--tv-focus-ring-width) hsl(var(--tv-focus-ring)), 
+                0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .tv-mode .media-card:focus-within .group-hover\:opacity-100 {
+    opacity: 1;
+  }
+
+  /* TV mode larger buttons */
+  .tv-mode .tv-button {
+    min-height: 3.5rem;
+    min-width: 3.5rem;
+    font-size: 1.125rem;
+    padding: 1rem 2rem;
+  }
+
+  .tv-mode .tv-button-icon {
+    min-height: 3.5rem;
+    min-width: 3.5rem;
+  }
+
+  /* TV mode sidebar */
+  .tv-mode .tv-nav-item {
+    padding: 1rem 1.5rem;
+    font-size: 1.125rem;
+  }
+
+  /* TV mode text scaling */
+  .tv-mode .tv-title {
+    font-size: 4rem;
+    line-height: 1.1;
+  }
+
+  .tv-mode .tv-subtitle {
+    font-size: 1.5rem;
+    line-height: 1.4;
+  }
+
+  .tv-mode .tv-row-title {
+    font-size: 1.5rem;
+  }
+
+  /* TV mode scrollbar hidden but scrollable */
+  .tv-mode .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Text shadow for readability over images */
+  .text-shadow {
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  }
+
+  /* Gradient text effect */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent;
+  }
+
+  /* Active sidebar item */
+  .sidebar-active {
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* Progress bar styling */
+  .progress-bar {
+    @apply h-1 bg-muted;
+  }
+
+  .progress-bar-fill {
+    @apply h-full bg-primary transition-all;
   }
 }

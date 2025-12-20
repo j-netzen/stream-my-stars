@@ -1,15 +1,20 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTVMode } from "@/hooks/useTVMode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
+  const { isTVMode, setTVMode } = useTVMode();
   const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingRd, setIsLoadingRd] = useState(false);
@@ -46,38 +51,108 @@ export default function SettingsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const handleTVModeChange = (enabled: boolean) => {
+    setTVMode(enabled);
+    toast.success(enabled ? "TV mode enabled" : "TV mode disabled");
+  };
+
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className={cn("p-6 space-y-6", isTVMode ? "max-w-4xl" : "max-w-2xl")}>
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gray-500/20 rounded-lg flex items-center justify-center">
-          <Settings className="w-5 h-5 text-gray-500" />
+        <div className={cn(
+          "bg-muted rounded-lg flex items-center justify-center",
+          isTVMode ? "w-14 h-14" : "w-10 h-10"
+        )}>
+          <Settings className={cn("text-muted-foreground", isTVMode ? "w-7 h-7" : "w-5 h-5")} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className={cn("font-bold", isTVMode ? "text-4xl" : "text-2xl")}>Settings</h1>
+          <p className={cn("text-muted-foreground", isTVMode ? "text-lg" : "text-sm")}>
             Manage your account and preferences
           </p>
         </div>
       </div>
 
+      {/* TV Mode */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Tv className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            TV Mode
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Optimize the interface for TV viewing with a remote control
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="tv-mode" className={cn("font-medium", isTVMode && "text-lg")}>
+                Enable TV Mode
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                Larger text, buttons, and better focus states for remote navigation
+              </p>
+            </div>
+            <Switch
+              id="tv-mode"
+              checked={isTVMode}
+              onCheckedChange={handleTVModeChange}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+          
+          <div className={cn(
+            "flex items-center gap-4 p-4 rounded-lg",
+            isTVMode ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
+          )}>
+            {isTVMode ? (
+              <>
+                <Tv className="w-8 h-8 text-primary" />
+                <div>
+                  <p className="font-medium text-lg">TV Mode Active</p>
+                  <p className="text-muted-foreground">
+                    Interface is optimized for TV viewing. Use arrow keys to navigate.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Monitor className="w-6 h-6 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Desktop Mode</p>
+                  <p className="text-sm text-muted-foreground">
+                    Standard interface for mouse and keyboard
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+            Tip: You can also enable TV mode by adding <code className="bg-secondary px-1.5 py-0.5 rounded">?tv=1</code> to the URL.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Account */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <User className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
             Account
           </CardTitle>
-          <CardDescription>Your account information</CardDescription>
+          <CardDescription className={isTVMode ? "text-base" : ""}>Your account information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm text-muted-foreground">Email</p>
-            <p className="font-medium">{user?.email}</p>
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Email</p>
+            <p className={cn("font-medium", isTVMode && "text-lg")}>{user?.email}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">User ID</p>
-            <p className="font-mono text-sm">{user?.id}</p>
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>User ID</p>
+            <p className={cn("font-mono", isTVMode ? "text-base" : "text-sm")}>{user?.id}</p>
           </div>
         </CardContent>
       </Card>
@@ -87,13 +162,18 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-green-500" />
+              <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+                <Zap className={cn("text-green-500", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
                 Real-Debrid
               </CardTitle>
-              <CardDescription>Premium link unrestriction service</CardDescription>
+              <CardDescription className={isTVMode ? "text-base" : ""}>Premium link unrestriction service</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchRealDebridData} disabled={isLoadingRd}>
+            <Button 
+              variant="outline" 
+              size={isTVMode ? "lg" : "sm"} 
+              onClick={fetchRealDebridData} 
+              disabled={isLoadingRd}
+            >
               {isLoadingRd ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </Button>
           </div>
@@ -102,27 +182,34 @@ export default function SettingsPage() {
           {rdError ? (
             <div className="flex items-center gap-2 text-destructive">
               <XCircle className="w-4 h-4" />
-              <span className="text-sm">{rdError}</span>
+              <span className={cn(isTVMode ? "text-base" : "text-sm")}>{rdError}</span>
             </div>
           ) : isLoadingRd && !rdUser ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Loading account info...</span>
+              <span className={cn(isTVMode ? "text-base" : "text-sm")}>Loading account info...</span>
             </div>
           ) : rdUser ? (
             <>
               {/* Account Status */}
-              <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+              <div className={cn(
+                "flex items-center justify-between bg-secondary/30 rounded-lg",
+                isTVMode ? "p-4" : "p-3"
+              )}>
                 <div className="flex items-center gap-3">
                   {rdUser.avatar && (
-                    <img src={rdUser.avatar} alt="Avatar" className="w-10 h-10 rounded-full" />
+                    <img 
+                      src={rdUser.avatar} 
+                      alt="Avatar" 
+                      className={cn("rounded-full", isTVMode ? "w-14 h-14" : "w-10 h-10")} 
+                    />
                   )}
                   <div>
-                    <p className="font-medium">{rdUser.username}</p>
-                    <p className="text-sm text-muted-foreground">{rdUser.email}</p>
+                    <p className={cn("font-medium", isTVMode && "text-lg")}>{rdUser.username}</p>
+                    <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>{rdUser.email}</p>
                   </div>
                 </div>
-                <Badge variant={isPremium ? "default" : "secondary"} className={isPremium ? "bg-green-500" : ""}>
+                <Badge variant={isPremium ? "default" : "secondary"} className={cn(isPremium ? "bg-green-500" : "", isTVMode && "text-base px-3 py-1")}>
                   {isPremium ? (
                     <><CheckCircle className="w-3 h-3 mr-1" /> Premium</>
                   ) : (
@@ -135,7 +222,7 @@ export default function SettingsPage() {
               {rdUser.expiration && (
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">
+                  <span className={cn(isTVMode ? "text-base" : "text-sm")}>
                     {isPremium ? (
                       <>Premium expires {formatDistanceToNow(new Date(rdUser.expiration), { addSuffix: true })} ({format(new Date(rdUser.expiration), "PPP")})</>
                     ) : (
@@ -148,19 +235,22 @@ export default function SettingsPage() {
               {/* Points */}
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm">{rdUser.points} fidelity points</span>
+                <span className={cn(isTVMode ? "text-base" : "text-sm")}>{rdUser.points} fidelity points</span>
               </div>
 
               {/* Recent Downloads */}
               {rdDownloads.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium flex items-center gap-2">
+                  <p className={cn("font-medium flex items-center gap-2", isTVMode ? "text-base" : "text-sm")}>
                     <Download className="w-4 h-4" />
                     Recent Downloads
                   </p>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {rdDownloads.map((dl) => (
-                      <div key={dl.id} className="flex items-center justify-between p-2 bg-secondary/20 rounded text-sm">
+                      <div key={dl.id} className={cn(
+                        "flex items-center justify-between bg-secondary/20 rounded",
+                        isTVMode ? "p-3 text-base" : "p-2 text-sm"
+                      )}>
                         <span className="truncate flex-1 mr-2">{dl.filename}</span>
                         <span className="text-muted-foreground whitespace-nowrap">{formatBytes(dl.filesize)}</span>
                       </div>
@@ -170,7 +260,7 @@ export default function SettingsPage() {
               )}
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
               Real-Debrid API key not configured or invalid.
             </p>
           )}
@@ -180,68 +270,68 @@ export default function SettingsPage() {
       {/* Storage Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5" />
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Database className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
             Storage
           </CardTitle>
-          <CardDescription>Video caching information</CardDescription>
+          <CardDescription className={isTVMode ? "text-base" : ""}>Video caching information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className={cn("grid gap-4", isTVMode ? "grid-cols-2" : "grid-cols-3")}>
             <div>
-              <p className="text-sm text-muted-foreground">Max Resolution</p>
-              <p className="font-medium">4K / 2160p</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Max Resolution</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>4K / 2160p</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Frame Rate</p>
-              <p className="font-medium">60 FPS</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Frame Rate</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>60 FPS</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Max Bitrate</p>
-              <p className="font-medium">50 Mbps</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className="text-sm text-muted-foreground">Cache Limit</p>
-              <p className="font-medium">128 MB</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Preload Mode</p>
-              <p className="font-medium">Auto (Full Buffer)</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Max Bitrate</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>50 Mbps</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div>
-              <p className="text-sm text-muted-foreground">Hardware Acceleration</p>
-              <p className="font-medium text-green-500">Enabled (GPU)</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Cache Limit</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>128 MB</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Rendering</p>
-              <p className="font-medium">GPU Compositing</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Preload Mode</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>Auto (Full Buffer)</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div>
-              <p className="text-sm text-muted-foreground">Audio Sync</p>
-              <p className="font-medium text-green-500">Low Latency</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Hardware Acceleration</p>
+              <p className={cn("font-medium text-green-500", isTVMode && "text-lg")}>Enabled (GPU)</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Pitch Preservation</p>
-              <p className="font-medium text-green-500">Enabled</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Rendering</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>GPU Compositing</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div>
-              <p className="text-sm text-muted-foreground">Audio Buffer</p>
-              <p className="font-medium">Optimized (50ms)</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Audio Sync</p>
+              <p className={cn("font-medium text-green-500", isTVMode && "text-lg")}>Low Latency</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Sync Tolerance</p>
-              <p className="font-medium">±25ms</p>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Pitch Preservation</p>
+              <p className={cn("font-medium text-green-500", isTVMode && "text-lg")}>Enabled</p>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Audio Buffer</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>Optimized (50ms)</p>
+            </div>
+            <div>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Sync Tolerance</p>
+              <p className={cn("font-medium", isTVMode && "text-lg")}>±25ms</p>
+            </div>
+          </div>
+          <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
             Video chunks are cached locally for smoother playback. Cache is
             automatically managed and cleared when full.
           </p>
@@ -251,14 +341,14 @@ export default function SettingsPage() {
       {/* Sign Out */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <LogOut className="w-5 h-5" />
+          <CardTitle className={cn("flex items-center gap-2 text-destructive", isTVMode && "text-xl")}>
+            <LogOut className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
             Sign Out
           </CardTitle>
-          <CardDescription>Sign out of your account</CardDescription>
+          <CardDescription className={isTVMode ? "text-base" : ""}>Sign out of your account</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="destructive" onClick={signOut}>
+          <Button variant="destructive" size={isTVMode ? "tv" : "default"} onClick={signOut}>
             Sign Out
           </Button>
         </CardContent>
