@@ -59,7 +59,7 @@ const ScrollAreaWithArrows = React.forwardRef<
   };
 
   return (
-    <div className="relative flex flex-col">
+    <div className={cn("relative flex flex-col h-full", className)}>
       {/* Up Arrow */}
       <Button
         variant="ghost"
@@ -67,7 +67,7 @@ const ScrollAreaWithArrows = React.forwardRef<
         onClick={scrollUp}
         disabled={!canScrollUp}
         className={cn(
-          "h-8 w-full rounded-none border-b border-border flex items-center justify-center gap-2 transition-opacity",
+          "h-8 w-full shrink-0 rounded-none border-b border-border flex items-center justify-center gap-2 transition-opacity",
           canScrollUp ? "opacity-100" : "opacity-40 cursor-not-allowed"
         )}
         aria-label="Scroll up"
@@ -79,12 +79,12 @@ const ScrollAreaWithArrows = React.forwardRef<
       {/* Scroll Area */}
       <ScrollAreaPrimitive.Root
         ref={ref}
-        className={cn("relative overflow-hidden flex-1", className)}
+        className="relative overflow-hidden flex-1 min-h-0"
         {...props}
       >
         <ScrollAreaPrimitive.Viewport
           ref={viewportRef}
-          className="h-full w-full rounded-[inherit]"
+          className="h-full w-full rounded-[inherit] [&>div]:!block"
         >
           {children}
         </ScrollAreaPrimitive.Viewport>
@@ -99,7 +99,7 @@ const ScrollAreaWithArrows = React.forwardRef<
         onClick={scrollDown}
         disabled={!canScrollDown}
         className={cn(
-          "h-8 w-full rounded-none border-t border-border flex items-center justify-center gap-2 transition-opacity",
+          "h-8 w-full shrink-0 rounded-none border-t border-border flex items-center justify-center gap-2 transition-opacity",
           canScrollDown ? "opacity-100" : "opacity-40 cursor-not-allowed"
         )}
         aria-label="Scroll down"

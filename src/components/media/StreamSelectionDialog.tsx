@@ -388,13 +388,14 @@ export function StreamSelectionDialog({
 
         {/* Stream list */}
         {streams.length > 0 && !isSearching && (
-          <ScrollAreaWithArrows 
-            className="flex-1 min-h-0 max-h-[300px]"
-            scrollStep={150}
-          >
-            <div className={cn(
-              isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
-            )}>
+          <div className="flex-1 min-h-0 max-h-[300px] overflow-hidden">
+            <ScrollAreaWithArrows 
+              className="h-full"
+              scrollStep={150}
+            >
+              <div className={cn(
+                isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
+              )}>
             {/* Quality filter and count */}
             <div className="flex items-center justify-between gap-3 mb-2">
               <p className={cn(
@@ -539,6 +540,7 @@ export function StreamSelectionDialog({
             })}
             </div>
           </ScrollAreaWithArrows>
+          </div>
         )}
       </DialogContent>
     </Dialog>
