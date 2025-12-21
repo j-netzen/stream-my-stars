@@ -525,9 +525,12 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => {
           handleLoadedMetadata();
-          // Audio sync optimizations
+          // Audio sync optimizations and ensure audio is enabled
           const video = videoRef.current;
           if (video) {
+            // Ensure audio is not muted and volume is set
+            video.muted = false;
+            video.volume = volume;
             // Set optimal audio buffer for sync
             video.preservesPitch = true;
             // Reduce audio latency
@@ -537,6 +540,16 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
             if ('webkitPreservesPitch' in video) {
               (video as any).webkitPreservesPitch = true;
             }
+            console.log('Video loaded - audio enabled, volume:', video.volume, 'muted:', video.muted);
+          }
+        }}
+        onCanPlay={() => {
+          // Double-check audio state when video is ready to play
+          const video = videoRef.current;
+          if (video) {
+            video.muted = isMuted;
+            video.volume = volume;
+            console.log('Video can play - audio state:', { muted: video.muted, volume: video.volume });
           }
         }}
         onError={handleVideoError}
@@ -548,6 +561,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         poster={backdropUrl || undefined}
         preload="auto"
         playsInline
+        muted={isMuted}
       />
 
       <input
