@@ -305,7 +305,7 @@ export function StreamSelectionDialog({
 
         {/* Season/Episode picker for TV shows - compact inline */}
         {media?.media_type === "tv" && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative z-10 flex items-center gap-2 flex-wrap">
             <Select
               value={selectedSeason.toString()}
               onValueChange={(v) => {
@@ -348,7 +348,7 @@ export function StreamSelectionDialog({
 
         {/* Search button for TV shows when episode changes */}
         {media?.media_type === "tv" && (
-          <Button onClick={handleSearch} disabled={isSearching} variant="outline" className="gap-2">
+          <Button onClick={handleSearch} disabled={isSearching} variant="outline" className="relative z-10 gap-2">
             {isSearching ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
