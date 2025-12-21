@@ -388,9 +388,11 @@ export function StreamSelectionDialog({
 
         {/* Stream list */}
         {streams.length > 0 && !isSearching && (
-          <div className="flex-1 min-h-0 max-h-[300px] overflow-hidden">
+          <div className={cn(
+            "flex flex-col overflow-hidden",
+            isTVMode ? "max-h-[350px]" : "max-h-[300px]"
+          )}>
             <ScrollAreaWithArrows 
-              className="h-full"
               scrollStep={150}
               isTVMode={isTVMode}
             >

@@ -59,8 +59,11 @@ const ScrollAreaWithArrows = React.forwardRef<
     viewport.scrollBy({ top: scrollStep, behavior: "smooth" });
   };
 
+  // Calculate button height based on TV mode
+  const buttonHeight = isTVMode ? 56 : 32; // h-14 = 56px, h-8 = 32px
+
   return (
-    <div className={cn("relative flex flex-col h-full", className)}>
+    <div className={cn("relative flex flex-col", className)} style={{ height: '100%' }}>
       {/* Up Arrow */}
       <Button
         variant="ghost"
@@ -85,10 +88,11 @@ const ScrollAreaWithArrows = React.forwardRef<
         )}>Scroll Up</span>
       </Button>
 
-      {/* Scroll Area */}
+      {/* Scroll Area - takes remaining space */}
       <ScrollAreaPrimitive.Root
         ref={ref}
-        className="relative overflow-hidden flex-1 min-h-0"
+        className="relative overflow-hidden"
+        style={{ flex: '1 1 0', minHeight: 0 }}
         {...props}
       >
         <ScrollAreaPrimitive.Viewport
