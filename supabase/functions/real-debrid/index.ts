@@ -16,6 +16,89 @@ const RATE_LIMIT = {
 // Simple in-memory rate limiter
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
+// ========== INPUT VALIDATION ==========
+const VALID_ACTIONS = ["user", "unrestrict", "add_magnet", "select_files", "torrent_info", "torrents", "downloads", "hosts"] as const;
+const URL_REGEX = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+const MAGNET_REGEX = /^magnet:\?xt=urn:[a-z0-9]+:[a-z0-9]{32,}/i;
+const TORRENT_ID_REGEX = /^[a-zA-Z0-9]+$/;
+const MAX_LINK_LENGTH = 2000;
+const MAX_MAGNET_LENGTH = 5000;
+const MAX_TORRENT_ID_LENGTH = 50;
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  data?: {
+    action: string;
+    link?: string;
+    magnet?: string;
+    torrentId?: string;
+  };
+}
+
+function validateRealDebridInput(body: unknown): ValidationResult {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: "Invalid request body" };
+  }
+  
+  const { action, link, magnet, torrentId } = body as Record<string, unknown>;
+  
+  // Validate action (required)
+  if (typeof action !== 'string' || !VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number])) {
+    return { valid: false, error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` };
+  }
+  
+  // Validate link for unrestrict action
+  if (action === "unrestrict") {
+    if (typeof link !== 'string') {
+      return { valid: false, error: "Link is required for unrestrict action" };
+    }
+    if (link.length > MAX_LINK_LENGTH) {
+      return { valid: false, error: `Link too long. Maximum ${MAX_LINK_LENGTH} characters` };
+    }
+    if (!URL_REGEX.test(link)) {
+      return { valid: false, error: "Invalid URL format for link" };
+    }
+  }
+  
+  // Validate magnet for add_magnet action
+  if (action === "add_magnet") {
+    if (typeof magnet !== 'string') {
+      return { valid: false, error: "Magnet link is required for add_magnet action" };
+    }
+    if (magnet.length > MAX_MAGNET_LENGTH) {
+      return { valid: false, error: `Magnet link too long. Maximum ${MAX_MAGNET_LENGTH} characters` };
+    }
+    if (!MAGNET_REGEX.test(magnet)) {
+      return { valid: false, error: "Invalid magnet link format. Must start with 'magnet:?xt=urn:'" };
+    }
+  }
+  
+  // Validate torrentId for select_files and torrent_info actions
+  if (["select_files", "torrent_info"].includes(action)) {
+    if (typeof torrentId !== 'string') {
+      return { valid: false, error: "Torrent ID is required for this action" };
+    }
+    if (torrentId.length > MAX_TORRENT_ID_LENGTH) {
+      return { valid: false, error: `Torrent ID too long. Maximum ${MAX_TORRENT_ID_LENGTH} characters` };
+    }
+    if (!TORRENT_ID_REGEX.test(torrentId)) {
+      return { valid: false, error: "Invalid torrent ID format. Must be alphanumeric" };
+    }
+  }
+  
+  return { 
+    valid: true, 
+    data: { 
+      action, 
+      link: link as string | undefined, 
+      magnet: magnet as string | undefined, 
+      torrentId: torrentId as string | undefined 
+    } 
+  };
+}
+
+// ========== RATE LIMITING ==========
 function getClientIp(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
@@ -84,8 +167,28 @@ serve(async (req) => {
       );
     }
 
-    const { action, link, magnet, torrentId } = await req.json();
-    console.log("Real-Debrid request:", { action, link: link ? "provided" : "none", magnet: magnet ? "provided" : "none" });
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Invalid JSON in request body" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const validation = validateRealDebridInput(body);
+    if (!validation.valid) {
+      console.warn("Validation failed:", validation.error);
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: validation.error }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, link, magnet, torrentId } = validation.data!;
+    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", magnet: magnet ? "provided" : "none" });
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
@@ -105,17 +208,11 @@ serve(async (req) => {
 
       case "unrestrict":
         // Unrestrict a link to get direct download/streaming URL
-        if (!link) {
-          return new Response(
-            JSON.stringify({ error: "Link is required for unrestrict action" }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
         console.log("Unrestricting link...");
         response = await fetch(`${RD_API_BASE}/unrestrict/link`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `link=${encodeURIComponent(link)}`,
+          body: `link=${encodeURIComponent(link!)}`,
         });
         data = await response.json();
         console.log("Unrestrict response status:", response.status);
@@ -123,17 +220,11 @@ serve(async (req) => {
 
       case "add_magnet":
         // Add a magnet link
-        if (!magnet) {
-          return new Response(
-            JSON.stringify({ error: "Magnet link is required" }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
         console.log("Adding magnet...");
         response = await fetch(`${RD_API_BASE}/torrents/addMagnet`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `magnet=${encodeURIComponent(magnet)}`,
+          body: `magnet=${encodeURIComponent(magnet!)}`,
         });
         data = await response.json();
         console.log("Add magnet response status:", response.status);
@@ -141,12 +232,6 @@ serve(async (req) => {
 
       case "select_files":
         // Select all files from a torrent
-        if (!torrentId) {
-          return new Response(
-            JSON.stringify({ error: "Torrent ID is required" }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
         console.log("Selecting files for torrent:", torrentId);
         response = await fetch(`${RD_API_BASE}/torrents/selectFiles/${torrentId}`, {
           method: 'POST',
@@ -164,12 +249,6 @@ serve(async (req) => {
 
       case "torrent_info":
         // Get torrent info
-        if (!torrentId) {
-          return new Response(
-            JSON.stringify({ error: "Torrent ID is required" }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
         console.log("Getting torrent info:", torrentId);
         response = await fetch(`${RD_API_BASE}/torrents/info/${torrentId}`, { headers });
         data = await response.json();
@@ -202,7 +281,7 @@ serve(async (req) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: `Unknown action: ${action}` }),
+          JSON.stringify({ error: "Validation error", message: `Unknown action: ${action}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
