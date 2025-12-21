@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import spaceBg from "@/assets/space-sidebar-bg.jpg";
 
 interface NavItemData {
   icon: any;
@@ -214,7 +215,7 @@ export function Sidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen bg-card border-r border-border flex flex-col transition-all duration-300",
+          "fixed left-0 top-0 z-50 h-screen border-r border-border flex flex-col transition-all duration-300 overflow-hidden",
           // Desktop sizing
           collapsed ? "w-16" : "w-64",
           // Mobile: hidden by default, shown when mobileOpen
@@ -222,10 +223,19 @@ export function Sidebar({
           mobileOpen && "max-md:translate-x-0 max-md:w-64"
         )}
       >
+        {/* Space Background with Fade */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-30 dark:opacity-40"
+          style={{ backgroundImage: `url(${spaceBg})` }}
+        />
+        {/* Gradient overlay for fading effect */}
+        <div className="absolute inset-0 bg-gradient-to-b from-card/95 via-card/80 to-card/95" />
+        {/* Additional overlay for better text contrast */}
+        <div className="absolute inset-0 bg-card/60" />
         {/* Header */}
-        <div className={cn("p-4 border-b border-border flex items-center", collapsed && !mobileOpen ? "justify-center" : "justify-between")}>
+        <div className={cn("relative z-10 p-4 border-b border-border/50 flex items-center", collapsed && !mobileOpen ? "justify-center" : "justify-between")}>
           <Link to="/" className="flex items-center gap-3" onClick={handleNavClick}>
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0 shadow-star-md">
               <Film className="w-5 h-5 text-primary" />
             </div>
             {(!collapsed || mobileOpen) && (
@@ -261,7 +271,7 @@ export function Sidebar({
         </div>
 
         {/* Add Media Button */}
-        <div className="p-3">
+        <div className="relative z-10 p-3">
           {collapsed && !mobileOpen ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -287,7 +297,7 @@ export function Sidebar({
         </div>
 
         {/* Navigation */}
-        <ScrollArea className="flex-1 px-2 py-2">
+        <ScrollArea className="relative z-10 flex-1 px-2 py-2">
           <nav>
             <ul className="space-y-1">
               {navItems.map((item, index) => (
@@ -300,7 +310,7 @@ export function Sidebar({
         </ScrollArea>
 
         {/* Bottom Actions */}
-        <div className="p-2 border-t border-border space-y-1">
+        <div className="relative z-10 p-2 border-t border-border/50 space-y-1">
           {/* Real-Debrid Status Indicator */}
           {collapsed && !mobileOpen ? (
             <Tooltip>
