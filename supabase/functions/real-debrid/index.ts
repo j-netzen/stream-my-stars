@@ -17,7 +17,7 @@ const RATE_LIMIT = {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const VALID_ACTIONS = ["user", "unrestrict", "streaming", "add_magnet", "select_files", "torrent_info", "torrents", "downloads", "hosts"] as const;
+const VALID_ACTIONS = ["user", "unrestrict", "streaming", "add_magnet", "add_torrent", "select_files", "torrent_info", "torrents", "downloads", "hosts"] as const;
 const URL_REGEX = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
 const MAGNET_REGEX = /^magnet:\?xt=urn:[a-z0-9]+:[a-z0-9]{32,}/i;
 const TORRENT_ID_REGEX = /^[a-zA-Z0-9]+$/;
@@ -33,6 +33,7 @@ interface ValidationResult {
     link?: string;
     magnet?: string;
     torrentId?: string;
+    torrentFile?: string; // base64 encoded torrent file
   };
 }
 
@@ -41,7 +42,7 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     return { valid: false, error: "Invalid request body" };
   }
   
-  const { action, link, magnet, torrentId } = body as Record<string, unknown>;
+  const { action, link, magnet, torrentId, torrentFile } = body as Record<string, unknown>;
   
   // Validate action (required)
   if (typeof action !== 'string' || !VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number])) {
@@ -74,6 +75,17 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     }
   }
   
+  // Validate torrentFile for add_torrent action
+  if (action === "add_torrent") {
+    if (typeof torrentFile !== 'string') {
+      return { valid: false, error: "Torrent file (base64) is required for add_torrent action" };
+    }
+    // Basic base64 validation
+    if (torrentFile.length > 10 * 1024 * 1024) { // 10MB max
+      return { valid: false, error: "Torrent file too large. Maximum 10MB" };
+    }
+  }
+  
   // Validate torrentId for select_files and torrent_info actions
   if (["select_files", "torrent_info"].includes(action)) {
     if (typeof torrentId !== 'string') {
@@ -93,7 +105,8 @@ function validateRealDebridInput(body: unknown): ValidationResult {
       action, 
       link: link as string | undefined, 
       magnet: magnet as string | undefined, 
-      torrentId: torrentId as string | undefined 
+      torrentId: torrentId as string | undefined,
+      torrentFile: torrentFile as string | undefined,
     } 
   };
 }
@@ -187,8 +200,8 @@ serve(async (req) => {
       );
     }
 
-    const { action, link, magnet, torrentId } = validation.data!;
-    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", magnet: magnet ? "provided" : "none" });
+    const { action, link, magnet, torrentId, torrentFile } = validation.data!;
+    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", magnet: magnet ? "provided" : "none", torrentFile: torrentFile ? "provided" : "none" });
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
@@ -239,6 +252,28 @@ serve(async (req) => {
         });
         data = await response.json();
         console.log("Add magnet response status:", response.status);
+        break;
+
+      case "add_torrent":
+        // Add a torrent file (base64 encoded)
+        console.log("Adding torrent file...");
+        // Decode base64 to binary
+        const binaryString = atob(torrentFile!);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/x-bittorrent' });
+        const formData = new FormData();
+        formData.append('file', blob, 'torrent.torrent');
+        
+        response = await fetch(`${RD_API_BASE}/torrents/addTorrent`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${apiKey}` },
+          body: formData,
+        });
+        data = await response.json();
+        console.log("Add torrent response status:", response.status);
         break;
 
       case "select_files":

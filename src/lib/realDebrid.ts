@@ -80,6 +80,10 @@ export async function addMagnet(magnet: string): Promise<RealDebridMagnetRespons
   return invokeRealDebrid({ action: "add_magnet", magnet });
 }
 
+export async function addTorrentFile(torrentFileBase64: string): Promise<RealDebridMagnetResponse> {
+  return invokeRealDebrid({ action: "add_torrent", torrentFile: torrentFileBase64 });
+}
+
 export async function selectTorrentFiles(torrentId: string): Promise<{ success: boolean }> {
   return invokeRealDebrid({ action: "select_files", torrentId });
 }
@@ -108,14 +112,33 @@ export async function addMagnetAndWait(
   // Add the magnet
   const { id } = await addMagnet(magnet);
   
+  return waitForTorrentLinks(id, onProgress);
+}
+
+// Helper to add a torrent file and wait for links to be available
+export async function addTorrentFileAndWait(
+  torrentFileBase64: string,
+  onProgress?: (progress: number) => void
+): Promise<RealDebridTorrent> {
+  // Add the torrent file
+  const { id } = await addTorrentFile(torrentFileBase64);
+  
+  return waitForTorrentLinks(id, onProgress);
+}
+
+// Internal helper to wait for torrent links
+async function waitForTorrentLinks(
+  torrentId: string,
+  onProgress?: (progress: number) => void
+): Promise<RealDebridTorrent> {
   // Select all files
-  await selectTorrentFiles(id);
+  await selectTorrentFiles(torrentId);
   
   // Wait a moment for RD to process
   await new Promise((resolve) => setTimeout(resolve, 1000));
   
   // Check torrent info - links may be available immediately if cached
-  let torrent = await getTorrentInfo(id);
+  let torrent = await getTorrentInfo(torrentId);
   
   // If links are already available (cached), return immediately
   if (torrent.links && torrent.links.length > 0) {
@@ -129,7 +152,7 @@ export async function addMagnetAndWait(
   
   do {
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
-    torrent = await getTorrentInfo(id);
+    torrent = await getTorrentInfo(torrentId);
     
     if (onProgress && torrent.progress) {
       onProgress(torrent.progress);
@@ -153,4 +176,19 @@ export async function addMagnetAndWait(
   }
   
   return torrent;
+}
+
+// Convert a File object to base64 string
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove data URL prefix (data:application/x-bittorrent;base64,)
+      const base64 = result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
