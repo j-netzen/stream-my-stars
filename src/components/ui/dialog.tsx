@@ -54,7 +54,10 @@ const DialogContent = React.forwardRef<
         className="pointer-events-none absolute inset-0 bg-gradient-to-br from-card/95 via-card/90 to-card/95"
       />
 
-      {children}
+      {/* Content wrapper with z-index to appear above backgrounds */}
+      <div className="relative z-10 flex flex-col gap-4 flex-1 min-h-0">
+        {children}
+      </div>
 
       <DialogPrimitive.Close className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-accent data-[state=open]:text-muted-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
         <X className="h-4 w-4" />
