@@ -191,7 +191,15 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
           types: [
             {
               description: "Video Files",
-              accept: { "video/*": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"] },
+              accept: { 
+                "video/*": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v", ".ts", ".m2ts", ".flv", ".wmv", ".3gp", ".ogv"],
+              },
+            },
+            {
+              description: "Audio Files",
+              accept: {
+                "audio/*": [".mp3", ".aac", ".m4a", ".ogg", ".oga", ".opus", ".flac", ".wav", ".weba", ".ac3", ".eac3", ".dts", ".wma"],
+              },
             },
           ],
           multiple: false,
@@ -463,15 +471,115 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   // Get MIME type based on file extension for better codec handling
   const getMimeType = (url: string): string => {
     const lowerUrl = url.toLowerCase();
+    // Video formats
     if (lowerUrl.includes('.mkv')) return 'video/x-matroska';
     if (lowerUrl.includes('.webm')) return 'video/webm';
     if (lowerUrl.includes('.mp4')) return 'video/mp4';
     if (lowerUrl.includes('.m4v')) return 'video/mp4';
     if (lowerUrl.includes('.mov')) return 'video/quicktime';
     if (lowerUrl.includes('.avi')) return 'video/x-msvideo';
-    if (lowerUrl.includes('.ogv')) return 'video/ogg';
+    if (lowerUrl.includes('.ogv') || lowerUrl.includes('.ogg')) return 'video/ogg';
+    if (lowerUrl.includes('.ts') || lowerUrl.includes('.m2ts')) return 'video/mp2t';
+    if (lowerUrl.includes('.flv')) return 'video/x-flv';
+    if (lowerUrl.includes('.wmv')) return 'video/x-ms-wmv';
+    if (lowerUrl.includes('.3gp')) return 'video/3gpp';
+    if (lowerUrl.includes('.3g2')) return 'video/3gpp2';
+    // Audio-only formats (for audio files played in video element)
+    if (lowerUrl.includes('.mp3')) return 'audio/mpeg';
+    if (lowerUrl.includes('.aac')) return 'audio/aac';
+    if (lowerUrl.includes('.m4a')) return 'audio/mp4';
+    if (lowerUrl.includes('.ogg') || lowerUrl.includes('.oga')) return 'audio/ogg';
+    if (lowerUrl.includes('.opus')) return 'audio/opus';
+    if (lowerUrl.includes('.flac')) return 'audio/flac';
+    if (lowerUrl.includes('.wav')) return 'audio/wav';
+    if (lowerUrl.includes('.weba')) return 'audio/webm';
+    if (lowerUrl.includes('.ac3')) return 'audio/ac3';
+    if (lowerUrl.includes('.eac3') || lowerUrl.includes('.ec3')) return 'audio/eac3';
+    if (lowerUrl.includes('.dts')) return 'audio/vnd.dts';
+    if (lowerUrl.includes('.wma')) return 'audio/x-ms-wma';
     return 'video/mp4'; // Default fallback
   };
+
+  // Check if browser supports a specific codec
+  const checkCodecSupport = useCallback((mimeType: string): boolean => {
+    const video = document.createElement('video');
+    
+    // Common codec strings to check
+    const codecVariants: Record<string, string[]> = {
+      'video/mp4': [
+        'video/mp4; codecs="avc1.42E01E, mp4a.40.2"', // H.264 + AAC
+        'video/mp4; codecs="avc1.4D401E, mp4a.40.2"', // H.264 Main + AAC
+        'video/mp4; codecs="avc1.64001E, mp4a.40.2"', // H.264 High + AAC
+        'video/mp4; codecs="hev1.1.6.L93.B0"', // H.265/HEVC
+        'video/mp4; codecs="av01.0.00M.08"', // AV1
+        'video/mp4; codecs="mp4a.40.2"', // AAC
+        'video/mp4; codecs="mp4a.40.5"', // AAC HE
+        'video/mp4; codecs="ac-3"', // Dolby AC3
+        'video/mp4; codecs="ec-3"', // Dolby E-AC3
+        'video/mp4; codecs="flac"', // FLAC in MP4
+        'video/mp4; codecs="opus"', // Opus in MP4
+      ],
+      'video/webm': [
+        'video/webm; codecs="vp8, vorbis"',
+        'video/webm; codecs="vp9, opus"',
+        'video/webm; codecs="vp9"',
+        'video/webm; codecs="av01.0.00M.08"', // AV1
+        'video/webm; codecs="opus"',
+        'video/webm; codecs="vorbis"',
+      ],
+      'video/ogg': [
+        'video/ogg; codecs="theora, vorbis"',
+        'video/ogg; codecs="theora"',
+        'video/ogg; codecs="opus"',
+      ],
+      'audio/mpeg': ['audio/mpeg'],
+      'audio/aac': ['audio/aac'],
+      'audio/ogg': [
+        'audio/ogg; codecs="vorbis"',
+        'audio/ogg; codecs="opus"',
+        'audio/ogg; codecs="flac"',
+      ],
+      'audio/opus': ['audio/opus'],
+      'audio/flac': ['audio/flac'],
+      'audio/wav': ['audio/wav'],
+      'audio/webm': [
+        'audio/webm; codecs="opus"',
+        'audio/webm; codecs="vorbis"',
+      ],
+      'audio/ac3': ['audio/ac3'],
+      'audio/eac3': ['audio/eac3'],
+    };
+
+    const variants = codecVariants[mimeType] || [mimeType];
+    
+    for (const codec of variants) {
+      const support = video.canPlayType(codec);
+      if (support === 'probably' || support === 'maybe') {
+        return true;
+      }
+    }
+    
+    return false;
+  }, []);
+
+  // Log supported codecs on mount for debugging
+  useEffect(() => {
+    const video = document.createElement('video');
+    const audioCodecs = [
+      'audio/mpeg', 'audio/aac', 'audio/ogg; codecs="vorbis"', 
+      'audio/ogg; codecs="opus"', 'audio/opus', 'audio/flac',
+      'audio/wav', 'audio/webm; codecs="opus"', 'audio/ac3', 'audio/eac3',
+      'audio/mp4; codecs="mp4a.40.2"', 'audio/mp4; codecs="ac-3"',
+      'audio/mp4; codecs="ec-3"', 'audio/mp4; codecs="flac"',
+    ];
+    
+    const supported = audioCodecs.filter(codec => {
+      const support = video.canPlayType(codec);
+      return support === 'probably' || support === 'maybe';
+    });
+    
+    console.log('Supported audio codecs:', supported);
+  }, []);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
