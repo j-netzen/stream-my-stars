@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
+import { useTVMode } from "@/hooks/useTVMode";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download, Star, Calendar, Clock, X, Check, ListChecks } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -43,6 +45,7 @@ interface AddMediaDialogProps {
 export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
   const { categories } = useCategories();
+  const { isTVMode } = useTVMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -838,12 +841,14 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-xl">Add Media</DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="debrid" className="w-full">
+        <div className={isTVMode ? "h-[calc(90vh-120px)]" : "h-[calc(90vh-100px)]"}>
+          <ScrollAreaWithArrows scrollStep={150} isTVMode={isTVMode}>
+            <Tabs defaultValue="debrid" className="w-full px-1">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="debrid" className="gap-2">
               <Zap className="w-4 h-4" />
@@ -1552,7 +1557,9 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               isAdding={isAdding}
             />
           </TabsContent>
-        </Tabs>
+            </Tabs>
+          </ScrollAreaWithArrows>
+        </div>
       </DialogContent>
     </Dialog>
   );
