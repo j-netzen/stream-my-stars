@@ -17,7 +17,7 @@ const RATE_LIMIT = {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const VALID_ACTIONS = ["user", "unrestrict", "add_magnet", "select_files", "torrent_info", "torrents", "downloads", "hosts"] as const;
+const VALID_ACTIONS = ["user", "unrestrict", "streaming", "add_magnet", "select_files", "torrent_info", "torrents", "downloads", "hosts"] as const;
 const URL_REGEX = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
 const MAGNET_REGEX = /^magnet:\?xt=urn:[a-z0-9]+:[a-z0-9]{32,}/i;
 const TORRENT_ID_REGEX = /^[a-zA-Z0-9]+$/;
@@ -48,10 +48,10 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     return { valid: false, error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` };
   }
   
-  // Validate link for unrestrict action
-  if (action === "unrestrict") {
+  // Validate link for unrestrict and streaming actions
+  if (action === "unrestrict" || action === "streaming") {
     if (typeof link !== 'string') {
-      return { valid: false, error: "Link is required for unrestrict action" };
+      return { valid: false, error: "Link is required for this action" };
     }
     if (link.length > MAX_LINK_LENGTH) {
       return { valid: false, error: `Link too long. Maximum ${MAX_LINK_LENGTH} characters` };
@@ -216,6 +216,17 @@ serve(async (req) => {
         });
         data = await response.json();
         console.log("Unrestrict response status:", response.status);
+        break;
+
+      case "streaming":
+        // Get streaming transcoded links for a file
+        console.log("Getting streaming links...");
+        response = await fetch(`${RD_API_BASE}/streaming/transcode/${encodeURIComponent(link!)}`, {
+          method: 'GET',
+          headers,
+        });
+        data = await response.json();
+        console.log("Streaming response status:", response.status);
         break;
 
       case "add_magnet":
