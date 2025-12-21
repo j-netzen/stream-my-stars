@@ -77,13 +77,43 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+    // Verify caller's identity using their JWT
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.warn("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", message: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create client with anon key to verify the user's JWT
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.warn("Authentication failed:", authError?.message);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", message: "Invalid or expired token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Authenticated user: ${user.id}`);
+
+    // Now use service role client for database operations (bypasses RLS for efficiency)
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get all media without a category but with genres
+    // Get only THIS USER's media without a category but with genres
     const { data: uncategorizedMedia, error: fetchError } = await supabase
       .from("media")
       .select("id, user_id, genres, title")
+      .eq("user_id", user.id)  // Only process authenticated user's media
       .is("category_id", null)
       .not("genres", "is", null);
 
@@ -92,7 +122,7 @@ Deno.serve(async (req) => {
       throw fetchError;
     }
 
-    console.log(`Found ${uncategorizedMedia?.length || 0} uncategorized media items`);
+    console.log(`Found ${uncategorizedMedia?.length || 0} uncategorized media items for user ${user.id}`);
 
     if (!uncategorizedMedia || uncategorizedMedia.length === 0) {
       return new Response(
