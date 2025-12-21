@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ListVideo, Plus, Trash2, Loader2 } from "lucide-react";
+import { ListVideo, Plus, Trash2, Loader2, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -66,6 +66,17 @@ export default function PlaylistsPage() {
   const playlistMedia = media.filter((m) =>
     playlistItems.some((item) => item.media_id === m.id)
   );
+
+  const handlePickForMe = () => {
+    if (playlistMedia.length === 0) {
+      toast.error("No media in this playlist to pick from");
+      return;
+    }
+    const randomIndex = Math.floor(Math.random() * playlistMedia.length);
+    const randomMedia = playlistMedia[randomIndex];
+    setActiveMedia(randomMedia);
+    toast.success(`Playing: ${randomMedia.title}`);
+  };
 
   if (isLoading) {
     return (
@@ -179,7 +190,19 @@ export default function PlaylistsPage() {
         <div className="flex-1">
           {selectedPlaylist && selectedPlaylistData ? (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">{selectedPlaylistData.name}</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">{selectedPlaylistData.name}</h2>
+                {playlistMedia.length > 0 && (
+                  <Button
+                    onClick={handlePickForMe}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Shuffle className="w-4 h-4" />
+                    Pick for me
+                  </Button>
+                )}
+              </div>
               {playlistMedia.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   {playlistMedia.map((item) => (
