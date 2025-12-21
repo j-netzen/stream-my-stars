@@ -441,17 +441,17 @@ export function StreamSelectionDialog({
                   onFocus={() => setFocusedIndex(index)}
                   disabled={isResolving}
                   className={cn(
-                    "w-full text-left rounded-lg border transition-all duration-200",
+                    "w-full text-left rounded-lg border-2 transition-all duration-200",
                     // Base padding - larger for TV
                     isTVMode ? "p-5" : "p-3",
                     // Focus/selection states - very visible for TV
                     isCurrentlyResolving
-                      ? "border-primary bg-primary/20 ring-2 ring-primary"
+                      ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
                       : isFocused
-                      ? "border-primary bg-primary/10 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]"
-                      : "border-border hover:border-primary/50 hover:bg-accent/50",
+                      ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02] shadow-lg shadow-primary/20"
+                      : "border-muted-foreground/30 bg-secondary/50 hover:border-primary hover:bg-primary/10 hover:shadow-md",
                     // Focused state styling
-                    "focus:outline-none focus:border-primary focus:bg-primary/10 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02]",
+                    "focus:outline-none focus:border-primary focus:bg-primary/20 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02] focus:shadow-lg focus:shadow-primary/20",
                     isResolving && !isCurrentlyResolving && "opacity-50"
                   )}
                 >
@@ -496,7 +496,7 @@ export function StreamSelectionDialog({
                         )}
                       </div>
                       <p className={cn(
-                        "text-muted-foreground mt-1 truncate",
+                        "text-foreground/80 mt-1 truncate font-medium",
                         isTVMode ? "text-base" : "text-sm"
                       )}>
                         {stream.title || stream.name}
