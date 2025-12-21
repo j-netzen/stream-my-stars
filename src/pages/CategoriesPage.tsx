@@ -7,6 +7,7 @@ import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -163,16 +164,19 @@ export default function CategoriesPage() {
         <div className="w-64 flex-shrink-0 space-y-2">
           {/* Uncategorized filter */}
           {uncategorizedMedia.length > 0 && (
-            <button
+            <Card
+              withSpaceBg
               onClick={() => setSelectedCategory("uncategorized")}
-              className={`w-full p-3 rounded-lg text-left transition-colors ${
+              className={`cursor-pointer p-3 transition-all ${
                 selectedCategory === "uncategorized"
-                  ? "bg-amber-500/20 border border-amber-500"
-                  : "bg-amber-500/10 hover:bg-amber-500/20"
+                  ? "ring-2 ring-amber-500 shadow-star-glow"
+                  : "hover:shadow-star-lg"
               }`}
             >
               <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4 text-amber-500" />
+                </div>
                 <div>
                   <p className="font-medium text-amber-600 dark:text-amber-400">Uncategorized</p>
                   <p className="text-xs text-muted-foreground">
@@ -180,7 +184,7 @@ export default function CategoriesPage() {
                   </p>
                 </div>
               </div>
-            </button>
+            </Card>
           )}
           
           {categories.length === 0 && uncategorizedMedia.length === 0 ? (
@@ -190,21 +194,27 @@ export default function CategoriesPage() {
             </div>
           ) : (
             categories.map((category) => (
-              <button
+              <Card
                 key={category.id}
+                withSpaceBg
                 onClick={() => setSelectedCategory(category.id)}
-                className={`w-full p-3 rounded-lg text-left transition-colors ${
+                className={`cursor-pointer p-3 transition-all ${
                   selectedCategory === category.id
-                    ? "bg-primary/20 border border-primary"
-                    : "bg-secondary/50 hover:bg-secondary"
+                    ? "ring-2 ring-primary shadow-star-glow"
+                    : "hover:shadow-star-lg"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{category.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {media.filter((m) => m.category_id === category.id).length} items
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                      <FolderOpen className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{category.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {media.filter((m) => m.category_id === category.id).length} items
+                      </p>
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -221,7 +231,7 @@ export default function CategoriesPage() {
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-              </button>
+              </Card>
             ))
           )}
         </div>
