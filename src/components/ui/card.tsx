@@ -1,9 +1,34 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import spaceBg from "@/assets/space-sidebar-bg.jpg";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)} {...props} />
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { withSpaceBg?: boolean }
+>(({ className, withSpaceBg = false, children, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-lg border border-border/50 text-card-foreground shadow-star-md overflow-hidden transition-all duration-300 hover:shadow-star-lg",
+      withSpaceBg ? "relative" : "bg-card",
+      className
+    )}
+    {...props}
+  >
+    {withSpaceBg && (
+      <>
+        {/* Space Background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-15 dark:opacity-25"
+          style={{ backgroundImage: `url(${spaceBg})` }}
+        />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-card/95 via-card/90 to-card/95" />
+      </>
+    )}
+    {withSpaceBg ? <div className="relative z-10">{children}</div> : children}
+  </div>
 ));
 Card.displayName = "Card";
 

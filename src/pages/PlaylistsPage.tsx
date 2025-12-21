@@ -7,6 +7,7 @@ import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -148,23 +149,29 @@ export default function PlaylistsPage() {
             </div>
           ) : (
             playlists.map((playlist) => (
-              <button
+              <Card
                 key={playlist.id}
+                withSpaceBg
                 onClick={() => setSelectedPlaylist(playlist.id)}
-                className={`w-full p-3 rounded-lg text-left transition-colors ${
+                className={`cursor-pointer p-3 transition-all ${
                   selectedPlaylist === playlist.id
-                    ? "bg-primary/20 border border-primary"
-                    : "bg-secondary/50 hover:bg-secondary"
+                    ? "ring-2 ring-primary shadow-star-glow"
+                    : "hover:shadow-star-lg"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{playlist.name}</p>
-                    {playlist.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {playlist.description}
-                      </p>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                      <ListVideo className="w-4 h-4 text-purple-500" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{playlist.name}</p>
+                      {playlist.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {playlist.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
@@ -181,7 +188,7 @@ export default function PlaylistsPage() {
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-              </button>
+              </Card>
             ))
           )}
         </div>
