@@ -382,16 +382,9 @@ export function StreamSelectionDialog({
 
         {/* Stream list */}
         {streams.length > 0 && !isSearching && (
-          <div className="flex flex-col flex-1 min-h-0">
-            <ScrollAreaWithArrows 
-              scrollStep={150}
-              isTVMode={isTVMode}
-            >
-              <div className={cn(
-                isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
-              )}>
-            {/* Quality filter and count */}
-            <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            {/* Quality filter and count - outside scroll area */}
+            <div className="flex items-center justify-between gap-3 mb-2 px-1 shrink-0">
               <p className={cn(
                 "text-muted-foreground",
                 isTVMode ? "text-base" : "text-xs"
@@ -415,11 +408,19 @@ export function StreamSelectionDialog({
               </div>
             </div>
             
-            {filteredStreams.length === 0 && (
+            {filteredStreams.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 No streams match the selected quality filter.
               </p>
-            )}
+            ) : (
+            <ScrollAreaWithArrows 
+              scrollStep={150}
+              isTVMode={isTVMode}
+              className="flex-1 min-h-0"
+            >
+              <div className={cn(
+                isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
+              )}>
             
             {filteredStreams.map((stream, index) => {
               const info = parseStreamInfo(stream);
@@ -532,8 +533,9 @@ export function StreamSelectionDialog({
                 </button>
               );
             })}
-            </div>
-          </ScrollAreaWithArrows>
+              </div>
+            </ScrollAreaWithArrows>
+            )}
           </div>
         )}
       </DialogContent>
