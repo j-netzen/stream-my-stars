@@ -16,6 +16,73 @@ const RATE_LIMIT = {
 // Simple in-memory rate limiter
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
+// ========== INPUT VALIDATION ==========
+const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos"] as const;
+const VALID_MEDIA_TYPES = ["movie", "tv", "all"] as const;
+const MAX_QUERY_LENGTH = 200;
+const MAX_ID_VALUE = 999999999; // TMDB IDs are large integers
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  data?: {
+    action: string;
+    query?: string;
+    id?: number;
+    media_type?: string;
+  };
+}
+
+function validateTmdbInput(body: unknown): ValidationResult {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: "Invalid request body" };
+  }
+  
+  const { action, query, id, media_type } = body as Record<string, unknown>;
+  
+  // Validate action (required)
+  if (typeof action !== 'string' || !VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number])) {
+    return { valid: false, error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` };
+  }
+  
+  // Validate query for search action
+  if (action === "search") {
+    if (typeof query !== 'string' || query.trim().length === 0) {
+      return { valid: false, error: "Query is required for search action" };
+    }
+    if (query.length > MAX_QUERY_LENGTH) {
+      return { valid: false, error: `Query too long. Maximum ${MAX_QUERY_LENGTH} characters` };
+    }
+  }
+  
+  // Validate id for detail actions
+  if (["movie_details", "tv_details", "get_imdb_id", "get_videos"].includes(action)) {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || id > MAX_ID_VALUE) {
+      return { valid: false, error: "ID must be a positive integer" };
+    }
+  }
+  
+  // Validate media_type for actions that use it
+  if (["trending", "get_imdb_id", "get_videos"].includes(action)) {
+    if (media_type !== undefined) {
+      if (typeof media_type !== 'string' || !VALID_MEDIA_TYPES.includes(media_type as typeof VALID_MEDIA_TYPES[number])) {
+        return { valid: false, error: `Invalid media_type. Must be one of: ${VALID_MEDIA_TYPES.join(', ')}` };
+      }
+    }
+  }
+  
+  return { 
+    valid: true, 
+    data: { 
+      action, 
+      query: typeof query === 'string' ? query.trim() : undefined, 
+      id: id as number | undefined, 
+      media_type: media_type as string | undefined 
+    } 
+  };
+}
+
+// ========== RATE LIMITING ==========
 function getClientIp(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
@@ -83,14 +150,34 @@ serve(async (req) => {
       );
     }
 
-    const { action, query, id, media_type } = await req.json();
-    console.log("TMDB request:", { action, query, id, media_type });
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Invalid JSON in request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validation = validateTmdbInput(body);
+    if (!validation.valid) {
+      console.warn("Validation failed:", validation.error);
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: validation.error }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { action, query, id, media_type } = validation.data!;
+    console.log("TMDB request (validated):", { action, query, id, media_type });
 
     let url = "";
     
     switch (action) {
       case "search":
-        url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&include_adult=false`;
+        url = `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query!)}&include_adult=false`;
         break;
       case "movie_details":
         url = `${TMDB_BASE_URL}/movie/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,external_ids`;
@@ -121,7 +208,7 @@ serve(async (req) => {
       }
       default:
         return new Response(
-          JSON.stringify({ error: "Invalid action" }),
+          JSON.stringify({ error: "Validation error", message: "Invalid action" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

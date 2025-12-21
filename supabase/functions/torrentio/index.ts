@@ -17,6 +17,80 @@ const RATE_LIMIT = {
 // Simple in-memory rate limiter
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
+// ========== INPUT VALIDATION ==========
+const IMDB_ID_REGEX = /^tt\d{7,10}$/;  // IMDB IDs: tt followed by 7-10 digits
+const VALID_TYPES = ["movie", "series"] as const;
+const VALID_ACTIONS = ["search"] as const;
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  data?: {
+    action: string;
+    imdbId: string;
+    type: string;
+    season?: number;
+    episode?: number;
+  };
+}
+
+function validateTorrentioInput(body: unknown): ValidationResult {
+  if (!body || typeof body !== 'object') {
+    return { valid: false, error: "Invalid request body" };
+  }
+  
+  const { action, imdbId, type, season, episode } = body as Record<string, unknown>;
+  
+  // Validate action
+  if (typeof action !== 'string' || !VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number])) {
+    return { valid: false, error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` };
+  }
+  
+  // For search action, validate required fields
+  if (action === "search") {
+    // Validate imdbId
+    if (typeof imdbId !== 'string') {
+      return { valid: false, error: "IMDB ID must be a string" };
+    }
+    if (!IMDB_ID_REGEX.test(imdbId)) {
+      return { valid: false, error: "Invalid IMDB ID format. Must match pattern: tt1234567 (7-10 digits)" };
+    }
+    
+    // Validate type
+    if (typeof type !== 'string' || !VALID_TYPES.includes(type as typeof VALID_TYPES[number])) {
+      return { valid: false, error: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}` };
+    }
+    
+    // Validate season/episode for series
+    if (type === "series") {
+      if (season !== undefined) {
+        if (typeof season !== 'number' || !Number.isInteger(season) || season < 1 || season > 100) {
+          return { valid: false, error: "Season must be an integer between 1 and 100" };
+        }
+      }
+      if (episode !== undefined) {
+        if (typeof episode !== 'number' || !Number.isInteger(episode) || episode < 1 || episode > 1000) {
+          return { valid: false, error: "Episode must be an integer between 1 and 1000" };
+        }
+      }
+    }
+    
+    return { 
+      valid: true, 
+      data: { 
+        action, 
+        imdbId, 
+        type, 
+        season: season as number | undefined, 
+        episode: episode as number | undefined 
+      } 
+    };
+  }
+  
+  return { valid: false, error: "Unknown action" };
+}
+
+// ========== RATE LIMITING ==========
 function getClientIp(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
@@ -76,17 +150,30 @@ serve(async (req) => {
   }
 
   try {
-    const { action, imdbId, type, season, episode } = await req.json();
-    console.log("Torrentio request:", { action, imdbId, type, season, episode });
+    // Parse and validate input
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: "Invalid JSON in request body" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const validation = validateTorrentioInput(body);
+    if (!validation.valid) {
+      console.warn("Validation failed:", validation.error);
+      return new Response(
+        JSON.stringify({ error: "Validation error", message: validation.error }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, imdbId, type, season, episode } = validation.data!;
+    console.log("Torrentio request (validated):", { action, imdbId, type, season, episode });
 
     if (action === "search") {
-      if (!imdbId || !type) {
-        return new Response(
-          JSON.stringify({ error: "IMDB ID and type are required" }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
       // Get Real-Debrid API key for authenticated streams
       const rdApiKey = Deno.env.get('REAL_DEBRID_API_KEY');
       
@@ -130,7 +217,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: `Unknown action: ${action}` }),
+      JSON.stringify({ error: "Validation error", message: `Unknown action: ${action}` }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
