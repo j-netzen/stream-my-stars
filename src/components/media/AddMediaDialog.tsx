@@ -846,9 +846,9 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           <DialogTitle className="text-xl">Add Media</DialogTitle>
         </DialogHeader>
 
-        <div className={isTVMode ? "h-[calc(90vh-120px)]" : "h-[calc(90vh-100px)]"}>
+        <div className={isTVMode ? "h-[500px]" : "h-[450px]"}>
           <ScrollAreaWithArrows scrollStep={150} isTVMode={isTVMode}>
-            <Tabs defaultValue="debrid" className="w-full px-1">
+            <Tabs defaultValue="debrid" className="w-full px-1 pb-4">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="debrid" className="gap-2">
               <Zap className="w-4 h-4" />
