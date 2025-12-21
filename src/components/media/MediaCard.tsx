@@ -50,7 +50,11 @@ export function MediaCard({
 
   return (
     <div 
-      className="media-card group"
+      className={cn(
+        "media-card group cosmic-border rounded-lg transition-all duration-300",
+        "hover:shadow-star-glow hover:scale-[1.02]",
+        isTVMode && "hover:scale-105"
+      )}
       tabIndex={0}
       role="button"
       aria-label={`Play ${media.title}`}
@@ -58,7 +62,8 @@ export function MediaCard({
     >
       {/* Poster */}
       <div className={cn(
-        "relative bg-secondary rounded-lg overflow-hidden",
+        "relative bg-secondary rounded-lg overflow-hidden shadow-star-md",
+        "transition-shadow duration-300 group-hover:shadow-star-lg",
         isTVMode ? "aspect-[2/3]" : "aspect-[2/3]"
       )}>
         {posterUrl ? (
@@ -149,9 +154,9 @@ export function MediaCard({
       </div>
 
       {/* Info */}
-      <div className={cn("p-3", isTVMode && "p-4")}>
+      <div className={cn("p-3 bg-card/80 backdrop-blur-sm", isTVMode && "p-4")}>
         <h3 className={cn(
-          "font-medium line-clamp-1",
+          "font-medium line-clamp-1 group-hover:text-primary transition-colors",
           isTVMode ? "text-lg" : "text-sm"
         )}>
           {media.title}
@@ -161,7 +166,9 @@ export function MediaCard({
           isTVMode ? "text-base" : "text-xs"
         )}>
           {media.release_date?.split("-")[0] || "Unknown year"}
-          {media.rating && ` • ${media.rating.toFixed(1)}★`}
+          {media.rating && (
+            <span className="text-star-glow"> • {media.rating.toFixed(1)}★</span>
+          )}
         </p>
       </div>
     </div>
