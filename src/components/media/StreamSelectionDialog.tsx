@@ -248,7 +248,7 @@ export function StreamSelectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary" />
@@ -388,10 +388,7 @@ export function StreamSelectionDialog({
 
         {/* Stream list */}
         {streams.length > 0 && !isSearching && (
-          <div className={cn(
-            "flex flex-col",
-            isTVMode ? "h-[350px]" : "h-[300px]"
-          )}>
+          <div className="flex flex-col flex-1 min-h-0">
             <ScrollAreaWithArrows 
               scrollStep={150}
               isTVMode={isTVMode}
