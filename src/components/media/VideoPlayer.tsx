@@ -57,10 +57,12 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   const currentTimeRef = useRef(0);
   const durationRef = useRef(0);
   const restoredMediaIdRef = useRef<string | null>(null);
+  const audioHealthCheckTimeoutRef = useRef<number | null>(null);
 
   const [src, setSrc] = useState("");
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [showCopyUrl, setShowCopyUrl] = useState(false);
+  const [hasWarnedNoAudio, setHasWarnedNoAudio] = useState(false);
 
   // Attempt to restore file handle on mount or media change
   useEffect(() => {
@@ -104,6 +106,11 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     // Reset state
     setPlaybackError(null);
     setShowCopyUrl(false);
+    setHasWarnedNoAudio(false);
+    if (audioHealthCheckTimeoutRef.current) {
+      window.clearTimeout(audioHealthCheckTimeoutRef.current);
+      audioHealthCheckTimeoutRef.current = null;
+    }
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -125,6 +132,10 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
   useEffect(() => {
     return () => {
+      if (audioHealthCheckTimeoutRef.current) {
+        window.clearTimeout(audioHealthCheckTimeoutRef.current);
+        audioHealthCheckTimeoutRef.current = null;
+      }
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
   }, []);
@@ -471,19 +482,24 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   // Get MIME type based on file extension for better codec handling
   const getMimeType = (url: string): string => {
     const lowerUrl = url.toLowerCase();
+
+    // Streaming manifests
+    if (lowerUrl.includes(".m3u8")) return "application/vnd.apple.mpegurl";
+    if (lowerUrl.includes(".mpd")) return "application/dash+xml";
+
     // Video formats
-    if (lowerUrl.includes('.mkv')) return 'video/x-matroska';
     if (lowerUrl.includes('.webm')) return 'video/webm';
-    if (lowerUrl.includes('.mp4')) return 'video/mp4';
-    if (lowerUrl.includes('.m4v')) return 'video/mp4';
+    if (lowerUrl.includes('.mp4') || lowerUrl.includes('.m4v')) return 'video/mp4';
     if (lowerUrl.includes('.mov')) return 'video/quicktime';
-    if (lowerUrl.includes('.avi')) return 'video/x-msvideo';
     if (lowerUrl.includes('.ogv') || lowerUrl.includes('.ogg')) return 'video/ogg';
     if (lowerUrl.includes('.ts') || lowerUrl.includes('.m2ts')) return 'video/mp2t';
+    if (lowerUrl.includes('.avi')) return 'video/x-msvideo';
     if (lowerUrl.includes('.flv')) return 'video/x-flv';
     if (lowerUrl.includes('.wmv')) return 'video/x-ms-wmv';
     if (lowerUrl.includes('.3gp')) return 'video/3gpp';
     if (lowerUrl.includes('.3g2')) return 'video/3gpp2';
+    if (lowerUrl.includes('.mkv')) return 'video/x-matroska';
+
     // Audio-only formats (for audio files played in video element)
     if (lowerUrl.includes('.mp3')) return 'audio/mpeg';
     if (lowerUrl.includes('.aac')) return 'audio/aac';
@@ -497,7 +513,32 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     if (lowerUrl.includes('.eac3') || lowerUrl.includes('.ec3')) return 'audio/eac3';
     if (lowerUrl.includes('.dts')) return 'audio/vnd.dts';
     if (lowerUrl.includes('.wma')) return 'audio/x-ms-wma';
+
     return 'video/mp4'; // Default fallback
+  };
+
+  const getSourceTypeHint = (url: string): string | undefined => {
+    // We can't reliably hint blobs/handles, and an incorrect hint can prevent playback.
+    if (!url || url.startsWith("blob:") || url === LOCAL_FILE_MARKER) return undefined;
+
+    const type = getMimeType(url);
+    const safeTypeHints = [
+      "video/mp4",
+      "video/webm",
+      "video/ogg",
+      "audio/mpeg",
+      "audio/aac",
+      "audio/mp4",
+      "audio/ogg",
+      "audio/opus",
+      "audio/flac",
+      "audio/wav",
+      "audio/webm",
+      "application/vnd.apple.mpegurl",
+      "application/dash+xml",
+    ];
+
+    return safeTypeHints.includes(type) ? type : undefined;
   };
 
   // Check if browser supports a specific codec
@@ -581,6 +622,54 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     console.log('Supported audio codecs:', supported);
   }, []);
 
+  const scheduleAudioHealthCheck = useCallback(() => {
+    if (audioHealthCheckTimeoutRef.current) {
+      window.clearTimeout(audioHealthCheckTimeoutRef.current);
+      audioHealthCheckTimeoutRef.current = null;
+    }
+
+    // Only meaningful for remote streams; local blobs typically either work or hard-fail
+    if (!src || src.startsWith("blob:") || src === LOCAL_FILE_MARKER) return;
+
+    audioHealthCheckTimeoutRef.current = window.setTimeout(() => {
+      const v: any = videoRef.current;
+      if (!v || v.paused || v.ended) return;
+      if (hasWarnedNoAudio) return;
+
+      const t = typeof v.currentTime === "number" ? v.currentTime : 0;
+
+      const mozHasAudio: boolean | null =
+        typeof v.mozHasAudio === "boolean" ? v.mozHasAudio : null;
+
+      const webkitAudioDecoded: number | null =
+        typeof v.webkitAudioDecodedByteCount === "number"
+          ? v.webkitAudioDecodedByteCount
+          : null;
+
+      const audioTracksLen: number | null =
+        v.audioTracks && typeof v.audioTracks.length === "number"
+          ? v.audioTracks.length
+          : null;
+
+      const hasAudio: boolean | null =
+        mozHasAudio !== null
+          ? mozHasAudio
+          : webkitAudioDecoded !== null
+            ? webkitAudioDecoded > 0
+            : audioTracksLen !== null
+              ? audioTracksLen > 0
+              : null;
+
+      if (t > 1 && hasAudio === false) {
+        setHasWarnedNoAudio(true);
+        setShowCopyUrl(true);
+        toast.warning(
+          "No audio detected for this stream in your browser. Try another stream (AAC/Opus), or copy the URL to VLC."
+        );
+      }
+    }, 4500);
+  }, [hasWarnedNoAudio, src]);
+
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -620,8 +709,8 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     >
       {/* Video - Hardware accelerated */}
       <video
+        key={src || media.id}
         ref={videoRef}
-        src={src || undefined}
         className="w-full h-full object-contain gpu-accelerated"
         style={{
           transform: 'translate3d(0, 0, 0)',
@@ -664,13 +753,20 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
+        onPlaying={() => {
+          setIsBuffering(false);
+          scheduleAudioHealthCheck();
+        }}
         onClick={handlePlayPause}
         poster={backdropUrl || undefined}
         preload="auto"
         playsInline
         muted={isMuted}
-      />
+      >
+        {src ? (
+          <source key={src} src={src} type={getSourceTypeHint(src)} />
+        ) : null}
+      </video>
 
       <input
         ref={filePickerRef}
