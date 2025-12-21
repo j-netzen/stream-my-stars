@@ -24,6 +24,12 @@ export interface RealDebridUnrestrictedLink {
   streamable: number;
 }
 
+export interface RealDebridStreamingLinks {
+  [quality: string]: {
+    full: string;
+  };
+}
+
 export interface RealDebridTorrent {
   id: string;
   filename: string;
@@ -64,6 +70,10 @@ export async function getRealDebridUser(): Promise<RealDebridUser> {
 
 export async function unrestrictLink(link: string): Promise<RealDebridUnrestrictedLink> {
   return invokeRealDebrid({ action: "unrestrict", link });
+}
+
+export async function getStreamingLinks(link: string): Promise<RealDebridStreamingLinks> {
+  return invokeRealDebrid({ action: "streaming", link });
 }
 
 export async function addMagnet(magnet: string): Promise<RealDebridMagnetResponse> {
