@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 interface ScrollAreaWithArrowsProps
   extends React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
   scrollStep?: number;
+  isTVMode?: boolean;
 }
 
 const ScrollAreaWithArrows = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   ScrollAreaWithArrowsProps
->(({ className, children, scrollStep = 100, ...props }, ref) => {
+>(({ className, children, scrollStep = 100, isTVMode = false, ...props }, ref) => {
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const [canScrollUp, setCanScrollUp] = React.useState(false);
   const [canScrollDown, setCanScrollDown] = React.useState(false);
@@ -67,13 +68,21 @@ const ScrollAreaWithArrows = React.forwardRef<
         onClick={scrollUp}
         disabled={!canScrollUp}
         className={cn(
-          "h-8 w-full shrink-0 rounded-none border-b border-border flex items-center justify-center gap-2 transition-opacity",
-          canScrollUp ? "opacity-100" : "opacity-40 cursor-not-allowed"
+          "w-full shrink-0 rounded-none border-b border-border flex items-center justify-center gap-2 transition-all",
+          isTVMode 
+            ? "h-14 text-lg bg-secondary/50 hover:bg-primary/20" 
+            : "h-8",
+          canScrollUp 
+            ? "opacity-100" 
+            : "opacity-40 cursor-not-allowed"
         )}
         aria-label="Scroll up"
       >
-        <ChevronUp className="h-4 w-4" />
-        <span className="text-xs text-muted-foreground">Scroll Up</span>
+        <ChevronUp className={cn(isTVMode ? "h-7 w-7" : "h-4 w-4")} />
+        <span className={cn(
+          "text-muted-foreground",
+          isTVMode ? "text-base font-medium" : "text-xs"
+        )}>Scroll Up</span>
       </Button>
 
       {/* Scroll Area */}
@@ -99,13 +108,21 @@ const ScrollAreaWithArrows = React.forwardRef<
         onClick={scrollDown}
         disabled={!canScrollDown}
         className={cn(
-          "h-8 w-full shrink-0 rounded-none border-t border-border flex items-center justify-center gap-2 transition-opacity",
-          canScrollDown ? "opacity-100" : "opacity-40 cursor-not-allowed"
+          "w-full shrink-0 rounded-none border-t border-border flex items-center justify-center gap-2 transition-all",
+          isTVMode 
+            ? "h-14 text-lg bg-secondary/50 hover:bg-primary/20" 
+            : "h-8",
+          canScrollDown 
+            ? "opacity-100" 
+            : "opacity-40 cursor-not-allowed"
         )}
         aria-label="Scroll down"
       >
-        <ChevronDown className="h-4 w-4" />
-        <span className="text-xs text-muted-foreground">Scroll Down</span>
+        <ChevronDown className={cn(isTVMode ? "h-7 w-7" : "h-4 w-4")} />
+        <span className={cn(
+          "text-muted-foreground",
+          isTVMode ? "text-base font-medium" : "text-xs"
+        )}>Scroll Down</span>
       </Button>
     </div>
   );

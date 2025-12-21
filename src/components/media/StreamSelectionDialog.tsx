@@ -392,6 +392,7 @@ export function StreamSelectionDialog({
             <ScrollAreaWithArrows 
               className="h-full"
               scrollStep={150}
+              isTVMode={isTVMode}
             >
               <div className={cn(
                 isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
