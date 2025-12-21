@@ -303,52 +303,46 @@ export function StreamSelectionDialog({
           </div>
         )}
 
-        {/* Season/Episode picker for TV shows */}
+        {/* Season/Episode picker for TV shows - compact inline */}
         {media?.media_type === "tv" && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Season</Label>
-              <Select
-                value={selectedSeason.toString()}
-                onValueChange={(v) => {
-                  setSelectedSeason(parseInt(v));
-                  setSelectedEpisode(1);
-                  setStreams([]);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
-                    <SelectItem key={s} value={s.toString()}>
-                      Season {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Episode</Label>
-              <Select
-                value={selectedEpisode.toString()}
-                onValueChange={(v) => {
-                  setSelectedEpisode(parseInt(v));
-                  setStreams([]);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
-                    <SelectItem key={e} value={e.toString()}>
-                      Episode {e}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select
+              value={selectedSeason.toString()}
+              onValueChange={(v) => {
+                setSelectedSeason(parseInt(v));
+                setSelectedEpisode(1);
+                setStreams([]);
+              }}
+            >
+              <SelectTrigger className="w-[100px] h-8 text-xs">
+                <SelectValue placeholder="Season" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
+                  <SelectItem key={s} value={s.toString()} className="text-xs">
+                    S{s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={selectedEpisode.toString()}
+              onValueChange={(v) => {
+                setSelectedEpisode(parseInt(v));
+                setStreams([]);
+              }}
+            >
+              <SelectTrigger className="w-[100px] h-8 text-xs">
+                <SelectValue placeholder="Episode" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[200px]">
+                {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
+                  <SelectItem key={e} value={e.toString()} className="text-xs">
+                    E{e}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
