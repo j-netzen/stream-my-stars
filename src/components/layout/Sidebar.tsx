@@ -32,6 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface NavItemData {
   icon: any;
@@ -286,15 +287,17 @@ export function Sidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-2">
-          <ul className="space-y-1">
-            {navItems.map((item, index) => (
-              <li key={item.path}>
-                <NavItem {...item} index={index} />
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <ScrollArea className="flex-1 px-2 py-2">
+          <nav>
+            <ul className="space-y-1">
+              {navItems.map((item, index) => (
+                <li key={item.path}>
+                  <NavItem {...item} index={index} />
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </ScrollArea>
 
         {/* Bottom Actions */}
         <div className="p-2 border-t border-border space-y-1">
