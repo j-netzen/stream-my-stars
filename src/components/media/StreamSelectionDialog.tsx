@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -387,10 +388,13 @@ export function StreamSelectionDialog({
 
         {/* Stream list */}
         {streams.length > 0 && !isSearching && (
-          <div className={cn(
-            "flex-1 overflow-y-auto min-h-0",
-            isTVMode ? "space-y-3" : "space-y-2"
-          )}>
+          <ScrollAreaWithArrows 
+            className="flex-1 min-h-0 max-h-[300px]"
+            scrollStep={150}
+          >
+            <div className={cn(
+              isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
+            )}>
             {/* Quality filter and count */}
             <div className="flex items-center justify-between gap-3 mb-2">
               <p className={cn(
@@ -533,7 +537,8 @@ export function StreamSelectionDialog({
                 </button>
               );
             })}
-          </div>
+            </div>
+          </ScrollAreaWithArrows>
         )}
       </DialogContent>
     </Dialog>
