@@ -31,8 +31,10 @@ const ScrollAreaWithArrows = React.forwardRef<
     const viewport = viewportRef.current;
     if (!viewport) return;
 
-    // Initial check
+    // Initial check with delay for content to render
     updateScrollState();
+    const initialTimer = setTimeout(updateScrollState, 100);
+    const secondTimer = setTimeout(updateScrollState, 500);
 
     // Listen for scroll events
     viewport.addEventListener("scroll", updateScrollState);
@@ -41,9 +43,20 @@ const ScrollAreaWithArrows = React.forwardRef<
     const resizeObserver = new ResizeObserver(updateScrollState);
     resizeObserver.observe(viewport);
 
+    // Use MutationObserver to detect when children are added/removed
+    const mutationObserver = new MutationObserver(updateScrollState);
+    mutationObserver.observe(viewport, { 
+      childList: true, 
+      subtree: true,
+      attributes: true 
+    });
+
     return () => {
+      clearTimeout(initialTimer);
+      clearTimeout(secondTimer);
       viewport.removeEventListener("scroll", updateScrollState);
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
     };
   }, [updateScrollState]);
 
