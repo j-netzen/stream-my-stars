@@ -447,8 +447,8 @@ export function StreamSelectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[95vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none border-none overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary" />
             Select Stream
@@ -643,9 +643,9 @@ export function StreamSelectionDialog({
                 >
                   <div className={cn(
                     "p-1",
-                    isCompactView 
-                      ? (isTVMode ? "space-y-2" : "space-y-1") 
-                      : (isTVMode ? "space-y-3" : "space-y-2")
+                    "grid gap-2",
+                    // Responsive grid: more columns in landscape/wider screens
+                    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
                   )}>
                 
                 {filteredStreams.map((stream, index) => {
