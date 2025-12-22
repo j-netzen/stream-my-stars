@@ -69,7 +69,7 @@ export default function HomePage() {
       {featured && (
         <div className={cn(
           "relative overflow-hidden z-20",
-          isTVMode ? "h-[80vh]" : "h-[70vh]"
+          isTVMode ? "h-[70vh] max-h-[600px]" : "h-[50vh] min-h-[320px] max-h-[500px] landscape:h-[60vh] landscape:max-h-[450px]"
         )}>
           {/* Background */}
           <div
@@ -88,24 +88,24 @@ export default function HomePage() {
           {/* Content */}
           <div className={cn(
             "relative z-40 h-full flex items-end",
-            isTVMode ? "pb-24 px-12" : "pb-16 px-6"
+            isTVMode ? "pb-16 px-12" : "pb-8 px-6 landscape:pb-6 landscape:px-8"
           )}>
-            <div className={cn("space-y-4", isTVMode ? "max-w-3xl space-y-6" : "max-w-2xl")}>
+            <div className={cn("space-y-3", isTVMode ? "max-w-3xl space-y-4" : "max-w-xl landscape:max-w-2xl")}>
               <h1 className={cn(
                 "font-bold text-shadow",
-                isTVMode ? "tv-title text-6xl" : "text-5xl"
+                isTVMode ? "tv-title text-5xl" : "text-3xl landscape:text-4xl"
               )}>
                 {featured.title}
               </h1>
               {featured.overview && (
                 <p className={cn(
-                  "text-white/80 line-clamp-3 text-shadow",
-                  isTVMode ? "tv-subtitle text-xl" : "text-lg"
+                  "text-white/80 text-shadow",
+                  isTVMode ? "tv-subtitle text-lg line-clamp-2" : "text-sm line-clamp-2 landscape:text-base landscape:line-clamp-2"
                 )}>
                   {featured.overview}
                 </p>
               )}
-              <div className={cn("flex", isTVMode ? "gap-4" : "gap-3")}>
+              <div className={cn("flex", isTVMode ? "gap-3" : "gap-2 landscape:gap-3")}>
                 <Button
                   size={isTVMode ? "tv-lg" : "lg"}
                   className="gap-2"
@@ -132,7 +132,7 @@ export default function HomePage() {
       {/* Content Rows */}
       <div className={cn(
         "pb-12 relative z-30",
-        isTVMode ? "space-y-12 mt-6" : "space-y-8 mt-4 md:-mt-8"
+        isTVMode ? "space-y-8 mt-4" : "space-y-6 mt-2 landscape:space-y-4 landscape:-mt-4"
       )}>
         {movies.length > 0 && (
           <MediaRow
