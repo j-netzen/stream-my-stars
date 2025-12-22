@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useCategories } from "@/hooks/useCategories";
@@ -8,13 +8,14 @@ import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Play, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function HomePage() {
-  const { media, isLoading: mediaLoading, deleteMedia } = useMedia();
+  const { media, isLoading: mediaLoading, deleteMedia, refetch } = useMedia();
   const { progress, getContinueWatching } = useWatchProgress();
   const { categories } = useCategories();
   const { isTVMode } = useTVMode();
@@ -55,6 +56,10 @@ export default function HomePage() {
     deleteMedia.mutate(item.id);
   };
 
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
   if (mediaLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,7 +69,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
       {/* Hero Section */}
       {featured && (
         <div className={cn(
@@ -256,6 +261,6 @@ export default function HomePage() {
       {activeMedia && (
         <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
       )}
-    </div>
+    </PullToRefresh>
   );
 }
