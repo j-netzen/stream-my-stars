@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, ZoomIn } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
-  const { isTVMode, setTVMode } = useTVMode();
+  const { isTVMode, setTVMode, tvScale, setTVScale } = useTVMode();
   const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingRd, setIsLoadingRd] = useState(false);
@@ -54,6 +55,10 @@ export default function SettingsPage() {
   const handleTVModeChange = (enabled: boolean) => {
     setTVMode(enabled);
     toast.success(enabled ? "TV mode enabled" : "TV mode disabled");
+  };
+
+  const handleScaleChange = (value: number[]) => {
+    setTVScale(value[0]);
   };
 
   return (
@@ -102,6 +107,39 @@ export default function SettingsPage() {
               className={isTVMode ? "scale-125" : ""}
             />
           </div>
+
+          {/* Scale Slider - only show when TV mode is enabled */}
+          {isTVMode && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label className={cn("font-medium flex items-center gap-2", isTVMode && "text-lg")}>
+                    <ZoomIn className="w-4 h-4" />
+                    Interface Scale
+                  </Label>
+                  <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                    Adjust the overall size of the TV interface
+                  </p>
+                </div>
+                <span className={cn("font-mono tabular-nums", isTVMode ? "text-lg" : "text-sm")}>
+                  {Math.round(tvScale * 100)}%
+                </span>
+              </div>
+              <Slider
+                value={[tvScale]}
+                onValueChange={handleScaleChange}
+                min={0.7}
+                max={1.2}
+                step={0.05}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>70%</span>
+                <span>100%</span>
+                <span>120%</span>
+              </div>
+            </div>
+          )}
           
           <div className={cn(
             "flex items-center gap-4 p-4 rounded-lg",
