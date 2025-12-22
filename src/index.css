@@ -228,6 +228,28 @@
     opacity: 1;
   }
 
+  /* TV mode sidebar navigation */
+  .tv-mode [data-sidebar="true"] a:focus-visible,
+  .tv-mode [data-sidebar="true"] button:focus-visible {
+    background: hsl(var(--primary) / 0.2);
+    outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
+    outline-offset: -2px;
+  }
+
+  /* Smooth scrolling for keyboard navigation */
+  .tv-mode {
+    scroll-behavior: smooth;
+  }
+
+  /* Better focus for all interactive elements in TV mode */
+  .tv-mode button:focus-visible,
+  .tv-mode a:focus-visible,
+  .tv-mode [tabindex="0"]:focus-visible {
+    outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
+    outline-offset: 2px;
+    box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
+  }
+
   /* TV mode larger buttons */
   .tv-mode .tv-button {
     min-height: 3.5rem;

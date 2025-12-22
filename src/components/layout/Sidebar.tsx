@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTVMode } from "@/hooks/useTVMode";
 import spaceBg from "@/assets/space-sidebar-bg.jpg";
 
 interface NavItemData {
@@ -71,6 +72,45 @@ export function Sidebar({
   const location = useLocation();
   const { signOut } = useAuth();
   const { status: rdStatus, user: rdUser, refresh: refreshRdStatus } = useRealDebridStatus();
+  const { isTVMode } = useTVMode();
+  
+  // Keyboard navigation for sidebar in TV mode
+  const handleSidebarKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!isTVMode) return;
+    
+    const focusableElements = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-sidebar="true"] a[href], [data-sidebar="true"] button:not([disabled])')
+    ).filter(el => el.offsetParent !== null);
+    
+    const currentIndex = focusableElements.findIndex(el => el === document.activeElement);
+    if (currentIndex === -1) return;
+    
+    let nextIndex = currentIndex;
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        nextIndex = Math.min(currentIndex + 1, focusableElements.length - 1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        nextIndex = Math.max(currentIndex - 1, 0);
+        break;
+      case 'ArrowRight':
+        // Move focus to main content
+        e.preventDefault();
+        const mainContent = document.querySelector('main');
+        const firstFocusable = mainContent?.querySelector<HTMLElement>('[tabindex="0"], button, a[href]');
+        if (firstFocusable) {
+          firstFocusable.focus();
+        }
+        return;
+    }
+    
+    if (nextIndex !== currentIndex) {
+      focusableElements[nextIndex]?.focus();
+    }
+  }, [isTVMode]);
   
   // Load saved order from localStorage
   const [navItems, setNavItems] = useState<NavItemData[]>(() => {
@@ -214,6 +254,8 @@ export function Sidebar({
 
       {/* Sidebar */}
       <aside
+        data-sidebar="true"
+        onKeyDown={handleSidebarKeyDown}
         className={cn(
           "fixed left-0 top-0 z-50 h-screen border-r border-border flex flex-col transition-all duration-300 overflow-hidden",
           // Desktop sizing
