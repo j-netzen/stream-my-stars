@@ -620,7 +620,7 @@ export function StreamSelectionDialog({
                   className="flex-1 min-h-0"
                 >
                   <div className={cn(
-                    isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
+                    isTVMode ? "space-y-2 p-1" : "space-y-1.5 p-1"
                   )}>
                 
                 {filteredStreams.map((stream, index) => {
@@ -637,8 +637,8 @@ export function StreamSelectionDialog({
                       onFocus={() => setFocusedIndex(index)}
                       disabled={isResolving}
                       className={cn(
-                        "w-full text-left rounded-lg border-2 transition-all duration-200",
-                        isTVMode ? "p-5" : "p-3",
+                        "w-full text-left rounded-lg border transition-all duration-200",
+                        isTVMode ? "p-4" : "p-2",
                         isCurrentlyResolving
                           ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
                           : isFocused
@@ -811,7 +811,7 @@ export function StreamSelectionDialog({
                   className="flex-1 min-h-0"
                 >
                   <div className={cn(
-                    isTVMode ? "space-y-3 p-1" : "space-y-2 p-1"
+                    isTVMode ? "space-y-2 p-1" : "space-y-1.5 p-1"
                   )}>
                     {filteredDownloads.map((download, index) => {
                       const quality = extractQuality(download.filename);
@@ -827,8 +827,8 @@ export function StreamSelectionDialog({
                           onFocus={() => setDownloadFocusedIndex(index)}
                           disabled={isResolving}
                           className={cn(
-                            "w-full text-left rounded-lg border-2 transition-all duration-200",
-                            isTVMode ? "p-5" : "p-3",
+                            "w-full text-left rounded-lg border transition-all duration-200",
+                            isTVMode ? "p-4" : "p-2",
                             isCurrentlyResolving
                               ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
                               : isFocused
