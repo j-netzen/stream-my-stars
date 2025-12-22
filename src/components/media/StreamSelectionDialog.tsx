@@ -63,7 +63,7 @@ export function StreamSelectionDialog({
   }, [isCompactView]);
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // My Downloads state
+  // Fail-Safe state
   const [myDownloads, setMyDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingDownloads, setIsLoadingDownloads] = useState(false);
   const [downloadsError, setDownloadsError] = useState<string | null>(null);
@@ -502,7 +502,7 @@ export function StreamSelectionDialog({
           </div>
         )}
 
-        {/* Tabs for Search vs My Downloads */}
+        {/* Tabs for Search vs Fail-Safe */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <TabsList className="grid w-full grid-cols-2 shrink-0">
             <TabsTrigger value="search" className="gap-2">
@@ -511,7 +511,7 @@ export function StreamSelectionDialog({
             </TabsTrigger>
             <TabsTrigger value="downloads" className="gap-2">
               <Download className="w-4 h-4" />
-              My Downloads
+              Fail-Safe
             </TabsTrigger>
           </TabsList>
 
@@ -765,7 +765,7 @@ export function StreamSelectionDialog({
             )}
           </TabsContent>
 
-          {/* My Downloads Tab */}
+          {/* Fail-Safe Tab */}
           <TabsContent value="downloads" className="flex-1 flex flex-col min-h-0 mt-4">
             {/* Search box for downloads */}
             <div className="flex items-center gap-2 mb-3">
