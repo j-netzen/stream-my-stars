@@ -128,9 +128,7 @@
   .tv-mode {
     --tv-card-width: 16rem;
     --tv-focus-ring-width: 6px;
-    --tv-scale: 0.95;
     font-size: 18px;
-    zoom: var(--tv-scale);
   }
 }
 
