@@ -1,5 +1,14 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 
+// Scale presets
+export const SCALE_PRESETS = {
+  small: { label: "Small", value: 80 },
+  normal: { label: "Normal", value: 95 },
+  large: { label: "Large", value: 110 },
+} as const;
+
+export type ScalePreset = keyof typeof SCALE_PRESETS;
+
 // TV detection: large screens (typically 1920+ wide) without touch support
 // or when explicitly enabled via URL param ?tv=1
 function detectTVMode(): boolean {
@@ -23,19 +32,34 @@ function detectTVMode(): boolean {
   return isLargeScreen && (hasCoarsePointer || noFinePointer);
 }
 
+function getStoredScale(): number {
+  if (typeof window === "undefined") return SCALE_PRESETS.normal.value;
+  const stored = localStorage.getItem("ui-scale");
+  if (stored) {
+    const parsed = parseInt(stored, 10);
+    if (!isNaN(parsed) && parsed >= 50 && parsed <= 150) return parsed;
+  }
+  return SCALE_PRESETS.normal.value;
+}
+
 interface TVModeContextType {
   isTVMode: boolean;
   setTVMode: (enabled: boolean) => void;
   toggleTVMode: () => void;
+  uiScale: number;
+  setUIScale: (scale: number) => void;
+  currentPreset: ScalePreset | null;
 }
 
 const TVModeContext = createContext<TVModeContextType | undefined>(undefined);
 
 export function TVModeProvider({ children }: { children: ReactNode }) {
   const [isTVMode, setIsTVMode] = useState(false);
+  const [uiScale, setUIScaleState] = useState<number>(SCALE_PRESETS.normal.value);
 
   useEffect(() => {
     setIsTVMode(detectTVMode());
+    setUIScaleState(getStoredScale());
   }, []);
 
   useEffect(() => {
@@ -47,6 +71,12 @@ export function TVModeProvider({ children }: { children: ReactNode }) {
     }
   }, [isTVMode]);
 
+  useEffect(() => {
+    // Apply UI scale to document
+    document.documentElement.style.setProperty("--ui-scale", String(uiScale / 100));
+    document.documentElement.style.fontSize = `${uiScale}%`;
+  }, [uiScale]);
+
   const setTVMode = (enabled: boolean) => {
     localStorage.setItem("tv-mode", String(enabled));
     setIsTVMode(enabled);
@@ -56,8 +86,18 @@ export function TVModeProvider({ children }: { children: ReactNode }) {
     setTVMode(!isTVMode);
   };
 
+  const setUIScale = (scale: number) => {
+    localStorage.setItem("ui-scale", String(scale));
+    setUIScaleState(scale);
+  };
+
+  // Determine current preset
+  const currentPreset = (Object.keys(SCALE_PRESETS) as ScalePreset[]).find(
+    (key) => SCALE_PRESETS[key].value === uiScale
+  ) || null;
+
   return (
-    <TVModeContext.Provider value={{ isTVMode, setTVMode, toggleTVMode }}>
+    <TVModeContext.Provider value={{ isTVMode, setTVMode, toggleTVMode, uiScale, setUIScale, currentPreset }}>
       {children}
     </TVModeContext.Provider>
   );

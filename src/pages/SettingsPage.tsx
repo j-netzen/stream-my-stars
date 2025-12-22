@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useTVMode } from "@/hooks/useTVMode";
+import { useTVMode, SCALE_PRESETS, ScalePreset } from "@/hooks/useTVMode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2 } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
-  const { isTVMode, setTVMode } = useTVMode();
+  const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset } = useTVMode();
   const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingRd, setIsLoadingRd] = useState(false);
@@ -54,6 +54,11 @@ export default function SettingsPage() {
   const handleTVModeChange = (enabled: boolean) => {
     setTVMode(enabled);
     toast.success(enabled ? "TV mode enabled" : "TV mode disabled");
+  };
+
+  const handleScaleChange = (preset: ScalePreset) => {
+    setUIScale(SCALE_PRESETS[preset].value);
+    toast.success(`UI scale set to ${SCALE_PRESETS[preset].label} (${SCALE_PRESETS[preset].value}%)`);
   };
 
   return (
@@ -132,6 +137,40 @@ export default function SettingsPage() {
 
           <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
             Tip: You can also enable TV mode by adding <code className="bg-secondary px-1.5 py-0.5 rounded">?tv=1</code> to the URL.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* UI Scale */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Maximize2 className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            UI Scale
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Adjust the overall interface size
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            {(Object.keys(SCALE_PRESETS) as ScalePreset[]).map((preset) => (
+              <Button
+                key={preset}
+                variant={currentPreset === preset ? "default" : "outline"}
+                size={isTVMode ? "lg" : "default"}
+                onClick={() => handleScaleChange(preset)}
+                className={cn(
+                  "min-w-[100px]",
+                  currentPreset === preset && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                )}
+              >
+                {SCALE_PRESETS[preset].label} ({SCALE_PRESETS[preset].value}%)
+              </Button>
+            ))}
+          </div>
+          <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+            Current scale: <span className="font-medium text-foreground">{uiScale}%</span>
           </p>
         </CardContent>
       </Card>
