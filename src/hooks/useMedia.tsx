@@ -51,7 +51,7 @@ export function useMedia() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: media = [], isLoading } = useQuery({
+  const { data: media = [], isLoading, refetch } = useQuery({
     queryKey: ["media", user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -122,5 +122,5 @@ export function useMedia() {
     },
   });
 
-  return { media, isLoading, addMedia, updateMedia, deleteMedia };
+  return { media, isLoading, addMedia, updateMedia, deleteMedia, refetch };
 }
