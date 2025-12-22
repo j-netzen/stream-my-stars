@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -448,11 +449,21 @@ export function StreamSelectionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none border-none overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
+        <DialogHeader className="shrink-0 flex flex-row items-center justify-between pr-2">
           <DialogTitle className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary" />
             Select Stream
           </DialogTitle>
+          <DialogClose asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 rounded-full bg-secondary hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            >
+              <X className="h-6 w-6" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </DialogClose>
         </DialogHeader>
 
         {media && (
