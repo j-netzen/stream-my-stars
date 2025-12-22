@@ -66,6 +66,14 @@
     --tv-card-width: 11rem;
     --tv-focus-ring: 265 85% 55%;
     --tv-focus-ring-width: 4px;
+
+    /* Landscape-friendly card sizes */
+    --card-width-xs: 8rem;
+    --card-width-sm: 9rem;
+    --card-width-md: 10rem;
+    --card-width-lg: 12rem;
+    --card-width-xl: 14rem;
+    --card-width-2xl: 16rem;
   }
 
   .dark {
@@ -126,9 +134,42 @@
 
   /* TV Mode - larger everything for 10-foot UI */
   .tv-mode {
-    --tv-card-width: 16rem;
+    --tv-card-width: 18rem;
     --tv-focus-ring-width: 6px;
     font-size: 18px;
+    --card-width-lg: 14rem;
+    --card-width-xl: 16rem;
+    --card-width-2xl: 18rem;
+  }
+
+  /* Landscape mode optimizations */
+  @media (min-aspect-ratio: 4/3) {
+    :root {
+      --card-width-lg: 13rem;
+      --card-width-xl: 15rem;
+      --card-width-2xl: 17rem;
+    }
+  }
+
+  @media (min-aspect-ratio: 16/9) {
+    :root {
+      --card-width-lg: 14rem;
+      --card-width-xl: 16rem;
+      --card-width-2xl: 18rem;
+    }
+    .tv-mode {
+      --tv-card-width: 20rem;
+    }
+  }
+
+  @media (min-aspect-ratio: 21/9) {
+    :root {
+      --card-width-xl: 18rem;
+      --card-width-2xl: 20rem;
+    }
+    .tv-mode {
+      --tv-card-width: 22rem;
+    }
   }
 }
 

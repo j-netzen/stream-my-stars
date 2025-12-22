@@ -76,14 +76,14 @@ export function MediaRow({
   if (media.length === 0) return null;
 
   return (
-    <div className={cn("space-y-4", isTVMode && "space-y-6")}>
+    <div className={cn("space-y-3", isTVMode ? "space-y-4" : "landscape:space-y-2")}>
       <div className={cn(
         "flex items-center justify-between",
         isTVMode ? "px-8" : "px-4 md:px-6"
       )}>
         <h2 className={cn(
           "font-semibold",
-          isTVMode ? "tv-row-title text-2xl" : "text-xl"
+          isTVMode ? "tv-row-title text-xl" : "text-lg landscape:text-base"
         )}>
           {title}
         </h2>
@@ -112,8 +112,8 @@ export function MediaRow({
         className={cn(
           "flex overflow-x-auto scrollbar-hide snap-x snap-mandatory",
           isTVMode 
-            ? "gap-6 px-8 pb-6" 
-            : "gap-3 md:gap-4 px-4 md:px-6 pb-4"
+            ? "gap-5 px-8 pb-4" 
+            : "gap-3 md:gap-4 px-4 md:px-6 pb-3 landscape:gap-4 landscape:pb-2"
         )}
       >
         {media.map((item, index) => (
@@ -125,7 +125,7 @@ export function MediaRow({
               "flex-shrink-0 snap-start",
               isTVMode 
                 ? "w-[var(--tv-card-width)]" 
-                : "w-32 sm:w-36 md:w-40 lg:w-44"
+                : "w-[var(--card-width-xs)] sm:w-[var(--card-width-sm)] md:w-[var(--card-width-md)] lg:w-[var(--card-width-lg)] xl:w-[var(--card-width-xl)] 2xl:w-[var(--card-width-2xl)]"
             )}
           >
             <MediaCard
