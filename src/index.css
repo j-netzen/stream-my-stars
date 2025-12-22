@@ -129,6 +129,7 @@
     --tv-card-width: 16rem;
     --tv-focus-ring-width: 6px;
     font-size: 18px;
+    zoom: 0.95;
   }
 }
 
