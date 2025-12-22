@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2 } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingRd, setIsLoadingRd] = useState(false);
   const [rdError, setRdError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -59,6 +60,31 @@ export default function SettingsPage() {
   const handleScaleChange = (preset: ScalePreset) => {
     setUIScale(SCALE_PRESETS[preset].value);
     toast.success(`UI scale set to ${SCALE_PRESETS[preset].label} (${SCALE_PRESETS[preset].value}%)`);
+  };
+
+  const handleUpdateApp = async () => {
+    setIsUpdating(true);
+    toast.info("Checking for updates...");
+    
+    try {
+      // Clear caches if available
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      
+      // Short delay for visual feedback
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast.success("Reloading app with latest version...");
+      
+      // Force reload from server, bypassing cache
+      window.location.reload();
+    } catch (error) {
+      console.error("Update failed:", error);
+      toast.error("Update failed. Please try again.");
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -374,6 +400,42 @@ export default function SettingsPage() {
             Video chunks are cached locally for smoother playback. Cache is
             automatically managed and cleared when full.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Update App */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <RotateCcw className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            Update App
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Check for and install the latest version
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+            Reload the app to get the latest features and bug fixes. Your data will be preserved.
+          </p>
+          <Button 
+            size={isTVMode ? "tv" : "default"} 
+            onClick={handleUpdateApp}
+            disabled={isUpdating}
+            className="gap-2"
+          >
+            {isUpdating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="w-4 h-4" />
+                Check for Updates
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
 
