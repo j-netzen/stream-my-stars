@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +52,7 @@ export function StreamSelectionDialog({
   const [error, setError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [qualityFilter, setQualityFilter] = useState<string>("all");
+  const [isCompactView, setIsCompactView] = useState(true);
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
   // My Downloads state
@@ -584,7 +585,7 @@ export function StreamSelectionDialog({
             {/* Stream list */}
             {streams.length > 0 && !isSearching && (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                {/* Quality filter and count */}
+                {/* Quality filter, compact toggle, and count */}
                 <div className="flex items-center justify-between gap-3 mb-2 px-1 shrink-0">
                   <p className={cn(
                     "text-muted-foreground",
@@ -593,6 +594,19 @@ export function StreamSelectionDialog({
                     {filteredStreams.length} of {streams.length} stream(s)
                   </p>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn("h-8 w-8", isTVMode && "h-10 w-10")}
+                      onClick={() => setIsCompactView(!isCompactView)}
+                      title={isCompactView ? "Normal view" : "Compact view"}
+                    >
+                      {isCompactView ? (
+                        <LayoutGrid className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+                      ) : (
+                        <List className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+                      )}
+                    </Button>
                     <Filter className="w-3 h-3 text-muted-foreground" />
                     <Select value={qualityFilter} onValueChange={setQualityFilter}>
                       <SelectTrigger className={cn("w-[100px]", isTVMode ? "h-10" : "h-8")}>
@@ -620,7 +634,10 @@ export function StreamSelectionDialog({
                   className="flex-1 min-h-0"
                 >
                   <div className={cn(
-                    isTVMode ? "space-y-2 p-1" : "space-y-1.5 p-1"
+                    "p-1",
+                    isCompactView 
+                      ? (isTVMode ? "space-y-2" : "space-y-1") 
+                      : (isTVMode ? "space-y-3" : "space-y-2")
                   )}>
                 
                 {filteredStreams.map((stream, index) => {
@@ -638,7 +655,9 @@ export function StreamSelectionDialog({
                       disabled={isResolving}
                       className={cn(
                         "w-full text-left rounded-lg border transition-all duration-200",
-                        isTVMode ? "p-4" : "p-2",
+                        isCompactView
+                          ? (isTVMode ? "p-3" : "p-1.5")
+                          : (isTVMode ? "p-5" : "p-3"),
                         isCurrentlyResolving
                           ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
                           : isFocused
@@ -798,12 +817,28 @@ export function StreamSelectionDialog({
             {/* Downloads list */}
             {!isLoadingDownloads && filteredDownloads.length > 0 && (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                <p className={cn(
-                  "text-muted-foreground mb-2 px-1 shrink-0",
-                  isTVMode ? "text-base" : "text-xs"
-                )}>
-                  {filteredDownloads.length} of {myDownloads.length} file(s)
-                </p>
+                {/* Compact toggle and count */}
+                <div className="flex items-center justify-between gap-3 mb-2 px-1 shrink-0">
+                  <p className={cn(
+                    "text-muted-foreground",
+                    isTVMode ? "text-base" : "text-xs"
+                  )}>
+                    {filteredDownloads.length} of {myDownloads.length} file(s)
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn("h-8 w-8", isTVMode && "h-10 w-10")}
+                    onClick={() => setIsCompactView(!isCompactView)}
+                    title={isCompactView ? "Normal view" : "Compact view"}
+                  >
+                    {isCompactView ? (
+                      <LayoutGrid className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+                    ) : (
+                      <List className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+                    )}
+                  </Button>
+                </div>
                 
                 <ScrollAreaWithArrows 
                   scrollStep={150}
@@ -811,7 +846,10 @@ export function StreamSelectionDialog({
                   className="flex-1 min-h-0"
                 >
                   <div className={cn(
-                    isTVMode ? "space-y-2 p-1" : "space-y-1.5 p-1"
+                    "p-1",
+                    isCompactView 
+                      ? (isTVMode ? "space-y-2" : "space-y-1") 
+                      : (isTVMode ? "space-y-3" : "space-y-2")
                   )}>
                     {filteredDownloads.map((download, index) => {
                       const quality = extractQuality(download.filename);
@@ -828,7 +866,9 @@ export function StreamSelectionDialog({
                           disabled={isResolving}
                           className={cn(
                             "w-full text-left rounded-lg border transition-all duration-200",
-                            isTVMode ? "p-4" : "p-2",
+                            isCompactView
+                              ? (isTVMode ? "p-3" : "p-1.5")
+                              : (isTVMode ? "p-5" : "p-3"),
                             isCurrentlyResolving
                               ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
                               : isFocused
