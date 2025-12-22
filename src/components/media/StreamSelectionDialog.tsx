@@ -82,11 +82,47 @@ export function StreamSelectionDialog({
     }
   });
 
-  // Filter downloads based on search query
+  // Filter downloads based on media title and episode
   const filteredDownloads = myDownloads.filter((download) => {
-    if (!downloadSearchQuery.trim()) return true;
-    const query = downloadSearchQuery.toLowerCase();
-    return download.filename.toLowerCase().includes(query);
+    if (!media) return true;
+    
+    const filename = download.filename.toLowerCase();
+    const mediaTitle = media.title.toLowerCase();
+    
+    // Normalize title for matching (remove special characters, convert spaces)
+    const normalizeForMatch = (str: string) => 
+      str.replace(/[^\w\s]/g, '').replace(/\s+/g, '.').toLowerCase();
+    
+    const normalizedFilename = normalizeForMatch(download.filename);
+    const normalizedTitle = normalizeForMatch(media.title);
+    
+    // Check if filename contains the media title (with various formats)
+    const titleWords = media.title.toLowerCase().split(/\s+/);
+    const titleMatches = titleWords.every(word => 
+      filename.includes(word.replace(/[^\w]/g, ''))
+    ) || normalizedFilename.includes(normalizedTitle);
+    
+    if (!titleMatches) return false;
+    
+    // For TV shows, also match season and episode
+    if (media.media_type === "tv") {
+      // Common episode patterns: S01E01, S1E1, 1x01, Season 1 Episode 1
+      const episodePatterns = [
+        new RegExp(`s0?${selectedSeason}e0?${selectedEpisode}\\b`, 'i'),
+        new RegExp(`${selectedSeason}x0?${selectedEpisode}\\b`, 'i'),
+        new RegExp(`season\\s*${selectedSeason}.*episode\\s*${selectedEpisode}`, 'i'),
+      ];
+      
+      return episodePatterns.some(pattern => pattern.test(download.filename));
+    }
+    
+    // Additional search query filter if provided
+    if (downloadSearchQuery.trim()) {
+      const query = downloadSearchQuery.toLowerCase();
+      return filename.includes(query);
+    }
+    
+    return true;
   });
 
   // Auto-focus first stream when list loads or filter changes
