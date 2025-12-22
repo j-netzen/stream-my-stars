@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
 import { WatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "./MediaCard";
@@ -29,6 +29,7 @@ export function MediaRow({
   onMoreInfo,
 }: MediaRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const { isTVMode } = useTVMode();
 
   const scroll = (direction: "left" | "right") => {
@@ -40,6 +41,37 @@ export function MediaRow({
       });
     }
   };
+
+  // Handle keyboard navigation within the row
+  const handleRowKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
+    if (!isTVMode) return;
+    
+    const cards = cardRefs.current.filter(Boolean) as HTMLDivElement[];
+    let nextIndex = index;
+    
+    switch (e.key) {
+      case 'ArrowRight':
+        e.preventDefault();
+        e.stopPropagation();
+        nextIndex = Math.min(index + 1, cards.length - 1);
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        e.stopPropagation();
+        nextIndex = Math.max(index - 1, 0);
+        break;
+      default:
+        return;
+    }
+    
+    if (nextIndex !== index && cards[nextIndex]) {
+      const focusable = cards[nextIndex].querySelector<HTMLElement>('[tabindex="0"]');
+      if (focusable) {
+        focusable.focus();
+        focusable.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [isTVMode]);
 
   if (media.length === 0) return null;
 
@@ -84,9 +116,11 @@ export function MediaRow({
             : "gap-3 md:gap-4 px-4 md:px-6 pb-4"
         )}
       >
-        {media.map((item) => (
+        {media.map((item, index) => (
           <div 
-            key={item.id} 
+            key={item.id}
+            ref={(el) => (cardRefs.current[index] = el)}
+            onKeyDown={(e) => handleRowKeyDown(e, index)}
             className={cn(
               "flex-shrink-0 snap-start",
               isTVMode 
