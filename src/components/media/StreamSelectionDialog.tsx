@@ -52,7 +52,15 @@ export function StreamSelectionDialog({
   const [error, setError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [qualityFilter, setQualityFilter] = useState<string>("all");
-  const [isCompactView, setIsCompactView] = useState(true);
+  const [isCompactView, setIsCompactView] = useState(() => {
+    const saved = localStorage.getItem("streamDialog-compactView");
+    return saved !== null ? saved === "true" : true;
+  });
+  
+  // Persist compact view preference
+  useEffect(() => {
+    localStorage.setItem("streamDialog-compactView", String(isCompactView));
+  }, [isCompactView]);
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
   // My Downloads state
