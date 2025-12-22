@@ -117,20 +117,26 @@ export function MainLayout({ children }: MainLayoutProps) {
         onMobileOpenChange={setMobileMenuOpen}
       />
       
-      {/* Top bar with mobile menu trigger and theme toggle */}
-      <div className="fixed top-0 right-0 left-0 md:left-auto z-30 flex items-center justify-between md:justify-end px-4 h-14 bg-background/80 backdrop-blur-sm border-b md:border-0">
+      {/* Top bar with mobile menu trigger and theme toggle - respects safe area */}
+      <div 
+        className="fixed right-0 left-0 md:left-auto z-30 flex items-center justify-between md:justify-end px-4 h-14 bg-background/80 backdrop-blur-sm border-b md:border-0 fixed-safe-top safe-x"
+        style={{ top: 'var(--safe-area-inset-top, 0px)' }}
+      >
         <MobileMenuTrigger onClick={() => setMobileMenuOpen(true)} />
         <ThemeToggle />
       </div>
       
       <main
         className={cn(
-          "min-h-screen transition-all duration-300",
+          "min-h-screen transition-all duration-300 safe-bottom",
           // Desktop: offset by sidebar width
           sidebarCollapsed ? "md:ml-16" : "md:ml-64",
-          // Mobile: no offset, add top padding for menu button
+          // Mobile: no offset, add top padding for menu button + safe area
           "ml-0 pt-16 md:pt-0"
         )}
+        style={{ 
+          paddingTop: 'calc(4rem + var(--safe-area-inset-top, 0px))',
+        }}
       >
         {children}
       </main>
