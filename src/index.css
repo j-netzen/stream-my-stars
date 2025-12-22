@@ -178,6 +178,20 @@
     @apply border-border;
   }
 
+  /* Safe area inset CSS variables for notched devices */
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  }
+
+  html {
+    /* Ensure the app fills the entire screen including notch area */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
   body {
     @apply bg-background text-foreground;
     background-image: 
@@ -185,6 +199,12 @@
       radial-gradient(ellipse at 80% 70%, hsl(var(--star-blue) / 0.06) 0%, transparent 50%),
       radial-gradient(ellipse at 50% 100%, hsl(var(--nebula-pink) / 0.04) 0%, transparent 40%);
     min-height: 100vh;
+    min-height: -webkit-fill-available;
+    /* Apply safe area padding to body */
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
   }
 
   .dark body {
@@ -463,5 +483,57 @@
 
   .shadow-star-glow {
     box-shadow: var(--shadow-glow);
+  }
+
+  /* Safe area utilities for notched devices */
+  .safe-top {
+    padding-top: var(--safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .safe-x {
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+
+  .safe-y {
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+
+  .safe-all {
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+  }
+
+  /* Margin variants */
+  .m-safe-top {
+    margin-top: var(--safe-area-inset-top);
+  }
+
+  .m-safe-bottom {
+    margin-bottom: var(--safe-area-inset-bottom);
+  }
+
+  /* Fixed elements that need safe area consideration */
+  .fixed-safe-top {
+    top: var(--safe-area-inset-top);
+  }
+
+  .fixed-safe-bottom {
+    bottom: var(--safe-area-inset-bottom);
   }
 }
