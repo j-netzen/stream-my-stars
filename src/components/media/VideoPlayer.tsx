@@ -62,6 +62,13 @@ function getBufferSettings(quality?: StreamQualityInfo) {
   }
 }
 
+// Get optimal playback rate based on stream quality to reduce frame drops
+function getOptimalPlaybackRate(quality?: StreamQualityInfo): number {
+  // For high quality streams, we might need to slightly reduce playback speed
+  // if the device can't keep up, but default to 1.0
+  return 1.0;
+}
+
 export function VideoPlayer({ media, onClose, streamQuality }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -833,6 +840,7 @@ export function VideoPlayer({ media, onClose, streamQuality }: VideoPlayerProps)
         preload={getBufferSettings(streamQuality).preloadAmount as "auto" | "metadata" | "none"}
         playsInline
         muted={isMuted}
+        controls={false}
       >
         {src ? (
           <source key={src} src={src} type={getSourceTypeHint(src)} />
