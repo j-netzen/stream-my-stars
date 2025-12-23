@@ -671,8 +671,8 @@ export function StreamSelectionDialog({
                   className="flex-1 min-h-0"
                 >
                   <div className={cn(
-                    "p-1",
-                    "grid gap-2",
+                    "p-0.5",
+                    "grid gap-1",
                     // Responsive grid: more columns in landscape/wider screens
                     "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
                   )}>
@@ -691,32 +691,32 @@ export function StreamSelectionDialog({
                       onFocus={() => setFocusedIndex(index)}
                       disabled={isResolving}
                       className={cn(
-                        "w-full text-left rounded-lg border transition-all duration-200",
+                        "w-full text-left rounded border transition-all duration-150",
                         isCompactView
-                          ? (isTVMode ? "p-3" : "p-1.5")
-                          : (isTVMode ? "p-5" : "p-3"),
+                          ? (isTVMode ? "px-2 py-1.5" : "px-1.5 py-1")
+                          : (isTVMode ? "p-3" : "p-2"),
                         isCurrentlyResolving
-                          ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
+                          ? "border-primary bg-primary/30 ring-1 ring-primary"
                           : isFocused
-                          ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02] shadow-lg shadow-primary/20"
-                          : "border-muted-foreground/30 bg-secondary/50 hover:border-primary hover:bg-primary/10 hover:shadow-md",
-                        "focus:outline-none focus:border-primary focus:bg-primary/20 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02] focus:shadow-lg focus:shadow-primary/20",
+                          ? "border-primary bg-primary/20 ring-1 ring-primary"
+                          : "border-muted-foreground/20 bg-secondary/30 hover:border-primary/50 hover:bg-primary/5",
+                        "focus:outline-none focus:border-primary focus:bg-primary/20 focus:ring-1 focus:ring-primary",
                         isResolving && !isCurrentlyResolving && "opacity-50"
                       )}
                     >
                       <div className={cn(
                         "flex items-center justify-between",
-                        isTVMode ? "gap-4" : "gap-3"
+                        isTVMode ? "gap-2" : "gap-1.5"
                       )}>
                         <div className="flex-1 min-w-0">
                           <div className={cn(
                             "flex flex-wrap items-center",
-                            isTVMode ? "gap-3" : "gap-2"
+                            isTVMode ? "gap-2" : "gap-1"
                           )}>
                             {info.quality && (
                               <span className={cn(
                                 "font-semibold rounded",
-                                isTVMode ? "px-3 py-1 text-base" : "px-2 py-0.5 text-xs",
+                                isTVMode ? "px-2 py-0.5 text-sm" : "px-1 py-0 text-[10px]",
                                 info.quality.includes("2160") || info.quality.includes("4K")
                                   ? "bg-purple-500/20 text-purple-400"
                                   : info.quality.includes("1080")
@@ -731,43 +731,44 @@ export function StreamSelectionDialog({
                             {info.size && (
                               <span className={cn(
                                 "text-muted-foreground",
-                                isTVMode ? "text-base" : "text-xs"
+                                isTVMode ? "text-sm" : "text-[10px]"
                               )}>{info.size}</span>
                             )}
                             {info.isDirectLink && (
                               <span className={cn(
-                                "bg-green-500/20 text-green-400 rounded flex items-center gap-1",
-                                isTVMode ? "px-2 py-1 text-sm" : "px-1.5 py-0.5 text-xs"
+                                "bg-green-500/20 text-green-400 rounded flex items-center",
+                                isTVMode ? "px-1.5 py-0.5 text-xs gap-0.5" : "px-1 py-0 text-[10px] gap-0.5"
                               )}>
-                                <Zap className={cn(isTVMode ? "w-4 h-4" : "w-3 h-3")} />
+                                <Zap className={cn(isTVMode ? "w-3 h-3" : "w-2.5 h-2.5")} />
                                 Cached
                               </span>
                             )}
                           </div>
                           <p className={cn(
-                            "text-foreground/80 mt-1 truncate font-medium",
-                            isTVMode ? "text-base" : "text-sm"
+                            "text-foreground/80 truncate font-medium leading-tight",
+                            isCompactView ? "mt-0.5" : "mt-1",
+                            isTVMode ? "text-sm" : "text-xs"
                           )}>
                             {stream.title || stream.name}
                           </p>
                         </div>
-                        <div className="shrink-0 flex flex-col items-end gap-1">
+                        <div className="shrink-0 flex flex-col items-end">
                           {isCurrentlyResolving ? (
-                            <div className="flex flex-col items-end gap-1">
+                            <div className="flex flex-col items-end gap-0.5">
                               <Loader2 className={cn(
                                 "animate-spin text-primary",
-                                isTVMode ? "w-8 h-8" : "w-5 h-5"
+                                isTVMode ? "w-5 h-5" : "w-4 h-4"
                               )} />
                               {resolveStatus && (
                                 <span className={cn(
                                   "text-primary",
-                                  isTVMode ? "text-sm" : "text-xs"
+                                  isTVMode ? "text-xs" : "text-[10px]"
                                 )}>{resolveStatus}</span>
                               )}
                               {resolveProgress > 0 && resolveProgress < 100 && (
                                 <div className={cn(
                                   "bg-muted rounded-full overflow-hidden",
-                                  isTVMode ? "w-28 h-2" : "w-20 h-1.5"
+                                  isTVMode ? "w-20 h-1.5" : "w-16 h-1"
                                 )}>
                                   <div 
                                     className="h-full bg-primary transition-all duration-300"
@@ -778,8 +779,8 @@ export function StreamSelectionDialog({
                             </div>
                           ) : (
                             <Play className={cn(
-                              isTVMode ? "w-8 h-8" : "w-5 h-5",
-                              isFocused ? "text-primary" : "text-muted-foreground"
+                              isTVMode ? "w-5 h-5" : "w-4 h-4",
+                              isFocused ? "text-primary" : "text-muted-foreground/50"
                             )} />
                           )}
                         </div>
