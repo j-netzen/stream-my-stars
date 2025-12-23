@@ -286,7 +286,15 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     } else if (looksLikePath) {
       message = "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL.";
     } else if (isMkvFile) {
-      message = "MKV playback requires codec support. Try Chrome/Edge, or copy the URL to play in VLC.";
+      // Check browser MKV support
+      const video = document.createElement('video');
+      const hasBasicMkvSupport = video.canPlayType('video/x-matroska') !== '';
+      
+      if (hasBasicMkvSupport) {
+        message = "MKV playback failed. The file may use unsupported codecs (like AC3/DTS audio or HEVC). Copy the URL to play in VLC or try a different stream.";
+      } else {
+        message = "Your browser doesn't support MKV files natively. Use Chrome/Edge for better support, or copy the URL to play in VLC.";
+      }
       showCopyOption = true;
     } else {
       message = "Playback failed. The video URL may be invalid or the format isn't supported by your browser.";
@@ -526,6 +534,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       "video/mp4",
       "video/webm",
       "video/ogg",
+      "video/x-matroska", // MKV support
       "audio/mpeg",
       "audio/aac",
       "audio/mp4",
@@ -540,6 +549,21 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
 
     return safeTypeHints.includes(type) ? type : undefined;
   };
+
+  // Check if MKV is likely supported (Chrome/Edge with H.264/VP9)
+  const checkMkvSupport = useCallback((): boolean => {
+    const video = document.createElement('video');
+    // MKV with H.264 (most common)
+    const mkvH264 = video.canPlayType('video/x-matroska; codecs="avc1.42E01E"');
+    // MKV with VP9
+    const mkvVP9 = video.canPlayType('video/x-matroska; codecs="vp9"');
+    // MKV with VP8
+    const mkvVP8 = video.canPlayType('video/x-matroska; codecs="vp8"');
+    
+    return mkvH264 === 'probably' || mkvH264 === 'maybe' ||
+           mkvVP9 === 'probably' || mkvVP9 === 'maybe' ||
+           mkvVP8 === 'probably' || mkvVP8 === 'maybe';
+  }, []);
 
   // Check if browser supports a specific codec
   const checkCodecSupport = useCallback((mimeType: string): boolean => {
@@ -771,7 +795,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
       <input
         ref={filePickerRef}
         type="file"
-        accept="video/*"
+        accept="video/*,.mkv,.avi,.mov,.mp4,.webm,.m4v,.ts,.m2ts,.flv,.wmv,.3gp,.ogv"
         onChange={handleLocalFileSelected}
         className="hidden"
       />
