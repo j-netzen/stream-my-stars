@@ -619,7 +619,7 @@ export function StreamSelectionDialog({
 
             {/* Stream list */}
             {streams.length > 0 && !isSearching && (
-              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              <div className="flex flex-col flex-1 min-h-0 overflow-hidden" style={{ minHeight: '150px' }}>
                 {/* Quality filter, compact toggle, and count */}
                 <div className="flex items-center justify-between gap-3 mb-2 px-1 shrink-0">
                   <p className={cn(
@@ -667,6 +667,7 @@ export function StreamSelectionDialog({
                   scrollStep={150}
                   isTVMode={isTVMode}
                   className="flex-1 min-h-0"
+                  style={{ minHeight: '120px', maxHeight: '100%' }}
                 >
                   <div className={cn(
                     "p-0.5",
