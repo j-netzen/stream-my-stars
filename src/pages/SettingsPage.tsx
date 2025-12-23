@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -436,6 +436,39 @@ export default function SettingsPage() {
               </>
             )}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* App Version */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Info className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            App Version
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Current build information
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Version</span>
+            <Badge variant="secondary" className={isTVMode ? "text-base px-3 py-1" : ""}>
+              {import.meta.env.VITE_APP_VERSION || "1.0.0"}
+            </Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Build Date</span>
+            <span className={cn("text-foreground font-medium", isTVMode ? "text-base" : "text-sm")}>
+              {import.meta.env.VITE_BUILD_DATE || new Date().toLocaleDateString()}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Environment</span>
+            <Badge variant={import.meta.env.MODE === "production" ? "default" : "outline"} className={isTVMode ? "text-base px-3 py-1" : ""}>
+              {import.meta.env.MODE}
+            </Badge>
+          </div>
         </CardContent>
       </Card>
 
