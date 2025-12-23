@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "@/components/media/MediaCard";
-import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
@@ -15,6 +15,7 @@ export default function MoviesPage() {
   const { progress } = useWatchProgress();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
+  const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
@@ -36,7 +37,8 @@ export default function MoviesPage() {
     }
   };
 
-  const handleStreamSelected = (updatedMedia: Media) => {
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo) => {
+    setActiveStreamQuality(qualityInfo);
     setActiveMedia(updatedMedia);
   };
 
@@ -135,7 +137,14 @@ export default function MoviesPage() {
 
         {/* Video Player */}
         {activeMedia && (
-          <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
+          <VideoPlayer 
+            media={activeMedia} 
+            onClose={() => {
+              setActiveMedia(null);
+              setActiveStreamQuality(undefined);
+            }}
+            streamQuality={activeStreamQuality}
+          />
         )}
       </div>
     </PullToRefresh>

@@ -4,7 +4,7 @@ import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useCategories } from "@/hooks/useCategories";
 import { useTVMode } from "@/hooks/useTVMode";
 import { MediaRow } from "@/components/media/MediaRow";
-import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
@@ -20,6 +20,7 @@ export default function HomePage() {
   const { categories } = useCategories();
   const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
+  const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
@@ -48,7 +49,8 @@ export default function HomePage() {
     }
   };
 
-  const handleStreamSelected = (updatedMedia: Media, streamUrl: string) => {
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo) => {
+    setActiveStreamQuality(qualityInfo);
     setActiveMedia(updatedMedia);
   };
 
@@ -259,7 +261,14 @@ export default function HomePage() {
 
       {/* Video Player */}
       {activeMedia && (
-        <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
+        <VideoPlayer 
+          media={activeMedia} 
+          onClose={() => {
+            setActiveMedia(null);
+            setActiveStreamQuality(undefined);
+          }}
+          streamQuality={activeStreamQuality}
+        />
       )}
     </PullToRefresh>
   );
