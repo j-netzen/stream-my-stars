@@ -324,35 +324,41 @@ export function StreamSelectionDialog({
     }
   };
 
-  const handleStreamSelect = async (stream: TorrentioStream) => {
-    if (!media) return;
+  const resolveStream = async (stream: TorrentioStream): Promise<string> => {
+    let streamUrl: string;
+    const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
     
-    setIsResolving(true);
-    setResolvingStream(stream.url);
-    setResolveProgress(0);
-    setResolveStatus("Starting...");
+    const handleProgress = (progress: number) => {
+      setResolveProgress(progress);
+      if (progress < 100) {
+        setResolveStatus(`Preparing: ${progress}%`);
+      } else {
+        setResolveStatus("Finalizing...");
+      }
+    };
     
-    try {
-      let streamUrl: string;
-      const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
-      
-      const handleProgress = (progress: number) => {
-        setResolveProgress(progress);
-        if (progress < 100) {
-          setResolveStatus(`Preparing: ${progress}%`);
-        } else {
-          setResolveStatus("Finalizing...");
-        }
-      };
-      
-      if (isDirectRdLink(stream.url)) {
-        // Already a direct link - try to get streaming version
-        setResolveStatus("Getting streaming URL...");
-        streamUrl = await getStreamableUrl(stream.url);
-      } else if (isMagnetLink(stream.url)) {
-        // Magnet link - add to RD and wait
-        setResolveStatus("Adding to Real-Debrid...");
-        const torrent = await addMagnetAndWait(stream.url, handleProgress);
+    if (isDirectRdLink(stream.url)) {
+      // Already a direct link - try to get streaming version
+      setResolveStatus("Getting streaming URL...");
+      streamUrl = await getStreamableUrl(stream.url);
+    } else if (isMagnetLink(stream.url)) {
+      // Magnet link - add to RD and wait
+      setResolveStatus("Adding to Real-Debrid...");
+      const torrent = await addMagnetAndWait(stream.url, handleProgress);
+      if (torrent.links && torrent.links.length > 0) {
+        setResolveStatus("Generating streaming link...");
+        const unrestricted = await unrestrictLink(torrent.links[0]);
+        streamUrl = await getStreamableUrl(unrestricted.download);
+      } else {
+        throw new Error("No download links available from torrent");
+      }
+    } else if (isTorrentioResolveUrl) {
+      // Torrentio resolve URLs can't be unrestricted directly - extract magnet and use that
+      console.log("Torrentio resolve URL detected, extracting magnet...");
+      const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
+      if (magnetLink) {
+        setResolveStatus("Preparing stream...");
+        const torrent = await addMagnetAndWait(magnetLink, handleProgress);
         if (torrent.links && torrent.links.length > 0) {
           setResolveStatus("Generating streaming link...");
           const unrestricted = await unrestrictLink(torrent.links[0]);
@@ -360,29 +366,32 @@ export function StreamSelectionDialog({
         } else {
           throw new Error("No download links available from torrent");
         }
-      } else if (isTorrentioResolveUrl) {
-        // Torrentio resolve URLs can't be unrestricted directly - extract magnet and use that
-        console.log("Torrentio resolve URL detected, extracting magnet...");
-        const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
-        if (magnetLink) {
-          setResolveStatus("Preparing stream...");
-          const torrent = await addMagnetAndWait(magnetLink, handleProgress);
-          if (torrent.links && torrent.links.length > 0) {
-            setResolveStatus("Generating streaming link...");
-            const unrestricted = await unrestrictLink(torrent.links[0]);
-            streamUrl = await getStreamableUrl(unrestricted.download);
-          } else {
-            throw new Error("No download links available from torrent");
-          }
-        } else {
-          throw new Error("Could not extract torrent hash from URL");
-        }
       } else {
-        // Try to unrestrict the link directly
-        setResolveStatus("Unrestricting link...");
-        const unrestricted = await unrestrictLink(stream.url);
-        streamUrl = await getStreamableUrl(unrestricted.download);
+        throw new Error("Could not extract torrent hash from URL");
       }
+    } else {
+      // Try to unrestrict the link directly
+      setResolveStatus("Unrestricting link...");
+      const unrestricted = await unrestrictLink(stream.url);
+      streamUrl = await getStreamableUrl(unrestricted.download);
+    }
+    
+    return streamUrl;
+  };
+
+  const handleStreamSelect = async (stream: TorrentioStream, autoRetry = true) => {
+    if (!media) return;
+    
+    // Find current stream index for fallback
+    const currentIndex = filteredStreams.findIndex(s => s.url === stream.url);
+    
+    setIsResolving(true);
+    setResolvingStream(stream.url);
+    setResolveProgress(0);
+    setResolveStatus("Starting...");
+    
+    try {
+      const streamUrl = await resolveStream(stream);
       
       // Don't save the URL to database - always prompt for stream selection
       toast.success("Stream ready!");
@@ -393,7 +402,35 @@ export function StreamSelectionDialog({
       
     } catch (err: any) {
       console.error("Stream resolution error:", err);
-      toast.error(err.message || "Failed to resolve stream");
+      
+      // Check if there's a next stream to try
+      const hasNextStream = autoRetry && currentIndex >= 0 && currentIndex < filteredStreams.length - 1;
+      
+      if (hasNextStream) {
+        const nextStream = filteredStreams[currentIndex + 1];
+        const nextInfo = parseStreamInfo(nextStream);
+        toast.error(`Stream failed: ${err.message}`, {
+          description: `Trying next stream: ${nextInfo.quality || 'Unknown quality'}...`,
+          duration: 3000,
+        });
+        
+        // Small delay before trying next stream
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reset state and try next stream
+        setIsResolving(false);
+        setResolvingStream(null);
+        setResolveProgress(0);
+        setResolveStatus("");
+        
+        // Update focused index to show which stream we're trying
+        setFocusedIndex(currentIndex + 1);
+        
+        // Recursively try the next stream
+        return handleStreamSelect(nextStream, true);
+      } else {
+        toast.error(err.message || "Failed to resolve stream. No more streams to try.");
+      }
     }
     
     setIsResolving(false);
