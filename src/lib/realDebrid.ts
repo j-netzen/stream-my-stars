@@ -72,8 +72,8 @@ export async function unrestrictLink(link: string): Promise<RealDebridUnrestrict
   return invokeRealDebrid({ action: "unrestrict", link });
 }
 
-export async function getStreamingLinks(link: string): Promise<RealDebridStreamingLinks> {
-  return invokeRealDebrid({ action: "streaming", link });
+export async function getStreamingLinks(fileId: string): Promise<RealDebridStreamingLinks> {
+  return invokeRealDebrid({ action: "streaming", fileId });
 }
 
 export async function addMagnet(magnet: string): Promise<RealDebridMagnetResponse> {

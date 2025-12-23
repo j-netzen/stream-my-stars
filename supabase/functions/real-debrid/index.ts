@@ -31,6 +31,7 @@ interface ValidationResult {
   data?: {
     action: string;
     link?: string;
+    fileId?: string; // for streaming action
     magnet?: string;
     torrentId?: string;
     torrentFile?: string; // base64 encoded torrent file
@@ -49,8 +50,8 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     return { valid: false, error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` };
   }
   
-  // Validate link for unrestrict and streaming actions
-  if (action === "unrestrict" || action === "streaming") {
+  // Validate link for unrestrict action
+  if (action === "unrestrict") {
     if (typeof link !== 'string') {
       return { valid: false, error: "Link is required for this action" };
     }
@@ -59,6 +60,17 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     }
     if (!URL_REGEX.test(link)) {
       return { valid: false, error: "Invalid URL format for link" };
+    }
+  }
+  
+  // Validate fileId for streaming action (needs file ID, not URL)
+  if (action === "streaming") {
+    const { fileId } = body as Record<string, unknown>;
+    if (typeof fileId !== 'string') {
+      return { valid: false, error: "File ID is required for streaming action" };
+    }
+    if (fileId.length > MAX_LINK_LENGTH) {
+      return { valid: false, error: `File ID too long. Maximum ${MAX_LINK_LENGTH} characters` };
     }
   }
   
@@ -99,11 +111,14 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     }
   }
   
+  const { fileId } = body as Record<string, unknown>;
+  
   return { 
     valid: true, 
     data: { 
       action, 
       link: link as string | undefined, 
+      fileId: fileId as string | undefined,
       magnet: magnet as string | undefined, 
       torrentId: torrentId as string | undefined,
       torrentFile: torrentFile as string | undefined,
@@ -200,8 +215,8 @@ serve(async (req) => {
       );
     }
 
-    const { action, link, magnet, torrentId, torrentFile } = validation.data!;
-    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", magnet: magnet ? "provided" : "none", torrentFile: torrentFile ? "provided" : "none" });
+    const { action, link, fileId, magnet, torrentId, torrentFile } = validation.data!;
+    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", fileId: fileId ? "provided" : "none", magnet: magnet ? "provided" : "none", torrentFile: torrentFile ? "provided" : "none" });
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
@@ -232,9 +247,9 @@ serve(async (req) => {
         break;
 
       case "streaming":
-        // Get streaming transcoded links for a file
-        console.log("Getting streaming links...");
-        response = await fetch(`${RD_API_BASE}/streaming/transcode/${encodeURIComponent(link!)}`, {
+        // Get streaming transcoded links for a file using its ID
+        console.log("Getting streaming links for file ID:", fileId);
+        response = await fetch(`${RD_API_BASE}/streaming/transcode/${encodeURIComponent(fileId!)}`, {
           method: 'GET',
           headers,
         });
