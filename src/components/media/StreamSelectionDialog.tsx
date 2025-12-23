@@ -296,11 +296,11 @@ export function StreamSelectionDialog({
     setIsSearching(false);
   };
 
-  // Helper to get streaming URL from an unrestricted link
-  const getStreamableUrl = async (unrestrictedLink: string): Promise<string> => {
+  // Helper to get streaming URL from an unrestricted file
+  const getStreamableUrl = async (fileId: string, downloadUrl: string): Promise<string> => {
     try {
       setResolveStatus("Getting streaming URL...");
-      const streamingLinks = await getStreamingLinks(unrestrictedLink);
+      const streamingLinks = await getStreamingLinks(fileId);
       
       // Prefer highest quality streaming link
       const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
@@ -323,10 +323,10 @@ export function StreamSelectionDialog({
       
       // Fallback to the download URL
       console.log("No streaming links available, using download URL");
-      return unrestrictedLink;
+      return downloadUrl;
     } catch (err) {
       console.warn("Could not get streaming links, using download URL:", err);
-      return unrestrictedLink;
+      return downloadUrl;
     }
   };
 
@@ -344,9 +344,9 @@ export function StreamSelectionDialog({
     };
     
     if (isDirectRdLink(stream.url)) {
-      // Already a direct link - try to get streaming version
-      setResolveStatus("Getting streaming URL...");
-      streamUrl = await getStreamableUrl(stream.url);
+      // Already a direct link - use it directly as we can't get file ID
+      setResolveStatus("Using direct link...");
+      streamUrl = stream.url;
     } else if (isMagnetLink(stream.url)) {
       // Magnet link - add to RD and wait
       setResolveStatus("Adding to Real-Debrid...");
@@ -354,7 +354,7 @@ export function StreamSelectionDialog({
       if (torrent.links && torrent.links.length > 0) {
         setResolveStatus("Generating streaming link...");
         const unrestricted = await unrestrictLink(torrent.links[0]);
-        streamUrl = await getStreamableUrl(unrestricted.download);
+        streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
       } else {
         throw new Error("No download links available from torrent");
       }
@@ -368,7 +368,7 @@ export function StreamSelectionDialog({
         if (torrent.links && torrent.links.length > 0) {
           setResolveStatus("Generating streaming link...");
           const unrestricted = await unrestrictLink(torrent.links[0]);
-          streamUrl = await getStreamableUrl(unrestricted.download);
+          streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
         } else {
           throw new Error("No download links available from torrent");
         }
@@ -379,7 +379,7 @@ export function StreamSelectionDialog({
       // Try to unrestrict the link directly
       setResolveStatus("Unrestricting link...");
       const unrestricted = await unrestrictLink(stream.url);
-      streamUrl = await getStreamableUrl(unrestricted.download);
+      streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
     }
     
     return streamUrl;
@@ -458,7 +458,7 @@ export function StreamSelectionDialog({
     setResolveStatus("Getting streaming URL...");
     
     try {
-      const streamUrl = await getStreamableUrl(download.download);
+      const streamUrl = await getStreamableUrl(download.id, download.download);
       toast.success("Stream ready!");
       onOpenChange(false);
       onStreamSelected({ ...media, source_url: streamUrl }, streamUrl);
