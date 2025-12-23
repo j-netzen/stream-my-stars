@@ -837,7 +837,6 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
               <Button variant="secondary" onClick={onClose}>
                 Close
               </Button>
-              <Button onClick={openFilePicker}>Choose file</Button>
             </div>
           </div>
         </div>
