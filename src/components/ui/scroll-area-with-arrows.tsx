@@ -8,12 +8,13 @@ interface ScrollAreaWithArrowsProps
   extends React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> {
   scrollStep?: number;
   isTVMode?: boolean;
+  style?: React.CSSProperties;
 }
 
 const ScrollAreaWithArrows = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   ScrollAreaWithArrowsProps
->(({ className, children, scrollStep = 100, isTVMode = false, ...props }, ref) => {
+>(({ className, children, scrollStep = 100, isTVMode = false, style, ...props }, ref) => {
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const [canScrollUp, setCanScrollUp] = React.useState(false);
   const [canScrollDown, setCanScrollDown] = React.useState(false);
@@ -76,7 +77,7 @@ const ScrollAreaWithArrows = React.forwardRef<
   const buttonHeight = isTVMode ? 56 : 32; // h-14 = 56px, h-8 = 32px
 
   return (
-    <div className={cn("relative flex flex-col", className)} style={{ height: '100%' }}>
+    <div className={cn("relative flex flex-col", className)} style={{ height: '100%', ...style }}>
       {/* Up Arrow */}
       <Button
         variant="ghost"
