@@ -532,12 +532,10 @@ export function StreamSelectionDialog({
               
               {/* Tabs moved here - next to show info */}
               <TabsList className="grid grid-cols-2 shrink-0 h-9">
-                <TabsTrigger value="search" className="gap-1.5 text-xs px-3">
-                  <Search className="w-3.5 h-3.5" />
+                <TabsTrigger value="search" className="text-xs px-3">
                   Streams
                 </TabsTrigger>
-                <TabsTrigger value="downloads" className="gap-1.5 text-xs px-3">
-                  <Download className="w-3.5 h-3.5" />
+                <TabsTrigger value="downloads" className="text-xs px-3">
                   Fail-Safe
                 </TabsTrigger>
               </TabsList>
