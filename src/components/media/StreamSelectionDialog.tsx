@@ -664,7 +664,7 @@ export function StreamSelectionDialog({
                   </p>
                 ) : (
                 <ScrollAreaWithArrows 
-                  scrollStep={150}
+                  scrollStep={70}
                   isTVMode={isTVMode}
                   className="flex-1 min-h-0"
                   style={{ minHeight: '120px', maxHeight: '100%' }}
