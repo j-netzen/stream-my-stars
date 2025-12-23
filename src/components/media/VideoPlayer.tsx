@@ -739,25 +739,29 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-black gpu-accelerated"
+      className="fixed inset-0 z-50 bg-black gpu-accelerated overflow-hidden"
       onMouseMove={handleMouseMove}
       style={{ 
         transform: 'translateZ(0)',
         willChange: 'transform',
-        backfaceVisibility: 'hidden'
+        backfaceVisibility: 'hidden',
+        height: '100dvh',
+        maxHeight: '100dvh',
       }}
     >
-      {/* Video - Hardware accelerated */}
+      {/* Video - Hardware accelerated, constrained to leave room for controls */}
       <video
         key={src || media.id}
         ref={videoRef}
-        className="w-full h-full object-contain gpu-accelerated"
+        className="w-full object-contain gpu-accelerated absolute inset-0"
         style={{
           transform: 'translate3d(0, 0, 0)',
           willChange: 'transform, opacity',
           backfaceVisibility: 'hidden',
           perspective: 1000,
           WebkitBackfaceVisibility: 'hidden',
+          height: '100%',
+          maxHeight: '100dvh',
         }}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={() => {
