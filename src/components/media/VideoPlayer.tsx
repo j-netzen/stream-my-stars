@@ -30,12 +30,39 @@ import {
 // Special marker URL for local files stored via File System Access API
 const LOCAL_FILE_MARKER = "local-file://stored-handle";
 
+export interface StreamQualityInfo {
+  quality: string;
+  size?: string;
+  qualityRank?: number;
+}
+
 interface VideoPlayerProps {
   media: Media;
   onClose: () => void;
+  streamQuality?: StreamQualityInfo;
 }
 
-export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
+// Get buffer settings based on stream quality
+function getBufferSettings(quality?: StreamQualityInfo) {
+  const qualityRank = quality?.qualityRank ?? 80; // Default to 1080p settings
+  
+  // Higher quality = more buffering needed
+  if (qualityRank >= 100) {
+    // 4K/2160p - aggressive buffering
+    return { preloadAmount: 'auto', bufferAhead: 60 };
+  } else if (qualityRank >= 80) {
+    // 1080p - moderate buffering
+    return { preloadAmount: 'auto', bufferAhead: 30 };
+  } else if (qualityRank >= 60) {
+    // 720p - light buffering
+    return { preloadAmount: 'metadata', bufferAhead: 15 };
+  } else {
+    // 480p and below - minimal buffering
+    return { preloadAmount: 'metadata', bufferAhead: 10 };
+  }
+}
+
+export function VideoPlayer({ media, onClose, streamQuality }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { progress, isLoading: progressLoading, updateProgress } = useWatchProgress();
@@ -803,7 +830,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
         }}
         onClick={handlePlayPause}
         poster={backdropUrl || undefined}
-        preload="auto"
+        preload={getBufferSettings(streamQuality).preloadAmount as "auto" | "metadata" | "none"}
         playsInline
         muted={isMuted}
       >

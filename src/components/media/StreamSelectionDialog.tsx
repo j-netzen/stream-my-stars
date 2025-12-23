@@ -25,11 +25,17 @@ import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, C
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+export interface StreamQualityInfo {
+  quality: string;
+  size?: string;
+  qualityRank?: number;
+}
+
 interface StreamSelectionDialogProps {
   media: Media | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStreamSelected: (media: Media, streamUrl: string) => void;
+  onStreamSelected: (media: Media, streamUrl: string, qualityInfo?: StreamQualityInfo) => void;
 }
 
 export function StreamSelectionDialog({
@@ -392,13 +398,18 @@ export function StreamSelectionDialog({
     
     try {
       const streamUrl = await resolveStream(stream);
+      const streamInfo = parseStreamInfo(stream);
       
       // Don't save the URL to database - always prompt for stream selection
-      toast.success("Stream ready!");
+      toast.success(`Stream ready! (${streamInfo.quality})`);
       onOpenChange(false);
       
-      // Pass the media with the stream URL to play (without persisting)
-      onStreamSelected({ ...media, source_url: streamUrl }, streamUrl);
+      // Pass the media with the stream URL and quality info to play
+      onStreamSelected(
+        { ...media, source_url: streamUrl }, 
+        streamUrl,
+        { quality: streamInfo.quality, size: streamInfo.size, qualityRank: streamInfo.qualityRank }
+      );
       
     } catch (err: any) {
       console.error("Stream resolution error:", err);
