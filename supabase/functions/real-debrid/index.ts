@@ -334,8 +334,27 @@ serve(async (req) => {
 
     if (!response.ok && response.status !== 204) {
       console.error("Real-Debrid API error:", data);
+      
+      // Map Real-Debrid error codes to user-friendly messages
+      let userMessage = data.error || "Real-Debrid API error";
+      const errorCode = data.error_code;
+      
+      if (data.error === "infringing_file" || errorCode === 35) {
+        userMessage = "This content is unavailable due to copyright restrictions. Please try a different stream.";
+      } else if (data.error === "hoster_unavailable" || errorCode === 7) {
+        userMessage = "The file host is temporarily unavailable. Please try again later or choose a different stream.";
+      } else if (data.error === "file_unavailable" || errorCode === 8) {
+        userMessage = "The file is no longer available. Please try a different stream.";
+      } else if (data.error === "torrent_too_big" || errorCode === 19) {
+        userMessage = "This torrent is too large for your account. Please try a smaller file.";
+      } else if (data.error === "magnet_conversion" || errorCode === 28) {
+        userMessage = "Could not process this magnet link. Please try a different stream.";
+      } else if (data.error === "action_already_done" || errorCode === 24) {
+        userMessage = "This action was already completed.";
+      }
+      
       return new Response(
-        JSON.stringify({ error: data.error || "Real-Debrid API error", details: data }),
+        JSON.stringify({ error: userMessage, details: data }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
