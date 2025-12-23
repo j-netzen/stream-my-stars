@@ -16,6 +16,7 @@ import {
   X,
   Loader2,
   Copy,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -269,6 +270,18 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
     }
   };
 
+  const openInVlc = () => {
+    const url = src || media.source_url || "";
+    if (url && !url.startsWith("blob:") && url !== LOCAL_FILE_MARKER) {
+      // VLC protocol handler - works if VLC is installed and registered
+      const vlcUrl = `vlc://${url}`;
+      window.open(vlcUrl, "_blank");
+      toast.success("Opening in VLC...", {
+        description: "If VLC doesn't open, make sure it's installed and set as a protocol handler."
+      });
+    }
+  };
+
   const handleVideoError = () => {
     const raw = src || media.source_url || "";
     const isBlob = raw.startsWith("blob:");
@@ -394,7 +407,7 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
   };
 
   // TV remote keyboard navigation
-  const controlOrder = ["skipBack", "play", "skipForward", "volume", "copy", "fullscreen", "close"];
+  const controlOrder = ["skipBack", "play", "skipForward", "vlc", "copy", "volume", "fullscreen", "close"];
   
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const currentIndex = controlOrder.indexOf(focusedControl);
@@ -470,6 +483,9 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
               navigator.clipboard.writeText(src);
               toast.success("Stream URL copied!");
             }
+            break;
+          case "vlc":
+            openInVlc();
             break;
         }
         break;
@@ -807,10 +823,16 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
             <p className="mt-1 text-sm text-muted-foreground">{playbackError}</p>
             <div className="mt-4 flex items-center justify-end gap-2">
               {showCopyUrl && (
-                <Button variant="outline" onClick={copyUrlToClipboard} className="gap-2">
-                  <Copy className="w-4 h-4" />
-                  Copy URL
-                </Button>
+                <>
+                  <Button variant="outline" onClick={openInVlc} className="gap-2">
+                    <ExternalLink className="w-4 h-4" />
+                    Open in VLC
+                  </Button>
+                  <Button variant="outline" onClick={copyUrlToClipboard} className="gap-2">
+                    <Copy className="w-4 h-4" />
+                    Copy URL
+                  </Button>
+                </>
               )}
               <Button variant="secondary" onClick={onClose}>
                 Close
@@ -962,6 +984,23 @@ export function VideoPlayer({ media, onClose }: VideoPlayerProps) {
             </div>
 
             <div className={cn("flex items-center", isTVMode ? "gap-4" : "gap-2")}>
+              {/* Open in VLC */}
+              {src && !src.startsWith('blob:') && (
+                <Button
+                  variant="ghost"
+                  size={isTVMode ? "lg" : "icon"}
+                  onClick={openInVlc}
+                  className={cn(
+                    "text-white hover:bg-white/20",
+                    isTVMode && "w-14 h-14",
+                    isTVMode && focusedControl === "vlc" && "ring-4 ring-primary bg-white/20"
+                  )}
+                  title="Open in VLC"
+                >
+                  <ExternalLink className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+                </Button>
+              )}
+
               {/* Copy URL for external players */}
               {src && !src.startsWith('blob:') && (
                 <Button
