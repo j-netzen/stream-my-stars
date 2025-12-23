@@ -492,68 +492,60 @@ export function StreamSelectionDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {media && (
-          <div className="flex gap-4 p-4 bg-secondary/30 rounded-lg">
-            {posterUrl ? (
-              <img
-                src={posterUrl}
-                alt={media.title}
-                className="w-16 h-24 object-cover rounded-md shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-24 bg-muted rounded-md flex items-center justify-center shrink-0">
-                {media.media_type === "movie" ? (
-                  <Film className="w-6 h-6 text-muted-foreground" />
-                ) : (
-                  <Tv className="w-6 h-6 text-muted-foreground" />
-                )}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-lg leading-tight">{media.title}</h3>
-              <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  {media.media_type === "movie" ? <Film className="w-3 h-3" /> : <Tv className="w-3 h-3" />}
-                  {media.media_type === "movie" ? "Movie" : "TV Series"}
-                </span>
-                {media.release_date && (
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    {media.release_date.slice(0, 4)}
-                  </span>
-                )}
-                {media.rating && media.rating > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Star className="w-3 h-3 text-yellow-500" />
-                    {media.rating.toFixed(1)}
-                  </span>
-                )}
-                {media.runtime && media.runtime > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {Math.floor(media.runtime / 60) > 0 ? `${Math.floor(media.runtime / 60)}h ` : ''}{media.runtime % 60}m
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs for Search vs Fail-Safe */}
+        {/* Tabs wrapper - encompasses everything including the header */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2 shrink-0">
-            <TabsTrigger value="search" className="gap-2">
-              <Search className="w-4 h-4" />
-              Search Streams
-            </TabsTrigger>
-            <TabsTrigger value="downloads" className="gap-2">
-              <Download className="w-4 h-4" />
-              Fail-Safe
-            </TabsTrigger>
-          </TabsList>
+          {media && (
+            <div className="flex gap-4 p-3 bg-secondary/30 rounded-lg items-center shrink-0">
+              {posterUrl ? (
+                <img
+                  src={posterUrl}
+                  alt={media.title}
+                  className="w-12 h-18 object-cover rounded-md shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-18 bg-muted rounded-md flex items-center justify-center shrink-0">
+                  {media.media_type === "movie" ? (
+                    <Film className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <Tv className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-base leading-tight truncate">{media.title}</h3>
+                <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    {media.media_type === "movie" ? <Film className="w-3 h-3" /> : <Tv className="w-3 h-3" />}
+                    {media.media_type === "movie" ? "Movie" : "TV"}
+                  </span>
+                  {media.release_date && (
+                    <span>{media.release_date.slice(0, 4)}</span>
+                  )}
+                  {media.rating && media.rating > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Star className="w-3 h-3 text-yellow-500" />
+                      {media.rating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Tabs moved here - next to show info */}
+              <TabsList className="grid grid-cols-2 shrink-0 h-9">
+                <TabsTrigger value="search" className="gap-1.5 text-xs px-3">
+                  <Search className="w-3.5 h-3.5" />
+                  Streams
+                </TabsTrigger>
+                <TabsTrigger value="downloads" className="gap-1.5 text-xs px-3">
+                  <Download className="w-3.5 h-3.5" />
+                  Fail-Safe
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          )}
 
           {/* Search Tab */}
-          <TabsContent value="search" className="flex-1 flex flex-col min-h-0 mt-4">
+          <TabsContent value="search" className="flex-1 flex flex-col min-h-0 mt-2">
             {/* Season/Episode picker for TV shows */}
             {media?.media_type === "tv" && (
               <div className="relative z-10 flex items-center gap-2 flex-wrap mb-2">
