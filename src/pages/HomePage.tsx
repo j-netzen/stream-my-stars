@@ -21,6 +21,7 @@ export default function HomePage() {
   const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
+  const [activeTryNextStream, setActiveTryNextStream] = useState<(() => void) | undefined>(undefined);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
@@ -49,8 +50,9 @@ export default function HomePage() {
     }
   };
 
-  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo) => {
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void) => {
     setActiveStreamQuality(qualityInfo);
+    setActiveTryNextStream(() => tryNextStream);
     setActiveMedia(updatedMedia);
   };
 
@@ -266,8 +268,10 @@ export default function HomePage() {
           onClose={() => {
             setActiveMedia(null);
             setActiveStreamQuality(undefined);
+            setActiveTryNextStream(undefined);
           }}
           streamQuality={activeStreamQuality}
+          onPlaybackError={activeTryNextStream}
         />
       )}
     </PullToRefresh>

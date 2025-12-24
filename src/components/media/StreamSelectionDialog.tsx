@@ -35,7 +35,7 @@ interface StreamSelectionDialogProps {
   media: Media | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStreamSelected: (media: Media, streamUrl: string, qualityInfo?: StreamQualityInfo) => void;
+  onStreamSelected: (media: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void) => void;
 }
 
 export function StreamSelectionDialog({
@@ -68,6 +68,10 @@ export function StreamSelectionDialog({
     localStorage.setItem("streamDialog-compactView", String(isCompactView));
   }, [isCompactView]);
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  
+  // Refs to track streams for auto-retry when player reports playback error
+  const filteredStreamsRef = useRef<TorrentioStream[]>([]);
+  const currentStreamIndexRef = useRef<number>(0);
 
   // Fail-Safe state
   const [myDownloads, setMyDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
@@ -96,6 +100,11 @@ export function StreamSelectionDialog({
         return true;
     }
   });
+  
+  // Keep ref in sync with filteredStreams for auto-retry functionality
+  useEffect(() => {
+    filteredStreamsRef.current = filteredStreams;
+  }, [filteredStreams]);
 
   // Filter downloads based on media title and episode
   const filteredDownloads = myDownloads.filter((download) => {
@@ -400,15 +409,35 @@ export function StreamSelectionDialog({
       const streamUrl = await resolveStream(stream);
       const streamInfo = parseStreamInfo(stream);
       
+      // Store current index in ref for auto-retry functionality
+      currentStreamIndexRef.current = currentIndex;
+      
+      // Create a tryNextStream function that the VideoPlayer can call on playback error
+      // Uses refs to ensure access to current streams even after dialog closes
+      const tryNextStream = () => {
+        const nextIndex = currentStreamIndexRef.current + 1;
+        const currentStreams = filteredStreamsRef.current;
+        if (nextIndex < currentStreams.length) {
+          const nextStream = currentStreams[nextIndex];
+          const nextInfo = parseStreamInfo(nextStream);
+          toast.info(`Trying next stream: ${nextInfo.quality || 'Unknown quality'}...`);
+          currentStreamIndexRef.current = nextIndex;
+          handleStreamSelect(nextStream, true);
+        } else {
+          toast.error("No more streams available to try.");
+        }
+      };
+      
       // Don't save the URL to database - always prompt for stream selection
       toast.success(`Stream ready! (${streamInfo.quality})`);
       onOpenChange(false);
       
-      // Pass the media with the stream URL and quality info to play
+      // Pass the media with the stream URL, quality info, and tryNextStream callback
       onStreamSelected(
         { ...media, source_url: streamUrl }, 
         streamUrl,
-        { quality: streamInfo.quality, size: streamInfo.size, qualityRank: streamInfo.qualityRank }
+        { quality: streamInfo.quality, size: streamInfo.size, qualityRank: streamInfo.qualityRank },
+        tryNextStream
       );
       
     } catch (err: any) {
