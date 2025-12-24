@@ -77,6 +77,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const { isTVMode } = useTVMode();
   const [focusedControl, setFocusedControl] = useState<string>("play");
 
+  // Auto-scroll to video player when it mounts
+  useEffect(() => {
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
