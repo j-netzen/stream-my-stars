@@ -40,6 +40,7 @@ interface VideoPlayerProps {
   media: Media;
   onClose: () => void;
   streamQuality?: StreamQualityInfo;
+  onPlaybackError?: () => void; // Called when playback fails - allows parent to try next stream
 }
 
 // Get buffer settings based on stream quality
@@ -69,7 +70,7 @@ function getOptimalPlaybackRate(quality?: StreamQualityInfo): number {
   return 1.0;
 }
 
-export function VideoPlayer({ media, onClose, streamQuality }: VideoPlayerProps) {
+export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { progress, isLoading: progressLoading, updateProgress } = useWatchProgress();
@@ -323,6 +324,17 @@ export function VideoPlayer({ media, onClose, streamQuality }: VideoPlayerProps)
     const isLocalMarker = raw === LOCAL_FILE_MARKER;
     const isMkvFile = raw.toLowerCase().includes('.mkv');
 
+    // If we have a callback for playback errors, use it to try next stream
+    // This handles format incompatibility by automatically skipping to next stream
+    if (onPlaybackError) {
+      console.log("Playback error detected, triggering fallback to next stream");
+      toast.info("Stream format not supported, trying next...");
+      onClose(); // Close current player before trying next stream
+      onPlaybackError();
+      return;
+    }
+
+    // Fallback to showing error UI if no callback provided
     let message: string;
     let showCopyOption = false;
     
