@@ -567,6 +567,12 @@ export function StreamSelectionDialog({
                       {media.rating.toFixed(1)}
                     </span>
                   )}
+                  {media.runtime && media.runtime > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {Math.floor(media.runtime / 60)}h {media.runtime % 60}m
+                    </span>
+                  )}
                 </div>
               </div>
               
