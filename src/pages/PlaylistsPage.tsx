@@ -4,6 +4,7 @@ import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "@/components/media/MediaCard";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { StreamSelectionDialog, StreamQualityInfo } from "@/components/media/StreamSelectionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,9 @@ export default function PlaylistsPage() {
   const { media, deleteMedia } = useMedia();
   const { progress } = useWatchProgress();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
+  const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
+  const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>();
+  const [activeTryNextStream, setActiveTryNextStream] = useState<(() => void) | undefined>();
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -68,6 +72,21 @@ export default function PlaylistsPage() {
     playlistItems.some((item) => item.media_id === m.id)
   );
 
+  const handlePlay = (item: Media) => {
+    // Show stream selection for media with TMDB ID
+    if (item.tmdb_id) {
+      setStreamSelectMedia(item);
+    } else {
+      setActiveMedia(item);
+    }
+  };
+
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void) => {
+    setActiveStreamQuality(qualityInfo);
+    setActiveTryNextStream(() => tryNextStream);
+    setActiveMedia(updatedMedia);
+  };
+
   const handlePickForMe = () => {
     if (playlistMedia.length === 0) {
       toast.error("No media in this playlist to pick from");
@@ -75,7 +94,7 @@ export default function PlaylistsPage() {
     }
     const randomIndex = Math.floor(Math.random() * playlistMedia.length);
     const randomMedia = playlistMedia[randomIndex];
-    setActiveMedia(randomMedia);
+    handlePlay(randomMedia);
     toast.success(`Playing: ${randomMedia.title}`);
   };
 
@@ -217,7 +236,7 @@ export default function PlaylistsPage() {
                       key={item.id}
                       media={item}
                       progress={progress.find((p) => p.media_id === item.id)}
-                      onPlay={setActiveMedia}
+                      onPlay={handlePlay}
                       onDelete={() => {
                         removeFromPlaylist.mutate({
                           playlistId: selectedPlaylist,
@@ -246,8 +265,26 @@ export default function PlaylistsPage() {
         </div>
       </div>
 
+      {/* Stream Selection Dialog */}
+      <StreamSelectionDialog
+        media={streamSelectMedia}
+        open={!!streamSelectMedia}
+        onOpenChange={(open) => !open && setStreamSelectMedia(null)}
+        onStreamSelected={handleStreamSelected}
+      />
+
+      {/* Video Player */}
       {activeMedia && (
-        <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
+        <VideoPlayer 
+          media={activeMedia} 
+          onClose={() => {
+            setActiveMedia(null);
+            setActiveStreamQuality(undefined);
+            setActiveTryNextStream(undefined);
+          }}
+          streamQuality={activeStreamQuality}
+          onPlaybackError={activeTryNextStream}
+        />
       )}
     </div>
   );
