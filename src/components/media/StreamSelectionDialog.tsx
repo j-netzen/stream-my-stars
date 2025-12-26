@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +80,9 @@ export function StreamSelectionDialog({
   const [downloadSearchQuery, setDownloadSearchQuery] = useState("");
   const downloadButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const [downloadFocusedIndex, setDownloadFocusedIndex] = useState(0);
+  
+  // Track failed streams for visual indicator
+  const [failedStreams, setFailedStreams] = useState<Set<string>>(new Set());
 
   // Filter streams based on quality selection
   const filteredStreams = streams.filter((stream) => {
@@ -229,6 +232,7 @@ export function StreamSelectionDialog({
       setQualityFilter("all");
       setActiveTab("search");
       setDownloadSearchQuery("");
+      setFailedStreams(new Set());
       // Auto-search when dialog opens
       handleSearch();
     }
@@ -445,6 +449,9 @@ export function StreamSelectionDialog({
       
       // Check if there's a next stream to try
       const hasNextStream = autoRetry && currentIndex >= 0 && currentIndex < filteredStreams.length - 1;
+      
+      // Mark current stream as failed
+      setFailedStreams(prev => new Set(prev).add(stream.url));
       
       if (hasNextStream) {
         const nextStream = filteredStreams[currentIndex + 1];
@@ -726,6 +733,7 @@ export function StreamSelectionDialog({
                   const info = parseStreamInfo(stream);
                   const isCurrentlyResolving = resolvingStream === stream.url;
                   const isFocused = focusedIndex === index;
+                  const hasFailed = failedStreams.has(stream.url);
                   
                   return (
                     <button
@@ -740,7 +748,9 @@ export function StreamSelectionDialog({
                         isCompactView
                           ? (isTVMode ? "px-2 py-1.5" : "px-1.5 py-1")
                           : (isTVMode ? "p-3" : "p-2"),
-                        isCurrentlyResolving
+                        hasFailed
+                          ? "border-destructive/50 bg-destructive/10 opacity-60"
+                          : isCurrentlyResolving
                           ? "border-primary bg-primary/30 ring-1 ring-primary"
                           : isFocused
                           ? "border-primary bg-primary/20 ring-1 ring-primary"
@@ -786,6 +796,15 @@ export function StreamSelectionDialog({
                               )}>
                                 <Zap className={cn(isTVMode ? "w-3 h-3" : "w-2.5 h-2.5")} />
                                 Cached
+                              </span>
+                            )}
+                            {hasFailed && (
+                              <span className={cn(
+                                "bg-destructive/20 text-destructive rounded flex items-center",
+                                isTVMode ? "px-1.5 py-0.5 text-xs gap-0.5" : "px-1 py-0 text-[10px] gap-0.5"
+                              )}>
+                                <XCircle className={cn(isTVMode ? "w-3 h-3" : "w-2.5 h-2.5")} />
+                                Failed
                               </span>
                             )}
                           </div>
