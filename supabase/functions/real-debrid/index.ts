@@ -366,6 +366,8 @@ serve(async (req) => {
         userMessage = "Could not process this magnet link. Please try a different stream.";
       } else if (data.error === "action_already_done" || errorCode === 24) {
         userMessage = "This action was already completed.";
+      } else if (data.error === "wrong_parameter" || errorCode === 2) {
+        userMessage = "This file doesn't support streaming transcoding. Trying alternative...";
       }
       
       return new Response(
