@@ -430,14 +430,59 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   };
 
   const toggleFullscreen = async () => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const video = videoRef.current;
+    if (!container) return;
 
-    if (!document.fullscreenElement) {
-      await containerRef.current.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      await document.exitFullscreen();
-      setIsFullscreen(false);
+    try {
+      // Check if we're in fullscreen (with vendor prefixes)
+      const fullscreenElement = document.fullscreenElement || 
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement;
+
+      if (!fullscreenElement) {
+        // Try to enter fullscreen with vendor prefixes
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        } else if ((container as any).mozRequestFullScreen) {
+          await (container as any).mozRequestFullScreen();
+        } else if ((container as any).msRequestFullscreen) {
+          await (container as any).msRequestFullscreen();
+        } else if (video?.requestFullscreen) {
+          // Fallback: try on the video element directly
+          await video.requestFullscreen();
+        } else if ((video as any)?.webkitEnterFullscreen) {
+          // iOS Safari fallback for video element
+          (video as any).webkitEnterFullscreen();
+        } else {
+          toast.error("Fullscreen not supported in this browser");
+          return;
+        }
+        setIsFullscreen(true);
+      } else {
+        // Exit fullscreen with vendor prefixes
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch (err: any) {
+      console.error("Fullscreen error:", err);
+      // Fullscreen blocked - common in iframes or due to user gesture requirements
+      if (err.message?.includes("fullscreen") || err.name === "TypeError") {
+        toast.error("Fullscreen blocked - try opening in a new tab or publishing the app");
+      } else {
+        toast.error("Could not toggle fullscreen");
+      }
     }
   };
 
