@@ -46,7 +46,7 @@ export function StreamSelectionDialog({
 }: StreamSelectionDialogProps) {
   const { updateMedia } = useMedia();
   const { isTVMode } = useTVMode();
-  const [activeTab, setActiveTab] = useState<string>("search");
+  const [activeTab, setActiveTab] = useState<string>("downloads");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -222,7 +222,7 @@ export function StreamSelectionDialog({
     }
   };
 
-  // Reset state when dialog opens with new media
+  // Reset state when dialog opens with new media - check downloads first
   useEffect(() => {
     if (open && media) {
       setStreams([]);
@@ -230,15 +230,68 @@ export function StreamSelectionDialog({
       setSelectedSeason(1);
       setSelectedEpisode(1);
       setQualityFilter("all");
-      setActiveTab("search");
+      setActiveTab("downloads"); // Start with downloads tab
       setDownloadSearchQuery("");
       setFailedStreams(new Set());
-      // Auto-search when dialog opens
-      handleSearch();
+      // Load downloads first, then search for streams as fallback
+      loadMyDownloadsFirst();
     }
   }, [open, media?.id]);
 
-  // Load downloads when tab changes to downloads
+  // Load downloads first, then search for streams if no matching downloads found
+  const loadMyDownloadsFirst = async () => {
+    setIsLoadingDownloads(true);
+    setDownloadsError(null);
+    
+    try {
+      const downloads = await listDownloads();
+      // Filter to only show streamable video files
+      const videoDownloads = downloads.filter(d => 
+        d.streamable === 1 && 
+        (d.mimeType?.startsWith('video/') || 
+         d.filename?.match(/\.(mp4|mkv|avi|m4v|webm)$/i))
+      );
+      setMyDownloads(videoDownloads);
+      
+      // Check if any downloads match current media
+      const hasMatchingDownloads = videoDownloads.some((download) => {
+        if (!media) return false;
+        const filename = download.filename.toLowerCase();
+        const titleWords = media.title.toLowerCase().split(/\s+/);
+        const titleMatches = titleWords.every(word => 
+          filename.includes(word.replace(/[^\w]/g, ''))
+        );
+        
+        if (!titleMatches) return false;
+        
+        // For TV shows, also check episode match
+        if (media.media_type === "tv") {
+          const episodePatterns = [
+            new RegExp(`s0?${selectedSeason}e0?${selectedEpisode}\\b`, 'i'),
+            new RegExp(`${selectedSeason}x0?${selectedEpisode}\\b`, 'i'),
+          ];
+          return episodePatterns.some(pattern => pattern.test(download.filename));
+        }
+        return true;
+      });
+      
+      // If no matching downloads, switch to streams tab and search
+      if (!hasMatchingDownloads) {
+        setActiveTab("search");
+        handleSearch();
+      }
+    } catch (err: any) {
+      console.error("Failed to load downloads:", err);
+      setDownloadsError(err.message || "Failed to load downloads");
+      // On error, fall back to stream search
+      setActiveTab("search");
+      handleSearch();
+    }
+    
+    setIsLoadingDownloads(false);
+  };
+
+  // Load downloads when manually switching to downloads tab (if not already loaded)
   useEffect(() => {
     if (activeTab === "downloads" && myDownloads.length === 0 && !isLoadingDownloads) {
       loadMyDownloads();
@@ -589,7 +642,7 @@ export function StreamSelectionDialog({
                   Streams
                 </TabsTrigger>
                 <TabsTrigger value="downloads" className="text-xs px-3">
-                  Fail-Safe
+                  Downloaded
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -859,7 +912,7 @@ export function StreamSelectionDialog({
             )}
           </TabsContent>
 
-          {/* Fail-Safe Tab */}
+          {/* Downloaded Tab */}
           <TabsContent value="downloads" className="flex-1 flex flex-col min-h-0 mt-4">
             {/* Search box for downloads */}
             <div className="flex items-center gap-2 mb-3">
