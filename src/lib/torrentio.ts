@@ -133,12 +133,47 @@ function parseSizeToBytes(sizeStr: string): number {
   return unit === 'GB' ? value * 1024 : value; // Convert to MB for comparison
 }
 
-// Sort streams by file size (largest to smallest)
+// Check if stream uses browser-compatible codecs (H264/AAC/MP4 preferred)
+function isBrowserCompatible(stream: TorrentioStream): boolean {
+  const title = (stream.title || "").toLowerCase();
+  const filename = stream.behaviorHints?.filename?.toLowerCase() || "";
+  const combined = title + " " + filename;
+  
+  // x265/HEVC and problematic audio codecs are less compatible
+  const hasProblematicCodec = 
+    combined.includes('x265') || 
+    combined.includes('hevc') || 
+    combined.includes('hdr') ||
+    combined.includes('dts') ||
+    combined.includes('truehd') ||
+    combined.includes('atmos');
+  
+  // H264 and AAC are most compatible
+  const hasCompatibleCodec = 
+    combined.includes('x264') || 
+    combined.includes('h264') || 
+    combined.includes('aac') ||
+    combined.includes('.mp4');
+  
+  if (hasProblematicCodec) return false;
+  if (hasCompatibleCodec) return true;
+  return true; // Assume compatible if unknown
+}
+
+// Sort streams by browser compatibility first, then file size (largest to smallest)
 export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   return [...streams].sort((a, b) => {
     const infoA = parseStreamInfo(a);
     const infoB = parseStreamInfo(b);
     
+    // First, prioritize browser-compatible streams
+    const compatA = isBrowserCompatible(a);
+    const compatB = isBrowserCompatible(b);
+    if (compatA !== compatB) {
+      return compatA ? -1 : 1; // Compatible streams first
+    }
+    
+    // Then sort by file size (largest to smallest)
     const sizeA = parseSizeToBytes(infoA.size);
     const sizeB = parseSizeToBytes(infoB.size);
     
