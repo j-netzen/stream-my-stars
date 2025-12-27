@@ -269,7 +269,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_own_profile: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          id: string
+          updated_at: string
+        }[]
+      }
+      update_own_profile: {
+        Args: { new_display_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
