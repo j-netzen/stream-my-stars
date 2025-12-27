@@ -286,14 +286,23 @@ export async function transcodeMkvToMp4(
         // Ignore if file doesn't exist
       }
 
+      // Maximum compatibility encoding: H.264 High Profile Level 4.0 + AAC
       await ffmpeg.exec([
         '-i', inputFileName,
-        '-c:v', 'libx264',      // H.264 video codec
-        '-preset', 'ultrafast', // Fastest encoding
-        '-crf', '23',           // Quality (lower = better)
-        '-c:a', 'aac',          // AAC audio codec
-        '-b:a', '128k',         // Audio bitrate
-        '-movflags', '+faststart',
+        '-c:v', 'libx264',           // H.264 (AVC) video codec
+        '-profile:v', 'high',        // High profile for best quality/compatibility balance
+        '-level:v', '4.0',           // Level 4.0 supports 1080p @ 30fps
+        '-preset', 'medium',         // Balanced speed/quality (faster than slow, better than ultrafast)
+        '-b:v', '6M',                // Target 6 Mbps video bitrate for 1080p
+        '-maxrate', '8M',            // Max bitrate cap
+        '-bufsize', '12M',           // VBV buffer size
+        '-pix_fmt', 'yuv420p',       // Standard pixel format for maximum compatibility
+        '-vsync', 'cfr',             // Constant frame rate
+        '-c:a', 'aac',               // AAC audio codec
+        '-b:a', '192k',              // Audio bitrate
+        '-ar', '48000',              // Standard sample rate
+        '-ac', '2',                  // Stereo audio
+        '-movflags', '+faststart',   // Optimize for web streaming
         outputFileName
       ]);
     }
@@ -421,14 +430,23 @@ export async function transcodeFileToMp4(
         // Ignore
       }
 
+      // Maximum compatibility encoding: H.264 High Profile Level 4.0 + AAC
       await ffmpeg.exec([
         '-i', inputFileName,
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
+        '-c:v', 'libx264',           // H.264 (AVC) video codec
+        '-profile:v', 'high',        // High profile for best quality/compatibility balance
+        '-level:v', '4.0',           // Level 4.0 supports 1080p @ 30fps
+        '-preset', 'medium',         // Balanced speed/quality
+        '-b:v', '6M',                // Target 6 Mbps video bitrate for 1080p
+        '-maxrate', '8M',            // Max bitrate cap
+        '-bufsize', '12M',           // VBV buffer size
+        '-pix_fmt', 'yuv420p',       // Standard pixel format for maximum compatibility
+        '-vsync', 'cfr',             // Constant frame rate
+        '-c:a', 'aac',               // AAC audio codec
+        '-b:a', '192k',              // Audio bitrate
+        '-ar', '48000',              // Standard sample rate
+        '-ac', '2',                  // Stereo audio
+        '-movflags', '+faststart',   // Optimize for web streaming
         outputFileName
       ]);
     }
