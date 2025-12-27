@@ -265,36 +265,58 @@
   }
 
   /* TV Mode focus styles - high visibility for remote navigation */
+  .tv-mode *:focus {
+    outline: none;
+  }
+
   .tv-mode *:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: 2px;
+    outline-offset: 3px;
     border-radius: var(--radius);
-    box-shadow: var(--shadow-glow);
+    box-shadow: 0 0 30px hsl(var(--tv-focus-ring) / 0.6);
+    animation: tv-focus-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes tv-focus-pulse {
+    0%, 100% {
+      box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
+    }
+    50% {
+      box-shadow: 0 0 40px hsl(var(--tv-focus-ring) / 0.8);
+    }
   }
 
   .tv-mode .media-card {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
     box-shadow: var(--shadow-md);
   }
 
-  .tv-mode .media-card:focus-within,
-  .tv-mode .media-card:hover {
-    transform: scale(1.08);
-    z-index: 10;
+  .tv-mode .media-card:focus,
+  .tv-mode .media-card:focus-visible,
+  .tv-mode .media-card:focus-within {
+    transform: scale(1.1);
+    z-index: 20;
     box-shadow: 0 0 0 var(--tv-focus-ring-width) hsl(var(--tv-focus-ring)), 
+                0 0 40px hsl(var(--tv-focus-ring) / 0.7),
                 var(--shadow-xl);
+    outline: none;
+    animation: tv-focus-pulse 2s ease-in-out infinite;
   }
 
-  .tv-mode .media-card:focus-within .group-hover\:opacity-100 {
+  .tv-mode .media-card:focus-within .group-hover\:opacity-100,
+  .tv-mode .media-card:focus .group-hover\:opacity-100 {
     opacity: 1;
   }
 
   /* TV mode sidebar navigation */
+  .tv-mode [data-sidebar="true"] a:focus,
   .tv-mode [data-sidebar="true"] a:focus-visible,
+  .tv-mode [data-sidebar="true"] button:focus,
   .tv-mode [data-sidebar="true"] button:focus-visible {
-    background: hsl(var(--primary) / 0.2);
+    background: hsl(var(--primary) / 0.25);
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
     outline-offset: -2px;
+    box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
   }
 
   /* Smooth scrolling for keyboard navigation */
@@ -303,12 +325,21 @@
   }
 
   /* Better focus for all interactive elements in TV mode */
+  .tv-mode button:focus,
   .tv-mode button:focus-visible,
+  .tv-mode a:focus,
   .tv-mode a:focus-visible,
+  .tv-mode [tabindex="0"]:focus,
   .tv-mode [tabindex="0"]:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: 2px;
-    box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
+    outline-offset: 3px;
+    box-shadow: 0 0 25px hsl(var(--tv-focus-ring) / 0.6);
+  }
+
+  /* Hero buttons focus in TV mode */
+  .tv-mode main button:focus,
+  .tv-mode main button:focus-visible {
+    transform: scale(1.05);
   }
 
   /* TV mode larger buttons */

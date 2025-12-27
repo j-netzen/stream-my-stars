@@ -119,6 +119,7 @@ export default function HomePage() {
                   size={isTVMode ? "tv-lg" : "lg"}
                   className="gap-2"
                   onClick={() => handlePlay(featured)}
+                  tabIndex={0}
                 >
                   <Play className={cn("fill-current", isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                   Play
@@ -128,6 +129,7 @@ export default function HomePage() {
                   variant="secondary" 
                   className="gap-2"
                   onClick={() => setDetailsMedia(featured)}
+                  tabIndex={0}
                 >
                   <Info className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
                   More Info
