@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { usePlaylists } from "@/hooks/usePlaylists";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
@@ -16,10 +16,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ListVideo, Plus, Trash2, Loader2, Shuffle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ListVideo, Plus, Trash2, Loader2, Shuffle, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+
+type SortOption = "date_added" | "alphabetical" | "release_date";
 
 export default function PlaylistsPage() {
   const { playlists, isLoading, addPlaylist, deletePlaylist, removeFromPlaylist } = usePlaylists();
@@ -33,6 +42,7 @@ export default function PlaylistsPage() {
   const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<SortOption>("date_added");
 
   // Fetch playlist items
   const { data: playlistItems = [] } = useQuery({
@@ -71,6 +81,30 @@ export default function PlaylistsPage() {
   const playlistMedia = media.filter((m) =>
     playlistItems.some((item) => item.media_id === m.id)
   );
+
+  // Sort playlist media based on selected option
+  const sortedPlaylistMedia = useMemo(() => {
+    const sorted = [...playlistMedia];
+    
+    switch (sortOption) {
+      case "alphabetical":
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case "release_date":
+        return sorted.sort((a, b) => {
+          const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
+          const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
+          return dateB - dateA; // Newest first
+        });
+      case "date_added":
+      default:
+        // Sort by the order they were added to the playlist
+        return sorted.sort((a, b) => {
+          const itemA = playlistItems.find((item) => item.media_id === a.id);
+          const itemB = playlistItems.find((item) => item.media_id === b.id);
+          return (itemA?.sort_order ?? 0) - (itemB?.sort_order ?? 0);
+        });
+    }
+  }, [playlistMedia, playlistItems, sortOption]);
 
   const handlePlay = (item: Media) => {
     // Show stream selection for media with TMDB ID
@@ -218,20 +252,36 @@ export default function PlaylistsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">{selectedPlaylistData.name}</h2>
-                {playlistMedia.length > 0 && (
-                  <Button
-                    onClick={handlePickForMe}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <Shuffle className="w-4 h-4" />
-                    Pick for me
-                  </Button>
-                )}
+                <div className="flex items-center gap-3">
+                  {/* Sort dropdown */}
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                    <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date_added">Date Added</SelectItem>
+                        <SelectItem value="alphabetical">Alphabetical</SelectItem>
+                        <SelectItem value="release_date">Release Date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {sortedPlaylistMedia.length > 0 && (
+                    <Button
+                      onClick={handlePickForMe}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      <Shuffle className="w-4 h-4" />
+                      Pick for me
+                    </Button>
+                  )}
+                </div>
               </div>
-              {playlistMedia.length > 0 ? (
+              {sortedPlaylistMedia.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {playlistMedia.map((item) => (
+                  {sortedPlaylistMedia.map((item) => (
                     <MediaCard
                       key={item.id}
                       media={item}
