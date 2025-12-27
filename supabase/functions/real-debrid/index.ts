@@ -434,6 +434,19 @@ serve(async (req) => {
       let userMessage = data.error || "Real-Debrid API error";
       const errorCode = data.error_code;
       
+      // For streaming action, wrong_parameter means the file doesn't support transcoding
+      // This is not an error - return success with empty links so client uses download URL
+      if (action === "streaming" && (data.error === "wrong_parameter" || errorCode === 2)) {
+        console.log("File doesn't support streaming transcoding, returning empty result");
+        return new Response(JSON.stringify({ streaming_not_supported: true }), {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+          },
+        });
+      }
+      
       if (data.error === "infringing_file" || errorCode === 35) {
         userMessage = "This content is unavailable due to copyright restrictions. Please try a different stream.";
       } else if (data.error === "hoster_unavailable" || errorCode === 7) {
@@ -447,7 +460,7 @@ serve(async (req) => {
       } else if (data.error === "action_already_done" || errorCode === 24) {
         userMessage = "This action was already completed.";
       } else if (data.error === "wrong_parameter" || errorCode === 2) {
-        userMessage = "This file doesn't support streaming transcoding. Trying alternative...";
+        userMessage = "Invalid parameter provided.";
       }
       
       return new Response(
