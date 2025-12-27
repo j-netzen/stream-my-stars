@@ -90,35 +90,17 @@ export async function transcodeMkvToMp4(
     // Write input file to FFmpeg virtual filesystem
     await ffmpeg.writeFile(inputFileName, inputData);
 
-    onProgress?.(35, 'Remuxing to MP4...');
+    onProgress?.(35, 'Converting to MP4 (stream copy)...');
 
-    // Try remuxing first (fast, just repackages without re-encoding)
-    // -c copy = copy streams without transcoding
+    // Use stream copy (no re-encoding) - fast remux
+    // -c copy = copy all streams without transcoding
     // -movflags +faststart = optimize for web streaming
-    try {
-      await ffmpeg.exec([
-        '-i', inputFileName,
-        '-c', 'copy',
-        '-movflags', '+faststart',
-        outputFileName
-      ]);
-    } catch (remuxError) {
-      console.warn('Remuxing failed, trying transcode:', remuxError);
-      
-      onProgress?.(40, 'Transcoding video (this may take a while)...');
-      
-      // Fallback to transcoding with browser-compatible codecs
-      await ffmpeg.exec([
-        '-i', inputFileName,
-        '-c:v', 'libx264',      // H.264 video codec (widely supported)
-        '-preset', 'ultrafast', // Fastest encoding
-        '-crf', '23',           // Quality (lower = better, 23 is default)
-        '-c:a', 'aac',          // AAC audio codec (widely supported)
-        '-b:a', '128k',         // Audio bitrate
-        '-movflags', '+faststart',
-        outputFileName
-      ]);
-    }
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      outputFileName
+    ]);
 
     onProgress?.(90, 'Finalizing...');
 
@@ -177,33 +159,17 @@ export async function transcodeFileToMp4(
     // Write input file to FFmpeg virtual filesystem
     await ffmpeg.writeFile(inputFileName, inputData);
 
-    onProgress?.(35, 'Remuxing to MP4...');
+    onProgress?.(35, 'Converting to MP4 (stream copy)...');
 
-    // Try remuxing first (fast)
-    try {
-      await ffmpeg.exec([
-        '-i', inputFileName,
-        '-c', 'copy',
-        '-movflags', '+faststart',
-        outputFileName
-      ]);
-    } catch (remuxError) {
-      console.warn('Remuxing failed, trying transcode:', remuxError);
-      
-      onProgress?.(40, 'Transcoding video (this may take a while)...');
-      
-      // Fallback to transcoding
-      await ffmpeg.exec([
-        '-i', inputFileName,
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '23',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-movflags', '+faststart',
-        outputFileName
-      ]);
-    }
+    // Use stream copy (no re-encoding) - fast remux
+    // -c copy = copy all streams without transcoding
+    // -movflags +faststart = optimize for web streaming
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      outputFileName
+    ]);
 
     onProgress?.(90, 'Finalizing...');
 
