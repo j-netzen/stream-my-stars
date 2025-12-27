@@ -347,6 +347,12 @@ export function StreamSelectionDialog({
       setResolveStatus("Getting streaming URL...");
       const streamingLinks = await getStreamingLinks(fileId);
       
+      // Check if streaming is not supported (server returns this flag)
+      if (streamingLinks?.streaming_not_supported) {
+        console.log("Streaming not supported for this file, using download URL");
+        return downloadUrl;
+      }
+      
       // Check if we got valid streaming links
       if (!streamingLinks || typeof streamingLinks !== 'object') {
         console.log("No valid streaming response, using download URL");
@@ -363,7 +369,7 @@ export function StreamSelectionDialog({
       }
       
       // Try any available quality
-      const availableQualities = Object.keys(streamingLinks);
+      const availableQualities = Object.keys(streamingLinks).filter(k => k !== 'streaming_not_supported');
       if (availableQualities.length > 0) {
         const firstQuality = availableQualities[0];
         if (streamingLinks[firstQuality]?.full) {
