@@ -222,7 +222,7 @@ export function StreamSelectionDialog({
     }
   };
 
-  // Reset state when dialog opens with new media - check downloads first
+  // Reset state when dialog opens with new media - start with streams search
   useEffect(() => {
     if (open && media) {
       setStreams([]);
@@ -230,16 +230,18 @@ export function StreamSelectionDialog({
       setSelectedSeason(1);
       setSelectedEpisode(1);
       setQualityFilter("all");
-      setActiveTab("downloads"); // Start with downloads tab
+      setActiveTab("search"); // Start with streams tab
       setDownloadSearchQuery("");
       setFailedStreams(new Set());
-      // Load downloads first, then search for streams as fallback
-      loadMyDownloadsFirst();
+      // Start stream search immediately
+      handleSearch();
+      // Load downloads in background for the downloads tab
+      loadDownloadsInBackground();
     }
   }, [open, media?.id]);
 
-  // Load downloads first, then search for streams if no matching downloads found
-  const loadMyDownloadsFirst = async () => {
+  // Load downloads in background (non-blocking)
+  const loadDownloadsInBackground = async () => {
     setIsLoadingDownloads(true);
     setDownloadsError(null);
     
@@ -252,40 +254,9 @@ export function StreamSelectionDialog({
          d.filename?.match(/\.(mp4|mkv|avi|m4v|webm)$/i))
       );
       setMyDownloads(videoDownloads);
-      
-      // Check if any downloads match current media
-      const hasMatchingDownloads = videoDownloads.some((download) => {
-        if (!media) return false;
-        const filename = download.filename.toLowerCase();
-        const titleWords = media.title.toLowerCase().split(/\s+/);
-        const titleMatches = titleWords.every(word => 
-          filename.includes(word.replace(/[^\w]/g, ''))
-        );
-        
-        if (!titleMatches) return false;
-        
-        // For TV shows, also check episode match
-        if (media.media_type === "tv") {
-          const episodePatterns = [
-            new RegExp(`s0?${selectedSeason}e0?${selectedEpisode}\\b`, 'i'),
-            new RegExp(`${selectedSeason}x0?${selectedEpisode}\\b`, 'i'),
-          ];
-          return episodePatterns.some(pattern => pattern.test(download.filename));
-        }
-        return true;
-      });
-      
-      // If no matching downloads, switch to streams tab and search
-      if (!hasMatchingDownloads) {
-        setActiveTab("search");
-        handleSearch();
-      }
     } catch (err: any) {
       console.error("Failed to load downloads:", err);
       setDownloadsError(err.message || "Failed to load downloads");
-      // On error, fall back to stream search
-      setActiveTab("search");
-      handleSearch();
     }
     
     setIsLoadingDownloads(false);
