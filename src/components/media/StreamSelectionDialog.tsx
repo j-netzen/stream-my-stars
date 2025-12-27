@@ -553,7 +553,15 @@ export function StreamSelectionDialog({
       onStreamSelected({ ...media, source_url: streamUrl }, streamUrl);
     } catch (err: any) {
       console.error("Download stream error:", err);
-      toast.error(err.message || "Failed to get streaming URL");
+      toast.warning("Download failed to play. Searching for streams...");
+      
+      // Switch to streams tab and auto-search
+      setActiveTab("search");
+      
+      // Wait a moment for tab switch, then search if not already searched
+      if (streams.length === 0) {
+        handleSearch();
+      }
     }
     
     setIsResolving(false);
