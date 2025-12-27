@@ -17,6 +17,7 @@ import {
   Loader2,
   Copy,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -26,6 +27,12 @@ import {
   requestFileFromHandle,
   isFileSystemAccessSupported,
 } from "@/lib/fileHandleStore";
+import {
+  isMkvFile,
+  transcodeMkvToMp4,
+  checkBrowserSupport,
+  TranscodeProgressCallback,
+} from "@/lib/ffmpegTranscode";
 
 // Special marker URL for local files stored via File System Access API
 const LOCAL_FILE_MARKER = "local-file://stored-handle";
@@ -104,6 +111,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [showCopyUrl, setShowCopyUrl] = useState(false);
   const [hasWarnedNoAudio, setHasWarnedNoAudio] = useState(false);
+  
+  // Transcoding state
+  const [isTranscoding, setIsTranscoding] = useState(false);
+  const [transcodeProgress, setTranscodeProgress] = useState(0);
+  const [transcodeMessage, setTranscodeMessage] = useState("");
+  const [showTranscodeOption, setShowTranscodeOption] = useState(false);
 
   // Attempt to restore file handle on mount or media change
   useEffect(() => {
@@ -147,6 +160,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     // Reset state
     setPlaybackError(null);
     setShowCopyUrl(false);
+    setShowTranscodeOption(false);
+    setIsTranscoding(false);
+    setTranscodeProgress(0);
+    setTranscodeMessage("");
     setHasWarnedNoAudio(false);
     hasTriggeredErrorRef.current = false; // Reset error trigger flag for new stream
     if (audioHealthCheckTimeoutRef.current) {
@@ -331,7 +348,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     const isBlob = raw.startsWith("blob:");
     const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\/.test(raw);
     const isLocalMarker = raw === LOCAL_FILE_MARKER;
-    const isMkvFile = raw.toLowerCase().includes('.mkv');
+    const isMkv = isMkvFile(raw);
 
     // If we have a callback for playback errors, use it to try next stream
     // This handles format incompatibility by automatically skipping to next stream
@@ -347,6 +364,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     // Fallback to showing error UI if no callback provided
     let message: string;
     let showCopyOption = false;
+    let showTranscode = false;
     
     if (isLocalMarker) {
       message = "Local file handle not found. Please re-select the file.";
@@ -354,15 +372,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       message = "This looks like a temporary local-file link. Please re-select the video file to play.";
     } else if (looksLikePath) {
       message = "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL.";
-    } else if (isMkvFile) {
-      // Check browser MKV support
-      const video = document.createElement('video');
-      const hasBasicMkvSupport = video.canPlayType('video/x-matroska') !== '';
+    } else if (isMkv) {
+      // Check if transcoding is supported
+      const { supported } = checkBrowserSupport();
       
-      if (hasBasicMkvSupport) {
-        message = "MKV playback failed. The file may use unsupported codecs (like AC3/DTS audio or HEVC). Copy the URL to play in VLC or try a different stream.";
+      if (supported) {
+        message = "MKV playback failed. You can convert it to MP4 for browser playback, or copy the URL to play in VLC.";
+        showTranscode = true;
       } else {
-        message = "Your browser doesn't support MKV files natively. Use Chrome/Edge for better support, or copy the URL to play in VLC.";
+        message = "Your browser doesn't support MKV files. Copy the URL to play in VLC or another media player.";
       }
       showCopyOption = true;
     } else {
@@ -372,7 +390,60 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
     setPlaybackError(message);
     setShowCopyUrl(showCopyOption);
+    setShowTranscodeOption(showTranscode);
     toast.error(message);
+  };
+
+  // Handle MKV transcoding
+  const handleTranscode = async () => {
+    const url = src || media.source_url || "";
+    if (!url || url.startsWith("blob:") || url === LOCAL_FILE_MARKER) {
+      toast.error("Cannot transcode this source");
+      return;
+    }
+
+    setIsTranscoding(true);
+    setTranscodeProgress(0);
+    setTranscodeMessage("Starting...");
+    setPlaybackError(null);
+
+    const progressCallback: TranscodeProgressCallback = (progress, message) => {
+      setTranscodeProgress(progress);
+      setTranscodeMessage(message);
+    };
+
+    try {
+      toast.info("Converting MKV to MP4 for browser playback...", {
+        description: "This may take a while depending on file size.",
+        duration: 5000,
+      });
+
+      const mp4Url = await transcodeMkvToMp4(url, progressCallback);
+      
+      // Update source with transcoded URL
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+      objectUrlRef.current = mp4Url;
+      setSrc(mp4Url);
+      setShowTranscodeOption(false);
+      
+      toast.success("Video converted successfully!");
+      
+      // Auto-play after transcoding
+      requestAnimationFrame(() => {
+        videoRef.current?.play().catch(() => {});
+      });
+    } catch (error) {
+      console.error("Transcoding failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setPlaybackError(`Transcoding failed: ${errorMessage}. Try copying the URL to VLC instead.`);
+      toast.error("Transcoding failed", { description: errorMessage });
+    } finally {
+      setIsTranscoding(false);
+      setTranscodeProgress(0);
+      setTranscodeMessage("");
+    }
   };
 
   const handlePlayPause = () => {
@@ -922,12 +993,40 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         className="hidden"
       />
 
-      {playbackError && (
+      {/* Transcoding Overlay */}
+      {isTranscoding && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-background/90 backdrop-blur-sm p-6">
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-lg text-center">
+            <RefreshCw className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
+            <h2 className="text-lg font-semibold">Converting Video</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{transcodeMessage}</p>
+            <div className="mt-4 w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${transcodeProgress}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">{transcodeProgress}%</p>
+            <p className="mt-4 text-xs text-muted-foreground">
+              This may take a while for large files. Please don't close this window.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Playback Error */}
+      {playbackError && !isTranscoding && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-6">
           <div className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-lg">
             <h2 className="text-base font-semibold">Can't play this video</h2>
             <p className="mt-1 text-sm text-muted-foreground">{playbackError}</p>
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+              {showTranscodeOption && (
+                <Button variant="default" onClick={handleTranscode} className="gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Convert to MP4
+                </Button>
+              )}
               {showCopyUrl && (
                 <>
                   <Button variant="outline" onClick={openInVlc} className="gap-2">
