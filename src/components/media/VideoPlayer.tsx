@@ -49,24 +49,35 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       ? `https://image.tmdb.org/t/p/w780${media.poster_path}`
       : null;
 
-  // Auto-fullscreen function
+  // Try to enter fullscreen
   const enterFullscreen = useCallback(async () => {
-    if (!containerRef.current || hasAutoFullscreenedRef.current) return;
+    if (hasAutoFullscreenedRef.current) return;
+    
+    const element = containerRef.current;
+    if (!element) return;
     
     try {
-      if (containerRef.current.requestFullscreen) {
-        await containerRef.current.requestFullscreen();
-      } else if ((containerRef.current as any).webkitRequestFullscreen) {
-        await (containerRef.current as any).webkitRequestFullscreen();
-      } else if ((containerRef.current as any).msRequestFullscreen) {
-        await (containerRef.current as any).msRequestFullscreen();
+      if (element.requestFullscreen) {
+        await element.requestFullscreen();
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen();
+      } else if ((element as any).msRequestFullscreen) {
+        await (element as any).msRequestFullscreen();
       }
       setIsFullscreen(true);
       hasAutoFullscreenedRef.current = true;
     } catch (err) {
-      console.warn("Auto-fullscreen failed:", err);
+      console.warn("Fullscreen request failed (requires user gesture):", err);
     }
   }, []);
+
+  // Handle first user click to enter fullscreen (browsers require user gesture)
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    // Only trigger fullscreen on first interaction if not already fullscreen
+    if (!hasAutoFullscreenedRef.current && !document.fullscreenElement) {
+      enterFullscreen();
+    }
+  }, [enterFullscreen]);
 
   // Auto-play and auto-fullscreen when video can play
   const handleCanPlay = useCallback(() => {
@@ -288,6 +299,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       className="fixed inset-0 z-50 bg-black flex items-center justify-center"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
+      onClick={handleContainerClick}
     >
       {/* Video element */}
       <video
@@ -302,7 +314,14 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         onPause={() => setIsPlaying(false)}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => setIsBuffering(false)}
-        onClick={handlePlayPause}
+        onClick={(e) => {
+          e.stopPropagation();
+          handlePlayPause();
+          // Also try fullscreen on video click
+          if (!hasAutoFullscreenedRef.current) {
+            enterFullscreen();
+          }
+        }}
         poster={backdropUrl || undefined}
         preload="auto"
         playsInline
