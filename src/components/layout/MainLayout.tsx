@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useCallback } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Sidebar, MobileMenuTrigger } from "./Sidebar";
@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
+import { useTVNavigation } from "@/hooks/useTVNavigation";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -18,82 +19,27 @@ export function MainLayout({ children }: MainLayoutProps) {
   const [isAddMediaOpen, setIsAddMediaOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
-  // Global keyboard navigation for TV mode
-  const handleGlobalKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!isTVMode) return;
-    
-    // Don't interfere with inputs
-    const activeElement = document.activeElement;
-    if (
-      activeElement instanceof HTMLInputElement ||
-      activeElement instanceof HTMLTextAreaElement ||
-      activeElement instanceof HTMLSelectElement
-    ) {
-      return;
-    }
+  // Initialize TV navigation system
+  useTVNavigation();
 
-    // Escape key to focus sidebar
-    if (e.key === "Escape") {
-      const sidebar = document.querySelector('[data-sidebar="true"]');
-      const firstLink = sidebar?.querySelector('a[href]') as HTMLElement;
-      if (firstLink) {
-        e.preventDefault();
-        firstLink.focus();
-      }
-      return;
-    }
-
-    // ArrowLeft from main content to go to sidebar
-    if (e.key === "ArrowLeft") {
-      const mainContent = document.querySelector('main');
-      const isInMain = mainContent?.contains(activeElement);
-      
-      if (isInMain) {
-        // Check if we're at the leftmost column
-        const focusableInMain = Array.from(
-          mainContent?.querySelectorAll<HTMLElement>('[tabindex="0"], button:not([disabled]), a[href]') || []
-        ).filter(el => el.offsetParent !== null);
-        
-        const currentIndex = focusableInMain.findIndex(el => el === activeElement);
-        
-        // Simple heuristic: if current element is near the left edge
-        if (activeElement instanceof HTMLElement) {
-          const rect = activeElement.getBoundingClientRect();
-          const mainRect = mainContent?.getBoundingClientRect();
-          if (mainRect && rect.left < mainRect.left + 200) {
-            // Close to left edge, move to sidebar
-            const sidebar = document.querySelector('[data-sidebar="true"]');
-            const sidebarLinks = sidebar?.querySelectorAll<HTMLElement>('a[href]');
-            const activeRoute = window.location.pathname;
-            
-            // Focus the currently active nav item or first link
-            let targetLink: HTMLElement | null = null;
-            sidebarLinks?.forEach(link => {
-              if (link.getAttribute('href') === activeRoute) {
-                targetLink = link;
-              }
-            });
-            
-            if (targetLink) {
-              e.preventDefault();
-              targetLink.focus();
-            } else if (sidebarLinks && sidebarLinks.length > 0) {
-              e.preventDefault();
-              sidebarLinks[0].focus();
-            }
-          }
-        }
-      }
-    }
-  }, [isTVMode]);
-
+  // Auto-focus first focusable element in main content on mount in TV mode
   useEffect(() => {
-    if (!isTVMode) return;
-    
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [isTVMode, handleGlobalKeyDown]);
+    if (!isTVMode || !mainRef.current) return;
+
+    // Delay to ensure content is rendered
+    const timer = setTimeout(() => {
+      const firstFocusable = mainRef.current?.querySelector<HTMLElement>(
+        '[tabindex="0"], button:not([disabled]), a[href]'
+      );
+      if (firstFocusable && !document.activeElement?.closest('[data-sidebar="true"]')) {
+        firstFocusable.focus();
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [isTVMode]);
 
   if (loading) {
     return (
@@ -127,6 +73,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       </div>
       
       <main
+        ref={mainRef}
         className={cn(
           "min-h-screen transition-all duration-300 safe-bottom",
           // Desktop: offset by sidebar width

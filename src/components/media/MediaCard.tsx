@@ -44,58 +44,13 @@ export function MediaCard({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      e.stopPropagation();
       onPlay?.(media);
       return;
     }
     
-    // Handle up/down arrow keys for row navigation
-    if (isTVMode && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-      e.preventDefault();
-      
-      // Find all media card containers across all rows
-      const allCards = Array.from(document.querySelectorAll<HTMLElement>('.media-card[tabindex="0"]'));
-      const currentIndex = allCards.findIndex(card => card === e.currentTarget);
-      
-      if (currentIndex === -1) return;
-      
-      // Get current card's position
-      const currentRect = e.currentTarget.getBoundingClientRect();
-      const currentCenterX = currentRect.left + currentRect.width / 2;
-      
-      // Find cards in the target direction (up or down)
-      const targetCards = allCards.filter((card, index) => {
-        if (index === currentIndex) return false;
-        const cardRect = card.getBoundingClientRect();
-        
-        if (e.key === "ArrowDown") {
-          return cardRect.top > currentRect.bottom - 20;
-        } else {
-          return cardRect.bottom < currentRect.top + 20;
-        }
-      });
-      
-      if (targetCards.length === 0) return;
-      
-      // Find the card in the target row that's closest horizontally
-      let closestCard: HTMLElement | null = null;
-      let closestDistance = Infinity;
-      
-      targetCards.forEach(card => {
-        const cardRect = card.getBoundingClientRect();
-        const cardCenterX = cardRect.left + cardRect.width / 2;
-        const distance = Math.abs(cardCenterX - currentCenterX);
-        
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestCard = card;
-        }
-      });
-      
-      if (closestCard) {
-        closestCard.focus();
-        closestCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
-    }
+    // Let the global TV navigation handler manage arrow keys
+    // Just handle navigation within the card overlay if needed
   };
 
   return (
