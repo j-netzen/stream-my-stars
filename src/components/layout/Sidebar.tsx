@@ -47,8 +47,8 @@ const defaultNavItems: NavItemData[] = [
   { icon: Film, label: "Movies", path: "/movies" },
   { icon: Tv, label: "TV Shows", path: "/tv-shows" },
   { icon: Video, label: "Home Videos", path: "/home-movies" },
-  { icon: FolderOpen, label: "Categories", path: "/categories" },
   { icon: ListVideo, label: "Playlists", path: "/playlists" },
+  { icon: FolderOpen, label: "Categories", path: "/categories" },
   { icon: Search, label: "Discover", path: "/discover" },
 ];
 
