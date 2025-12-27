@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from "lucide-react";
+import { X, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 
 interface Media {
   id: string;
@@ -31,6 +32,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
   const hasAutoPlayedRef = useRef(false);
   const hasAutoFullscreenedRef = useRef(false);
+  const bufferCheckIntervalRef = useRef<NodeJS.Timeout>();
+  const lastBufferTimeRef = useRef<number>(0);
+  const bufferStallCountRef = useRef<number>(0);
+
+  const { settings } = usePlaybackSettings();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -41,6 +47,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [bufferHealth, setBufferHealth] = useState<'good' | 'warning' | 'poor'>('good');
+  const [bufferedPercent, setBufferedPercent] = useState(0);
+  const [showBufferWarning, setShowBufferWarning] = useState(false);
 
   const src = media.source_url || null;
   const backdropUrl = media.backdrop_path 
@@ -79,6 +88,71 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
   }, [enterFullscreen]);
 
+  // Monitor buffer health
+  const updateBufferHealth = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !duration) return;
+
+    const buffered = video.buffered;
+    if (buffered.length === 0) {
+      setBufferHealth('poor');
+      setBufferedPercent(0);
+      return;
+    }
+
+    // Find the buffer range that contains current time
+    let bufferEnd = 0;
+    for (let i = 0; i < buffered.length; i++) {
+      if (buffered.start(i) <= video.currentTime && buffered.end(i) >= video.currentTime) {
+        bufferEnd = buffered.end(i);
+        break;
+      }
+    }
+
+    const bufferedAhead = bufferEnd - video.currentTime;
+    const totalBuffered = (bufferEnd / duration) * 100;
+    setBufferedPercent(totalBuffered);
+
+    // Check buffer health based on settings
+    const targetBuffer = settings.bufferAhead;
+    if (bufferedAhead >= targetBuffer * 0.8) {
+      setBufferHealth('good');
+      setShowBufferWarning(false);
+      bufferStallCountRef.current = 0;
+    } else if (bufferedAhead >= targetBuffer * 0.3) {
+      setBufferHealth('warning');
+    } else {
+      setBufferHealth('poor');
+      
+      // Track buffer stalls
+      if (bufferedAhead < 2 && isPlaying) {
+        bufferStallCountRef.current++;
+        if (bufferStallCountRef.current >= 3) {
+          setShowBufferWarning(true);
+        }
+      }
+    }
+
+    lastBufferTimeRef.current = bufferedAhead;
+  }, [duration, isPlaying, settings.bufferAhead]);
+
+  // Buffer monitoring interval
+  useEffect(() => {
+    if (isPlaying) {
+      bufferCheckIntervalRef.current = setInterval(updateBufferHealth, 1000);
+    } else {
+      if (bufferCheckIntervalRef.current) {
+        clearInterval(bufferCheckIntervalRef.current);
+      }
+    }
+
+    return () => {
+      if (bufferCheckIntervalRef.current) {
+        clearInterval(bufferCheckIntervalRef.current);
+      }
+    };
+  }, [isPlaying, updateBufferHealth]);
+
   // Auto-play and auto-fullscreen when video can play
   const handleCanPlay = useCallback(() => {
     const video = videoRef.current;
@@ -88,13 +162,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     video.muted = isMuted;
     video.volume = volume;
 
-    // Auto-play if not already playing
-    if (!hasAutoPlayedRef.current) {
+    // Auto-play if not already playing and autoPlay is enabled
+    if (!hasAutoPlayedRef.current && settings.autoPlay) {
       video.play().then(() => {
         setIsPlaying(true);
         hasAutoPlayedRef.current = true;
-        // Enter fullscreen after playback starts
-        enterFullscreen();
+        // Enter fullscreen after playback starts if enabled
+        if (settings.autoFullscreen) {
+          enterFullscreen();
+        }
       }).catch((err) => {
         console.warn("Auto-play failed:", err);
         // Try muted autoplay as fallback
@@ -103,13 +179,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         video.play().then(() => {
           setIsPlaying(true);
           hasAutoPlayedRef.current = true;
-          enterFullscreen();
+          if (settings.autoFullscreen) {
+            enterFullscreen();
+          }
         }).catch(() => {
           console.warn("Muted auto-play also failed");
         });
       });
     }
-  }, [isMuted, volume, enterFullscreen]);
+  }, [isMuted, volume, enterFullscreen, settings.autoPlay, settings.autoFullscreen]);
 
   // Reset auto-play/fullscreen refs when media changes
   useEffect(() => {
@@ -331,10 +409,42 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         {src && <source src={src} />}
       </video>
 
-      {/* Buffering indicator */}
+      {/* Buffering indicator with health status */}
       {isBuffering && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          {settings.isSlowConnection && (
+            <p className="text-white/80 text-sm mt-4 flex items-center gap-2">
+              <WifiOff className="w-4 h-4" />
+              Slow connection detected
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Buffer health warning */}
+      {showBufferWarning && !isBuffering && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-yellow-500/90 text-black px-4 py-2 rounded-lg flex items-center gap-2 pointer-events-none animate-pulse">
+          <AlertTriangle className="w-5 h-5" />
+          <span className="text-sm font-medium">Connection unstable - buffering may occur</span>
+        </div>
+      )}
+
+      {/* Buffer health indicator (shown with controls) */}
+      {showControls && (
+        <div className="absolute top-4 right-16 flex items-center gap-2 text-white/60 text-sm">
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            bufferHealth === 'good' && "bg-green-500",
+            bufferHealth === 'warning' && "bg-yellow-500",
+            bufferHealth === 'poor' && "bg-red-500"
+          )} />
+          {settings.connectionSpeedMbps !== null && (
+            <span className="flex items-center gap-1">
+              <Wifi className="w-3 h-3" />
+              {settings.connectionSpeedMbps.toFixed(1)} Mbps
+            </span>
+          )}
         </div>
       )}
 

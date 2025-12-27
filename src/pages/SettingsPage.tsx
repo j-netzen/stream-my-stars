@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTVMode, SCALE_PRESETS, ScalePreset } from "@/hooks/useTVMode";
+import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -16,11 +18,13 @@ import { checkBrowserSupport } from "@/lib/ffmpegTranscode";
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset } = useTVMode();
+  const { settings: playbackSettings, updateSetting: updatePlaybackSetting, measureConnectionSpeed } = usePlaybackSettings();
   const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingRd, setIsLoadingRd] = useState(false);
   const [rdError, setRdError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isTestingSpeed, setIsTestingSpeed] = useState(false);
   
   // Auto-transcode MKV setting
   const [autoTranscodeMkv, setAutoTranscodeMkv] = useState(() => {
@@ -188,17 +192,54 @@ export default function SettingsPage() {
             Video Playback
           </CardTitle>
           <CardDescription className={isTVMode ? "text-base" : ""}>
-            Configure video playback settings
+            Configure video playback and buffering settings
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Auto-play */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="auto-play" className={cn("font-medium", isTVMode && "text-lg")}>
+                Auto-play videos
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                Automatically start playing when a video is opened
+              </p>
+            </div>
+            <Switch
+              id="auto-play"
+              checked={playbackSettings.autoPlay}
+              onCheckedChange={(checked) => updatePlaybackSetting('autoPlay', checked)}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+
+          {/* Auto-fullscreen */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="auto-fullscreen" className={cn("font-medium", isTVMode && "text-lg")}>
+                Auto-fullscreen
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                Automatically enter fullscreen when video starts playing
+              </p>
+            </div>
+            <Switch
+              id="auto-fullscreen"
+              checked={playbackSettings.autoFullscreen}
+              onCheckedChange={(checked) => updatePlaybackSetting('autoFullscreen', checked)}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+
+          {/* Auto-transcode MKV */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <Label htmlFor="auto-transcode" className={cn("font-medium", isTVMode && "text-lg")}>
                 Auto-convert MKV files
               </Label>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                Automatically convert MKV files to MP4 for browser playback without prompting
+                Automatically convert MKV files to MP4 for browser playback
               </p>
             </div>
             <Switch
@@ -219,18 +260,144 @@ export default function SettingsPage() {
               <span>{ffmpegSupport.reason || "Your browser doesn't support MKV conversion"}</span>
             </div>
           )}
-          
-          {ffmpegSupport.supported && (
-            <div className={cn(
-              "flex items-center gap-2 p-3 rounded-lg bg-secondary/30",
-              isTVMode ? "text-base" : "text-sm"
-            )}>
-              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-              <span className="text-muted-foreground">
-                FFmpeg is preloaded and ready for fast video conversion
+        </CardContent>
+      </Card>
+
+      {/* Buffer & Network Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Gauge className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            Buffer & Network
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Optimize buffering to prevent video stalling
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Connection Speed Display */}
+          <div className={cn(
+            "flex items-center justify-between p-4 rounded-lg",
+            playbackSettings.isSlowConnection ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-secondary/30"
+          )}>
+            <div className="flex items-center gap-3">
+              {playbackSettings.isSlowConnection ? (
+                <WifiOff className={cn("text-yellow-500", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+              ) : (
+                <Wifi className={cn("text-green-500", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+              )}
+              <div>
+                <p className={cn("font-medium", isTVMode && "text-lg")}>
+                  {playbackSettings.connectionSpeedMbps !== null 
+                    ? `${playbackSettings.connectionSpeedMbps.toFixed(1)} Mbps` 
+                    : "Speed unknown"}
+                </p>
+                <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                  {playbackSettings.isSlowConnection 
+                    ? "Slow connection - buffering may occur" 
+                    : "Connection speed"}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size={isTVMode ? "lg" : "sm"}
+              onClick={async () => {
+                setIsTestingSpeed(true);
+                const speed = await measureConnectionSpeed();
+                setIsTestingSpeed(false);
+                if (speed !== null) {
+                  toast.success(`Connection speed: ${speed.toFixed(1)} Mbps`);
+                } else {
+                  toast.error("Failed to measure connection speed");
+                }
+              }}
+              disabled={isTestingSpeed}
+            >
+              {isTestingSpeed ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              <span className="ml-2">Test</span>
+            </Button>
+          </div>
+
+          {/* Buffer Ahead Setting */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className={cn("font-medium", isTVMode && "text-lg")}>
+                Buffer ahead (seconds)
+              </Label>
+              <span className={cn("font-mono text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                {playbackSettings.bufferAhead}s
               </span>
             </div>
-          )}
+            <Slider
+              value={[playbackSettings.bufferAhead]}
+              min={5}
+              max={60}
+              step={5}
+              onValueChange={(value) => updatePlaybackSetting('bufferAhead', value[0])}
+              className="w-full"
+            />
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+              Higher values = less buffering but uses more data. Try 45-60s for slow connections.
+            </p>
+          </div>
+
+          {/* Auto Quality Downgrade */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="auto-quality" className={cn("font-medium", isTVMode && "text-lg")}>
+                Auto quality adjustment
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                Automatically switch to lower quality on slow connections
+              </p>
+            </div>
+            <Switch
+              id="auto-quality"
+              checked={playbackSettings.autoQualityDowngrade}
+              onCheckedChange={(checked) => updatePlaybackSetting('autoQualityDowngrade', checked)}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+
+          {/* Preload on Hover */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="preload-hover" className={cn("font-medium", isTVMode && "text-lg")}>
+                Preload on hover
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                Start loading video when hovering on a title (faster playback start)
+              </p>
+            </div>
+            <Switch
+              id="preload-hover"
+              checked={playbackSettings.preloadOnHover}
+              onCheckedChange={(checked) => updatePlaybackSetting('preloadOnHover', checked)}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+
+          {/* Tips */}
+          <div className={cn(
+            "flex items-start gap-2 p-3 rounded-lg bg-secondary/30",
+            isTVMode ? "text-base" : "text-sm"
+          )}>
+            <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <div className="text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Tips to reduce buffering:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Increase buffer ahead time to 45-60 seconds</li>
+                <li>Enable auto quality adjustment</li>
+                <li>Choose a lower quality stream when available</li>
+                <li>Close other apps using your network</li>
+              </ul>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
