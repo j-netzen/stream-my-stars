@@ -7,6 +7,86 @@ let loadPromise: Promise<FFmpeg> | null = null;
 // Progress callback type
 export type TranscodeProgressCallback = (progress: number, message: string) => void;
 
+// Codec information type
+export interface CodecInfo {
+  videoCodec: string | null;
+  audioCodec: string | null;
+  resolution: string | null;
+  duration: string | null;
+}
+
+// Store detected codec info for display
+let lastDetectedCodecs: CodecInfo | null = null;
+
+/**
+ * Get the last detected codec information
+ */
+export function getLastDetectedCodecs(): CodecInfo | null {
+  return lastDetectedCodecs;
+}
+
+/**
+ * Parse FFmpeg output to extract codec information
+ */
+function parseCodecInfo(logMessages: string[]): CodecInfo {
+  const info: CodecInfo = {
+    videoCodec: null,
+    audioCodec: null,
+    resolution: null,
+    duration: null
+  };
+
+  const fullLog = logMessages.join('\n');
+
+  // Parse video codec (e.g., "Video: h264", "Video: hevc")
+  const videoMatch = fullLog.match(/Video:\s*(\w+)/i);
+  if (videoMatch) {
+    info.videoCodec = videoMatch[1].toUpperCase();
+  }
+
+  // Parse audio codec (e.g., "Audio: aac", "Audio: ac3")
+  const audioMatch = fullLog.match(/Audio:\s*(\w+)/i);
+  if (audioMatch) {
+    info.audioCodec = audioMatch[1].toUpperCase();
+  }
+
+  // Parse resolution (e.g., "1920x1080")
+  const resMatch = fullLog.match(/(\d{3,4}x\d{3,4})/);
+  if (resMatch) {
+    info.resolution = resMatch[1];
+  }
+
+  // Parse duration (e.g., "Duration: 01:30:45.00")
+  const durMatch = fullLog.match(/Duration:\s*(\d{2}:\d{2}:\d{2})/);
+  if (durMatch) {
+    info.duration = durMatch[1];
+  }
+
+  return info;
+}
+
+/**
+ * Format codec info for display
+ */
+export function formatCodecInfo(info: CodecInfo): string {
+  const parts: string[] = [];
+  
+  if (info.videoCodec) {
+    parts.push(`Video: ${info.videoCodec}`);
+  }
+  if (info.audioCodec) {
+    parts.push(`Audio: ${info.audioCodec}`);
+  }
+  if (info.resolution) {
+    parts.push(info.resolution);
+  }
+  if (info.duration) {
+    parts.push(`Duration: ${info.duration}`);
+  }
+  
+  return parts.length > 0 ? parts.join(' | ') : 'Unknown format';
+}
+
 /**
  * Load and initialize FFmpeg with SharedArrayBuffer support check
  */
@@ -28,7 +108,7 @@ async function loadFFmpeg(onProgress?: TranscodeProgressCallback): Promise<FFmpe
     });
 
     // Set up progress tracking
-    ffmpeg.on('progress', ({ progress, time }) => {
+    ffmpeg.on('progress', ({ progress }) => {
       const percent = Math.round(progress * 100);
       onProgress?.(percent, `Transcoding: ${percent}%`);
     });
@@ -36,7 +116,6 @@ async function loadFFmpeg(onProgress?: TranscodeProgressCallback): Promise<FFmpe
     onProgress?.(5, 'Loading FFmpeg...');
 
     // Load FFmpeg core from CDN with proper CORS headers
-    // Using unpkg as it provides proper CORS headers
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
     
     try {
@@ -78,6 +157,13 @@ export async function transcodeMkvToMp4(
   
   const inputFileName = 'input.mkv';
   const outputFileName = 'output.mp4';
+  const logMessages: string[] = [];
+
+  // Capture logs for codec detection
+  const logHandler = ({ message }: { message: string }) => {
+    logMessages.push(message);
+  };
+  ffmpeg.on('log', logHandler);
 
   try {
     onProgress?.(15, 'Downloading video...');
@@ -85,22 +171,78 @@ export async function transcodeMkvToMp4(
     // Fetch the input file
     const inputData = await fetchFile(inputUrl);
     
-    onProgress?.(30, 'Preparing video...');
+    onProgress?.(30, 'Analyzing video...');
     
     // Write input file to FFmpeg virtual filesystem
     await ffmpeg.writeFile(inputFileName, inputData);
 
-    onProgress?.(35, 'Converting to MP4 (stream copy)...');
+    // First, probe the file to get codec info
+    try {
+      await ffmpeg.exec(['-i', inputFileName]);
+    } catch {
+      // FFmpeg returns error when no output specified, but logs contain codec info
+    }
 
-    // Use stream copy (no re-encoding) - fast remux
-    // -c copy = copy all streams without transcoding
-    // -movflags +faststart = optimize for web streaming
-    await ffmpeg.exec([
-      '-i', inputFileName,
-      '-c', 'copy',
-      '-movflags', '+faststart',
-      outputFileName
-    ]);
+    // Parse and store codec info
+    const codecInfo = parseCodecInfo(logMessages);
+    lastDetectedCodecs = codecInfo;
+    
+    const codecDisplay = formatCodecInfo(codecInfo);
+    onProgress?.(35, `Detected: ${codecDisplay}`);
+
+    // Small delay to show codec info
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    onProgress?.(40, 'Converting to MP4 (stream copy)...');
+
+    // Try stream copy first (fast, no re-encoding)
+    let streamCopyFailed = false;
+    try {
+      await ffmpeg.exec([
+        '-i', inputFileName,
+        '-c', 'copy',
+        '-movflags', '+faststart',
+        outputFileName
+      ]);
+    } catch (copyError) {
+      console.warn('Stream copy failed, will try re-encoding:', copyError);
+      streamCopyFailed = true;
+    }
+
+    // Check if output file exists and has content
+    if (!streamCopyFailed) {
+      try {
+        const testOutput = await ffmpeg.readFile(outputFileName);
+        if (testOutput instanceof Uint8Array && testOutput.length < 1000) {
+          streamCopyFailed = true;
+        }
+      } catch {
+        streamCopyFailed = true;
+      }
+    }
+
+    // Fallback to re-encoding if stream copy failed
+    if (streamCopyFailed) {
+      onProgress?.(45, 'Stream copy failed, re-encoding (this takes longer)...');
+      
+      // Clean up failed output
+      try {
+        await ffmpeg.deleteFile(outputFileName);
+      } catch {
+        // Ignore if file doesn't exist
+      }
+
+      await ffmpeg.exec([
+        '-i', inputFileName,
+        '-c:v', 'libx264',      // H.264 video codec
+        '-preset', 'ultrafast', // Fastest encoding
+        '-crf', '23',           // Quality (lower = better)
+        '-c:a', 'aac',          // AAC audio codec
+        '-b:a', '128k',         // Audio bitrate
+        '-movflags', '+faststart',
+        outputFileName
+      ]);
+    }
 
     onProgress?.(90, 'Finalizing...');
 
@@ -111,10 +253,9 @@ export async function transcodeMkvToMp4(
     await ffmpeg.deleteFile(inputFileName);
     await ffmpeg.deleteFile(outputFileName);
     
-    // Convert to regular ArrayBuffer to avoid SharedArrayBuffer issues with Blob
+    // Convert to regular ArrayBuffer
     let arrayBuffer: ArrayBuffer;
     if (outputData instanceof Uint8Array) {
-      // Copy the buffer to a regular ArrayBuffer
       arrayBuffer = outputData.buffer instanceof ArrayBuffer 
         ? outputData.buffer 
         : new Uint8Array(outputData).buffer;
@@ -132,6 +273,8 @@ export async function transcodeMkvToMp4(
   } catch (error) {
     console.error('Transcoding failed:', error);
     throw new Error(`Failed to transcode video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+    ffmpeg.off('log', logHandler);
   }
 }
 
@@ -146,6 +289,13 @@ export async function transcodeFileToMp4(
   
   const inputFileName = `input.${file.name.split('.').pop() || 'mkv'}`;
   const outputFileName = 'output.mp4';
+  const logMessages: string[] = [];
+
+  // Capture logs for codec detection
+  const logHandler = ({ message }: { message: string }) => {
+    logMessages.push(message);
+  };
+  ffmpeg.on('log', logHandler);
 
   try {
     onProgress?.(15, 'Reading file...');
@@ -154,22 +304,76 @@ export async function transcodeFileToMp4(
     const inputArrayBuffer = await file.arrayBuffer();
     const inputData = new Uint8Array(inputArrayBuffer);
     
-    onProgress?.(30, 'Preparing video...');
+    onProgress?.(30, 'Analyzing video...');
     
     // Write input file to FFmpeg virtual filesystem
     await ffmpeg.writeFile(inputFileName, inputData);
 
-    onProgress?.(35, 'Converting to MP4 (stream copy)...');
+    // Probe the file to get codec info
+    try {
+      await ffmpeg.exec(['-i', inputFileName]);
+    } catch {
+      // FFmpeg returns error when no output specified, but logs contain codec info
+    }
 
-    // Use stream copy (no re-encoding) - fast remux
-    // -c copy = copy all streams without transcoding
-    // -movflags +faststart = optimize for web streaming
-    await ffmpeg.exec([
-      '-i', inputFileName,
-      '-c', 'copy',
-      '-movflags', '+faststart',
-      outputFileName
-    ]);
+    // Parse and store codec info
+    const codecInfo = parseCodecInfo(logMessages);
+    lastDetectedCodecs = codecInfo;
+    
+    const codecDisplay = formatCodecInfo(codecInfo);
+    onProgress?.(35, `Detected: ${codecDisplay}`);
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    onProgress?.(40, 'Converting to MP4 (stream copy)...');
+
+    // Try stream copy first
+    let streamCopyFailed = false;
+    try {
+      await ffmpeg.exec([
+        '-i', inputFileName,
+        '-c', 'copy',
+        '-movflags', '+faststart',
+        outputFileName
+      ]);
+    } catch (copyError) {
+      console.warn('Stream copy failed, will try re-encoding:', copyError);
+      streamCopyFailed = true;
+    }
+
+    // Check if output file exists and has content
+    if (!streamCopyFailed) {
+      try {
+        const testOutput = await ffmpeg.readFile(outputFileName);
+        if (testOutput instanceof Uint8Array && testOutput.length < 1000) {
+          streamCopyFailed = true;
+        }
+      } catch {
+        streamCopyFailed = true;
+      }
+    }
+
+    // Fallback to re-encoding if stream copy failed
+    if (streamCopyFailed) {
+      onProgress?.(45, 'Stream copy failed, re-encoding (this takes longer)...');
+      
+      try {
+        await ffmpeg.deleteFile(outputFileName);
+      } catch {
+        // Ignore
+      }
+
+      await ffmpeg.exec([
+        '-i', inputFileName,
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-movflags', '+faststart',
+        outputFileName
+      ]);
+    }
 
     onProgress?.(90, 'Finalizing...');
 
@@ -180,7 +384,7 @@ export async function transcodeFileToMp4(
     await ffmpeg.deleteFile(inputFileName);
     await ffmpeg.deleteFile(outputFileName);
 
-    // Convert to regular ArrayBuffer to avoid SharedArrayBuffer issues with Blob
+    // Convert to regular ArrayBuffer
     let outputBuffer: ArrayBuffer;
     if (outputData instanceof Uint8Array) {
       outputBuffer = outputData.buffer instanceof ArrayBuffer 
@@ -200,6 +404,8 @@ export async function transcodeFileToMp4(
   } catch (error) {
     console.error('Transcoding failed:', error);
     throw new Error(`Failed to transcode video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+    ffmpeg.off('log', logHandler);
   }
 }
 
