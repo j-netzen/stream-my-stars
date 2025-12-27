@@ -7,18 +7,84 @@ const corsHeaders = {
 
 const RD_API_BASE = "https://api.real-debrid.com/rest/1.0";
 
-// Create an HTTP client that forces HTTP/1.1 to avoid HTTP/2 connection issues
+// Connection pooling configuration
+const POOL_CONFIG = {
+  maxConnections: 10,
+  idleTimeout: 30000, // 30 seconds
+  connectionTimeout: 15000, // 15 seconds for connection establishment
+};
+
+// Request timeout configuration
+const REQUEST_TIMEOUT = {
+  default: 30000, // 30 seconds
+  streaming: 45000, // 45 seconds for streaming transcoding (can be slow)
+  download: 60000, // 60 seconds for download-related operations
+};
+
+// Create an HTTP client with connection pooling and HTTP/1.1 forced
 const httpClient = Deno.createHttpClient({
   http2: false,
+  poolMaxIdlePerHost: POOL_CONFIG.maxConnections,
+  poolIdleTimeout: POOL_CONFIG.idleTimeout,
 });
 
-// Custom fetch wrapper to use HTTP/1.1
-async function rdFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  return await fetch(url, {
-    ...options,
-    // @ts-ignore - Deno-specific option
-    client: httpClient,
-  });
+// Timeout wrapper for fetch requests
+async function fetchWithTimeout(
+  url: string, 
+  options: RequestInit = {}, 
+  timeoutMs: number = REQUEST_TIMEOUT.default
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      // @ts-ignore - Deno-specific option
+      client: httpClient,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Custom fetch wrapper with retry logic for transient errors
+async function rdFetch(
+  url: string, 
+  options: RequestInit = {}, 
+  timeoutMs: number = REQUEST_TIMEOUT.default,
+  maxRetries: number = 2
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options, timeoutMs);
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Check if it's a retryable error
+      const isRetryable = 
+        lastError.name === 'AbortError' || // Timeout
+        lastError.message.includes('connection') ||
+        lastError.message.includes('http2') ||
+        lastError.message.includes('network');
+      
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Exponential backoff: 500ms, 1000ms, 2000ms
+      const backoffMs = Math.min(500 * Math.pow(2, attempt), 2000);
+      console.log(`Retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${url}`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+    }
+  }
+  
+  throw lastError || new Error('Unexpected error in rdFetch');
 }
 
 // Rate limiting configuration
@@ -243,7 +309,7 @@ serve(async (req) => {
       case "user":
         // Get user account info
         console.log("Fetching user info...");
-        response = await rdFetch(`${RD_API_BASE}/user`, { headers });
+        response = await rdFetch(`${RD_API_BASE}/user`, { headers }, REQUEST_TIMEOUT.default);
         data = await response.json();
         console.log("User info response status:", response.status);
         break;
@@ -255,7 +321,7 @@ serve(async (req) => {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
           body: `link=${encodeURIComponent(link!)}`,
-        });
+        }, REQUEST_TIMEOUT.download);
         data = await response.json();
         console.log("Unrestrict response status:", response.status);
         break;
@@ -266,7 +332,7 @@ serve(async (req) => {
         response = await rdFetch(`${RD_API_BASE}/streaming/transcode/${encodeURIComponent(fileId!)}`, {
           method: 'GET',
           headers,
-        });
+        }, REQUEST_TIMEOUT.streaming);
         data = await response.json();
         console.log("Streaming response status:", response.status);
         break;
@@ -278,7 +344,7 @@ serve(async (req) => {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
           body: `magnet=${encodeURIComponent(magnet!)}`,
-        });
+        }, REQUEST_TIMEOUT.download);
         data = await response.json();
         console.log("Add magnet response status:", response.status);
         break;
@@ -300,7 +366,7 @@ serve(async (req) => {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${apiKey}` },
           body: formData,
-        });
+        }, REQUEST_TIMEOUT.download);
         data = await response.json();
         console.log("Add torrent response status:", response.status);
         break;
@@ -401,10 +467,34 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error in real-debrid function:", error);
+    const isTimeout = error instanceof Error && error.name === 'AbortError';
+    const isConnectionError = error instanceof Error && 
+      (errorMessage.includes('connection') || errorMessage.includes('http2') || errorMessage.includes('network'));
+    
+    console.error("Error in real-debrid function:", {
+      message: errorMessage,
+      isTimeout,
+      isConnectionError,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    
+    let userMessage = errorMessage;
+    let statusCode = 500;
+    
+    if (isTimeout) {
+      userMessage = "Request timed out. The Real-Debrid API is taking too long to respond. Please try again.";
+      statusCode = 504; // Gateway Timeout
+    } else if (isConnectionError) {
+      userMessage = "Connection error with Real-Debrid. Please try again in a moment.";
+      statusCode = 502; // Bad Gateway
+    }
+    
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: userMessage,
+        details: { originalError: errorMessage, isTimeout, isConnectionError }
+      }),
+      { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
