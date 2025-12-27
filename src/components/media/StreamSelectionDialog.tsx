@@ -449,6 +449,60 @@ export function StreamSelectionDialog({
     return streamUrl;
   };
 
+  // Standalone function to resolve a stream without dialog state
+  // This is used by tryNextStream after the dialog is closed
+  const resolveStreamStandalone = async (
+    stream: TorrentioStream,
+    mediaForStream: Media,
+    remainingStreams: TorrentioStream[],
+    currentIdx: number
+  ): Promise<void> => {
+    try {
+      toast.info(`Resolving stream: ${parseStreamInfo(stream).quality || 'Unknown'}...`);
+      
+      const streamUrl = await resolveStream(stream);
+      const streamInfo = parseStreamInfo(stream);
+      
+      // Create a new tryNextStream for the remaining streams
+      const tryNextStream = () => {
+        const nextIdx = currentIdx + 1;
+        if (nextIdx < remainingStreams.length) {
+          const nextStream = remainingStreams[nextIdx];
+          toast.info(`Trying next stream: ${parseStreamInfo(nextStream).quality || 'Unknown'}...`);
+          resolveStreamStandalone(nextStream, mediaForStream, remainingStreams, nextIdx);
+        } else {
+          toast.error("No more streams available to try.");
+        }
+      };
+      
+      toast.success(`Stream ready! (${streamInfo.quality})`);
+      
+      // Notify parent with new stream
+      onStreamSelected(
+        { ...mediaForStream, source_url: streamUrl },
+        streamUrl,
+        { quality: streamInfo.quality, size: streamInfo.size, qualityRank: streamInfo.qualityRank },
+        tryNextStream
+      );
+    } catch (err: any) {
+      console.error("Stream resolution error:", err);
+      
+      // Try next stream if available
+      const nextIdx = currentIdx + 1;
+      if (nextIdx < remainingStreams.length) {
+        const nextStream = remainingStreams[nextIdx];
+        toast.error(`Stream failed: ${err.message}`, {
+          description: `Trying next stream: ${parseStreamInfo(nextStream).quality || 'Unknown'}...`,
+          duration: 2000,
+        });
+        await new Promise(resolve => setTimeout(resolve, 500));
+        resolveStreamStandalone(nextStream, mediaForStream, remainingStreams, nextIdx);
+      } else {
+        toast.error(err.message || "Failed to resolve stream. No more streams to try.");
+      }
+    }
+  };
+
   const handleStreamSelect = async (stream: TorrentioStream, autoRetry = true) => {
     if (!media) return;
     
@@ -464,20 +518,18 @@ export function StreamSelectionDialog({
       const streamUrl = await resolveStream(stream);
       const streamInfo = parseStreamInfo(stream);
       
-      // Store current index in ref for auto-retry functionality
-      currentStreamIndexRef.current = currentIndex;
+      // Capture a snapshot of remaining streams for the tryNextStream closure
+      const remainingStreams = [...filteredStreams];
+      const mediaSnapshot = { ...media };
       
-      // Create a tryNextStream function that the VideoPlayer can call on playback error
-      // Uses refs to ensure access to current streams even after dialog closes
+      // Create a tryNextStream function that works independently after dialog closes
       const tryNextStream = () => {
-        const nextIndex = currentStreamIndexRef.current + 1;
-        const currentStreams = filteredStreamsRef.current;
-        if (nextIndex < currentStreams.length) {
-          const nextStream = currentStreams[nextIndex];
-          const nextInfo = parseStreamInfo(nextStream);
-          toast.info(`Trying next stream: ${nextInfo.quality || 'Unknown quality'}...`);
-          currentStreamIndexRef.current = nextIndex;
-          handleStreamSelect(nextStream, true);
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < remainingStreams.length) {
+          const nextStream = remainingStreams[nextIndex];
+          toast.info(`Trying next stream: ${parseStreamInfo(nextStream).quality || 'Unknown quality'}...`);
+          // Use standalone resolver since dialog will be closed
+          resolveStreamStandalone(nextStream, mediaSnapshot, remainingStreams, nextIndex);
         } else {
           toast.error("No more streams available to try.");
         }
