@@ -125,15 +125,15 @@ export function parseStreamInfo(stream: TorrentioStream): {
 
 // Parse file size string to bytes for comparison
 function parseSizeToBytes(sizeStr: string): number {
-  if (!sizeStr) return Infinity; // No size = sort to end
+  if (!sizeStr) return 0; // No size = sort to end
   const match = sizeStr.match(/(\d+\.?\d*)\s*(GB|MB)/i);
-  if (!match) return Infinity;
+  if (!match) return 0;
   const value = parseFloat(match[1]);
   const unit = match[2].toUpperCase();
   return unit === 'GB' ? value * 1024 : value; // Convert to MB for comparison
 }
 
-// Sort streams by file size (smallest to largest)
+// Sort streams by file size (largest to smallest)
 export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   return [...streams].sort((a, b) => {
     const infoA = parseStreamInfo(a);
@@ -142,7 +142,7 @@ export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
     const sizeA = parseSizeToBytes(infoA.size);
     const sizeB = parseSizeToBytes(infoB.size);
     
-    return sizeA - sizeB;
+    return sizeB - sizeA;
   });
 }
 
