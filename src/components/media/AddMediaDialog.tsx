@@ -3,7 +3,7 @@ import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { useTVMode } from "@/hooks/useTVMode";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
-import { unrestrictLink, addMagnetAndWait, addTorrentFileAndWait, fileToBase64, getTorrentInfo, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
+import { unrestrictLink, addMagnetAndWait, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
 import {
   Dialog,
@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download, Star, Calendar, Clock, X, Check, ListChecks, Upload } from "lucide-react";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download, Star, Calendar, Clock, X, Check, ListChecks } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
@@ -47,7 +47,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { categories } = useCategories();
   const { isTVMode } = useTVMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const torrentInputRef = useRef<HTMLInputElement>(null);
   const pendingFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,9 +94,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [isSearchingTorrentio, setIsSearchingTorrentio] = useState(false);
   const [torrentioResults, setTorrentioResults] = useState<TorrentioStream[]>([]);
   const [showTorrentioDropdown, setShowTorrentioDropdown] = useState(false);
-  
-  // Torrent file upload state
-  const [selectedTorrentFile, setSelectedTorrentFile] = useState<File | null>(null);
   
   // TV show episode selection
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -748,92 +744,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsUnrestricting(false);
   };
 
-  // Handle torrent file upload
-  const handleTorrentFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedTorrentFile(file);
-      
-      // Auto-fill title from filename if empty
-      if (!manualTitle) {
-        const titleFromFile = file.name.replace(/\.torrent$/i, "").replace(/[._-]/g, " ");
-        setManualTitle(titleFromFile);
-      }
-      
-      toast.success(`Selected torrent: ${file.name}`);
-    }
-  };
-
-  // Process torrent file via Real-Debrid
-  const handleTorrentFileSubmit = async () => {
-    if (!selectedTorrentFile) {
-      toast.error("Please select a .torrent file");
-      return;
-    }
-
-    if (!manualTitle.trim()) {
-      toast.error("Please provide a title");
-      return;
-    }
-
-    setIsUnrestricting(true);
-    setRdProgress(0);
-    setRdStatus("Reading torrent file...");
-
-    try {
-      // Convert file to base64
-      const base64 = await fileToBase64(selectedTorrentFile);
-      
-      setRdStatus("Adding torrent to Real-Debrid...");
-      const torrent = await addTorrentFileAndWait(base64, (progress) => {
-        setRdProgress(progress);
-        setRdStatus(`Processing: ${progress}%`);
-      });
-
-      if (!torrent.links || torrent.links.length === 0) {
-        throw new Error("No download links available from torrent");
-      }
-
-      setRdStatus("Unrestricting download link...");
-      const unrestricted = await unrestrictLink(torrent.links[0]);
-      const streamUrl = unrestricted.download;
-
-      setRdStatus("Adding to library...");
-
-      const input: CreateMediaInput = {
-        title: manualTitle,
-        media_type: manualType,
-        source_type: "url",
-        source_url: streamUrl,
-        category_id: selectedCategory || undefined,
-        overview: manualOverview,
-        // Include TMDB metadata if available
-        ...(selectedTmdbForDebrid && {
-          tmdb_id: selectedTmdbForDebrid.tmdb_id,
-          poster_path: selectedTmdbForDebrid.poster_path,
-          backdrop_path: selectedTmdbForDebrid.backdrop_path,
-          release_date: selectedTmdbForDebrid.release_date,
-          rating: selectedTmdbForDebrid.rating,
-          genres: selectedTmdbForDebrid.genres,
-          runtime: selectedTmdbForDebrid.runtime,
-          seasons: selectedTmdbForDebrid.seasons,
-          episodes: selectedTmdbForDebrid.episodes,
-          cast_members: selectedTmdbForDebrid.cast_members,
-        }),
-      };
-
-      await addMedia.mutateAsync(input);
-      toast.success("Media added via torrent file!");
-      resetForm();
-      onOpenChange(false);
-    } catch (error: any) {
-      console.error("Torrent file error:", error);
-      toast.error(error.message || "Failed to process torrent file");
-      setRdStatus(null);
-    }
-    setIsUnrestricting(false);
-  };
-
   // Use File System Access API if supported for persistent handles
   const handleBrowseFile = async () => {
     if (isFileSystemAccessSupported()) {
@@ -924,12 +834,8 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setSelectedEpisode(1);
     setBatchQueue([]);
     setIsBatchMode(false);
-    setSelectedTorrentFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
-    }
-    if (torrentInputRef.current) {
-      torrentInputRef.current.value = "";
     }
   };
 
@@ -1167,51 +1073,11 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 Real-Debrid Integration
               </p>
               <p className="text-muted-foreground">
-                Search TMDB for metadata, or upload a .torrent file to stream via Real-Debrid.
+                Search TMDB for metadata to stream via Real-Debrid.
               </p>
             </div>
 
-            {/* Torrent File Upload Section */}
-            <div className="space-y-2">
-              <Label>Upload Torrent File</Label>
-              <div className="flex gap-2">
-                <input
-                  ref={torrentInputRef}
-                  type="file"
-                  accept=".torrent"
-                  onChange={handleTorrentFileSelect}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => torrentInputRef.current?.click()}
-                  className="flex-1"
-                  disabled={isUnrestricting}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {selectedTorrentFile ? selectedTorrentFile.name : "Select .torrent file..."}
-                </Button>
-                {selectedTorrentFile && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setSelectedTorrentFile(null);
-                      if (torrentInputRef.current) torrentInputRef.current.value = "";
-                    }}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Upload a .torrent file to add it to Real-Debrid and stream instantly
-              </p>
-            </div>
-
-            {/* Progress indicator for torrent processing */}
+            {/* Progress indicator for Real-Debrid processing */}
             {isUnrestricting && rdStatus && (
               <div className="space-y-2 p-3 bg-secondary/30 rounded-lg">
                 <div className="flex items-center gap-2 text-sm">
@@ -1221,14 +1087,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 {rdProgress > 0 && (
                   <Progress value={rdProgress} className="h-2" />
                 )}
-              </div>
-            )}
-
-            {selectedTorrentFile && (
-              <div className="relative flex items-center gap-4 py-2">
-                <div className="flex-1 border-t border-border" />
-                <span className="text-xs text-muted-foreground">OR search TMDB</span>
-                <div className="flex-1 border-t border-border" />
               </div>
             )}
 
@@ -1581,32 +1439,17 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               </Select>
             </div>
 
-            {/* Show torrent upload button if a torrent file is selected */}
-            {selectedTorrentFile ? (
-              <Button
-                onClick={handleTorrentFileSubmit}
-                disabled={isUnrestricting || !manualTitle.trim()}
-                className="w-full"
-              >
-                {isUnrestricting ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing Torrent...</>
-                ) : (
-                  <><Upload className="w-4 h-4 mr-2" /> Add Torrent to Library</>
-                )}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleAddWithMetadata}
-                disabled={isAdding || !selectedTmdbForDebrid}
-                className="w-full"
-              >
-                {isAdding ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</>
-                ) : (
-                  <><Zap className="w-4 h-4 mr-2" /> Add to Library</>
-                )}
-              </Button>
-            )}
+            <Button
+              onClick={handleAddWithMetadata}
+              disabled={isAdding || !selectedTmdbForDebrid}
+              className="w-full"
+            >
+              {isAdding ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</>
+              ) : (
+                <><Zap className="w-4 h-4 mr-2" /> Add to Library</>
+              )}
+            </Button>
           </TabsContent>
 
           <TabsContent value="network" className="space-y-4 mt-4">
