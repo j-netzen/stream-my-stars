@@ -116,6 +116,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [transcodeProgress, setTranscodeProgress] = useState(0);
   const [transcodeMessage, setTranscodeMessage] = useState("");
+  const [transcodeEta, setTranscodeEta] = useState<number | undefined>();
   const [showTranscodeOption, setShowTranscodeOption] = useState(false);
 
   // Attempt to restore file handle on mount or media change
@@ -418,9 +419,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     setTranscodeMessage("Starting...");
     setPlaybackError(null);
 
-    const progressCallback: TranscodeProgressCallback = (progress, message) => {
+    const progressCallback: TranscodeProgressCallback = (progress, message, etaSeconds) => {
       setTranscodeProgress(progress);
       setTranscodeMessage(message);
+      setTranscodeEta(etaSeconds);
     };
 
     try {
@@ -454,6 +456,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       setIsTranscoding(false);
       setTranscodeProgress(0);
       setTranscodeMessage("");
+      setTranscodeEta(undefined);
     }
   };
 
@@ -1017,7 +1020,19 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 style={{ width: `${transcodeProgress}%` }}
               />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">{transcodeProgress}%</p>
+            <div className="mt-2 flex items-center justify-center gap-3">
+              <span className="text-xs text-muted-foreground">{transcodeProgress}%</span>
+              {transcodeEta !== undefined && transcodeEta > 0 && (
+                <span className="text-xs text-primary font-medium">
+                  ~{transcodeEta < 60 
+                    ? `${transcodeEta}s` 
+                    : transcodeEta < 3600 
+                      ? `${Math.floor(transcodeEta / 60)}m ${transcodeEta % 60}s`
+                      : `${Math.floor(transcodeEta / 3600)}h ${Math.floor((transcodeEta % 3600) / 60)}m`
+                  } remaining
+                </span>
+              )}
+            </div>
             <p className="mt-4 text-xs text-muted-foreground">
               This may take a while for large files. Please don't close this window.
             </p>

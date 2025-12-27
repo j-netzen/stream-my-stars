@@ -4,8 +4,56 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util';
 let ffmpegInstance: FFmpeg | null = null;
 let loadPromise: Promise<FFmpeg> | null = null;
 
-// Progress callback type
-export type TranscodeProgressCallback = (progress: number, message: string) => void;
+// Progress callback type - now includes optional ETA in seconds
+export type TranscodeProgressCallback = (progress: number, message: string, etaSeconds?: number) => void;
+
+// ETA tracker class
+class ETATracker {
+  private startTime: number = 0;
+  private lastProgress: number = 0;
+
+  start() {
+    this.startTime = Date.now();
+    this.lastProgress = 0;
+  }
+
+  getETA(currentProgress: number): { etaSeconds: number; etaFormatted: string } | null {
+    if (currentProgress <= 0 || currentProgress >= 100) {
+      return null;
+    }
+
+    const elapsed = (Date.now() - this.startTime) / 1000; // seconds
+    if (elapsed < 1) {
+      return null; // Not enough data yet
+    }
+
+    // Calculate estimated total time based on current progress
+    const estimatedTotal = (elapsed / currentProgress) * 100;
+    const remaining = Math.max(0, estimatedTotal - elapsed);
+
+    return {
+      etaSeconds: Math.round(remaining),
+      etaFormatted: this.formatTime(remaining)
+    };
+  }
+
+  private formatTime(seconds: number): string {
+    if (seconds < 60) {
+      return `${Math.round(seconds)}s`;
+    } else if (seconds < 3600) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.round(seconds % 60);
+      return `${mins}m ${secs}s`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    }
+  }
+}
+
+// Global ETA tracker instance
+const etaTracker = new ETATracker();
 
 // Codec information type
 export interface CodecInfo {
@@ -166,6 +214,7 @@ export async function transcodeMkvToMp4(
   ffmpeg.on('log', logHandler);
 
   try {
+    etaTracker.start();
     onProgress?.(15, 'Downloading video...');
     
     // Fetch the input file
@@ -193,7 +242,8 @@ export async function transcodeMkvToMp4(
     // Small delay to show codec info
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    onProgress?.(40, 'Converting to MP4 (stream copy)...');
+    const eta = etaTracker.getETA(40);
+    onProgress?.(40, `Converting to MP4 (stream copy)...${eta ? ` ~${eta.etaFormatted} remaining` : ''}`, eta?.etaSeconds);
 
     // Try stream copy first (fast, no re-encoding)
     let streamCopyFailed = false;
@@ -223,7 +273,11 @@ export async function transcodeMkvToMp4(
 
     // Fallback to re-encoding if stream copy failed
     if (streamCopyFailed) {
-      onProgress?.(45, 'Stream copy failed, re-encoding (this takes longer)...');
+      // Reset ETA tracker for re-encoding phase
+      etaTracker.start();
+      
+      const reencodeEta = etaTracker.getETA(5);
+      onProgress?.(45, `Re-encoding required (slower)...${reencodeEta ? ` ~${reencodeEta.etaFormatted} remaining` : ''}`, reencodeEta?.etaSeconds);
       
       // Clean up failed output
       try {
@@ -298,6 +352,7 @@ export async function transcodeFileToMp4(
   ffmpeg.on('log', logHandler);
 
   try {
+    etaTracker.start();
     onProgress?.(15, 'Reading file...');
     
     // Read file as ArrayBuffer
@@ -325,7 +380,8 @@ export async function transcodeFileToMp4(
 
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    onProgress?.(40, 'Converting to MP4 (stream copy)...');
+    const eta = etaTracker.getETA(40);
+    onProgress?.(40, `Converting to MP4 (stream copy)...${eta ? ` ~${eta.etaFormatted} remaining` : ''}`, eta?.etaSeconds);
 
     // Try stream copy first
     let streamCopyFailed = false;
@@ -355,7 +411,9 @@ export async function transcodeFileToMp4(
 
     // Fallback to re-encoding if stream copy failed
     if (streamCopyFailed) {
-      onProgress?.(45, 'Stream copy failed, re-encoding (this takes longer)...');
+      etaTracker.start();
+      const reencodeEta = etaTracker.getETA(5);
+      onProgress?.(45, `Re-encoding required (slower)...${reencodeEta ? ` ~${reencodeEta.etaFormatted} remaining` : ''}`, reencodeEta?.etaSeconds);
       
       try {
         await ffmpeg.deleteFile(outputFileName);
