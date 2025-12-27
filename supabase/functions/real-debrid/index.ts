@@ -7,6 +7,20 @@ const corsHeaders = {
 
 const RD_API_BASE = "https://api.real-debrid.com/rest/1.0";
 
+// Create an HTTP client that forces HTTP/1.1 to avoid HTTP/2 connection issues
+const httpClient = Deno.createHttpClient({
+  http2: false,
+});
+
+// Custom fetch wrapper to use HTTP/1.1
+async function rdFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  return await fetch(url, {
+    ...options,
+    // @ts-ignore - Deno-specific option
+    client: httpClient,
+  });
+}
+
 // Rate limiting configuration
 const RATE_LIMIT = {
   maxRequests: 30,      // 30 requests
@@ -229,7 +243,7 @@ serve(async (req) => {
       case "user":
         // Get user account info
         console.log("Fetching user info...");
-        response = await fetch(`${RD_API_BASE}/user`, { headers });
+        response = await rdFetch(`${RD_API_BASE}/user`, { headers });
         data = await response.json();
         console.log("User info response status:", response.status);
         break;
@@ -237,7 +251,7 @@ serve(async (req) => {
       case "unrestrict":
         // Unrestrict a link to get direct download/streaming URL
         console.log("Unrestricting link...");
-        response = await fetch(`${RD_API_BASE}/unrestrict/link`, {
+        response = await rdFetch(`${RD_API_BASE}/unrestrict/link`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
           body: `link=${encodeURIComponent(link!)}`,
@@ -249,7 +263,7 @@ serve(async (req) => {
       case "streaming":
         // Get streaming transcoded links for a file using its ID
         console.log("Getting streaming links for file ID:", fileId);
-        response = await fetch(`${RD_API_BASE}/streaming/transcode/${encodeURIComponent(fileId!)}`, {
+        response = await rdFetch(`${RD_API_BASE}/streaming/transcode/${encodeURIComponent(fileId!)}`, {
           method: 'GET',
           headers,
         });
@@ -260,7 +274,7 @@ serve(async (req) => {
       case "add_magnet":
         // Add a magnet link
         console.log("Adding magnet...");
-        response = await fetch(`${RD_API_BASE}/torrents/addMagnet`, {
+        response = await rdFetch(`${RD_API_BASE}/torrents/addMagnet`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
           body: `magnet=${encodeURIComponent(magnet!)}`,
@@ -282,7 +296,7 @@ serve(async (req) => {
         const formData = new FormData();
         formData.append('file', blob, 'torrent.torrent');
         
-        response = await fetch(`${RD_API_BASE}/torrents/addTorrent`, {
+        response = await rdFetch(`${RD_API_BASE}/torrents/addTorrent`, {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${apiKey}` },
           body: formData,
@@ -294,7 +308,7 @@ serve(async (req) => {
       case "select_files":
         // Select all files from a torrent
         console.log("Selecting files for torrent:", torrentId);
-        response = await fetch(`${RD_API_BASE}/torrents/selectFiles/${torrentId}`, {
+        response = await rdFetch(`${RD_API_BASE}/torrents/selectFiles/${torrentId}`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
           body: 'files=all',
@@ -311,7 +325,7 @@ serve(async (req) => {
       case "torrent_info":
         // Get torrent info
         console.log("Getting torrent info:", torrentId);
-        response = await fetch(`${RD_API_BASE}/torrents/info/${torrentId}`, { headers });
+        response = await rdFetch(`${RD_API_BASE}/torrents/info/${torrentId}`, { headers });
         data = await response.json();
         console.log("Torrent info response status:", response.status);
         break;
@@ -319,7 +333,7 @@ serve(async (req) => {
       case "torrents":
         // List all torrents
         console.log("Listing torrents...");
-        response = await fetch(`${RD_API_BASE}/torrents`, { headers });
+        response = await rdFetch(`${RD_API_BASE}/torrents`, { headers });
         data = await response.json();
         console.log("Torrents list response status:", response.status);
         break;
@@ -327,7 +341,7 @@ serve(async (req) => {
       case "downloads":
         // List download history
         console.log("Listing downloads...");
-        response = await fetch(`${RD_API_BASE}/downloads`, { headers });
+        response = await rdFetch(`${RD_API_BASE}/downloads`, { headers });
         data = await response.json();
         console.log("Downloads list response status:", response.status);
         break;
@@ -335,7 +349,7 @@ serve(async (req) => {
       case "hosts":
         // Get supported hosts
         console.log("Fetching supported hosts...");
-        response = await fetch(`${RD_API_BASE}/hosts`, { headers });
+        response = await rdFetch(`${RD_API_BASE}/hosts`, { headers });
         data = await response.json();
         console.log("Hosts response status:", response.status);
         break;
