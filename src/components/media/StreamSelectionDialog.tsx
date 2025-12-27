@@ -334,10 +334,24 @@ export function StreamSelectionDialog({
   };
 
   // Helper to get streaming URL from an unrestricted file
+  // Falls back to download URL if streaming/transcoding is not supported
   const getStreamableUrl = async (fileId: string, downloadUrl: string): Promise<string> => {
+    // Skip streaming API for certain file types that don't support transcoding
+    // Just use the direct download URL which is already streamable
+    if (!fileId || fileId.length < 5) {
+      console.log("Invalid file ID, using direct download URL");
+      return downloadUrl;
+    }
+
     try {
       setResolveStatus("Getting streaming URL...");
       const streamingLinks = await getStreamingLinks(fileId);
+      
+      // Check if we got valid streaming links
+      if (!streamingLinks || typeof streamingLinks !== 'object') {
+        console.log("No valid streaming response, using download URL");
+        return downloadUrl;
+      }
       
       // Prefer highest quality streaming link
       const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
@@ -358,11 +372,18 @@ export function StreamSelectionDialog({
         }
       }
       
-      // Fallback to the download URL
+      // Fallback to the download URL (most video files are directly streamable)
       console.log("No streaming links available, using download URL");
       return downloadUrl;
-    } catch (err) {
-      console.warn("Could not get streaming links, using download URL:", err);
+    } catch (err: unknown) {
+      // Streaming/transcoding not supported for this file type - this is normal
+      // The direct download URL works fine for most video formats
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes("wrong_parameter") || errorMessage.includes("invalid")) {
+        console.log("File doesn't support transcoding, using direct download URL");
+      } else {
+        console.warn("Could not get streaming links, using download URL:", errorMessage);
+      }
       return downloadUrl;
     }
   };
