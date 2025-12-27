@@ -349,6 +349,19 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     const looksLikePath = raw.startsWith("\\\\") || /^[a-zA-Z]:\\/.test(raw);
     const isLocalMarker = raw === LOCAL_FILE_MARKER;
     const isMkv = isMkvFile(raw);
+    
+    // Check auto-transcode setting for MKV files
+    const autoTranscodeEnabled = localStorage.getItem('auto-transcode-mkv') === 'true';
+    const { supported: ffmpegSupported } = checkBrowserSupport();
+
+    // If MKV and auto-transcode is enabled, start transcoding automatically
+    if (isMkv && autoTranscodeEnabled && ffmpegSupported && !isBlob && !isLocalMarker) {
+      console.log("Auto-transcoding MKV file...");
+      hasTriggeredErrorRef.current = true;
+      toast.info("Auto-converting MKV to MP4...");
+      handleTranscode();
+      return;
+    }
 
     // If we have a callback for playback errors, use it to try next stream
     // This handles format incompatibility by automatically skipping to next stream
@@ -374,9 +387,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       message = "Browsers can't play Windows file paths directly. Please use the file picker or a hosted URL.";
     } else if (isMkv) {
       // Check if transcoding is supported
-      const { supported } = checkBrowserSupport();
-      
-      if (supported) {
+      if (ffmpegSupported) {
         message = "MKV playback failed. You can convert it to MP4 for browser playback, or copy the URL to play in VLC.";
         showTranscode = true;
       } else {

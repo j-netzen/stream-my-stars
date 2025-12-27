@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { checkBrowserSupport } from "@/lib/ffmpegTranscode";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -20,6 +21,12 @@ export default function SettingsPage() {
   const [isLoadingRd, setIsLoadingRd] = useState(false);
   const [rdError, setRdError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Auto-transcode MKV setting
+  const [autoTranscodeMkv, setAutoTranscodeMkv] = useState(() => {
+    return localStorage.getItem('auto-transcode-mkv') === 'true';
+  });
+  const ffmpegSupport = checkBrowserSupport();
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -60,6 +67,12 @@ export default function SettingsPage() {
   const handleScaleChange = (preset: ScalePreset) => {
     setUIScale(SCALE_PRESETS[preset].value);
     toast.success(`UI scale set to ${SCALE_PRESETS[preset].label} (${SCALE_PRESETS[preset].value}%)`);
+  };
+
+  const handleAutoTranscodeChange = (enabled: boolean) => {
+    setAutoTranscodeMkv(enabled);
+    localStorage.setItem('auto-transcode-mkv', enabled ? 'true' : 'false');
+    toast.success(enabled ? "Auto-convert MKV enabled" : "Auto-convert MKV disabled");
   };
 
   const handleUpdateApp = async () => {
@@ -164,6 +177,60 @@ export default function SettingsPage() {
           <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
             Tip: You can also enable TV mode by adding <code className="bg-secondary px-1.5 py-0.5 rounded">?tv=1</code> to the URL.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Video Playback */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Film className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            Video Playback
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Configure video playback settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="auto-transcode" className={cn("font-medium", isTVMode && "text-lg")}>
+                Auto-convert MKV files
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                Automatically convert MKV files to MP4 for browser playback without prompting
+              </p>
+            </div>
+            <Switch
+              id="auto-transcode"
+              checked={autoTranscodeMkv}
+              onCheckedChange={handleAutoTranscodeChange}
+              disabled={!ffmpegSupport.supported}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+          
+          {!ffmpegSupport.supported && (
+            <div className={cn(
+              "flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive",
+              isTVMode ? "text-base" : "text-sm"
+            )}>
+              <XCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{ffmpegSupport.reason || "Your browser doesn't support MKV conversion"}</span>
+            </div>
+          )}
+          
+          {ffmpegSupport.supported && (
+            <div className={cn(
+              "flex items-center gap-2 p-3 rounded-lg bg-secondary/30",
+              isTVMode ? "text-base" : "text-sm"
+            )}>
+              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              <span className="text-muted-foreground">
+                FFmpeg is preloaded and ready for fast video conversion
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
