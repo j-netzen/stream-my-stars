@@ -123,21 +123,26 @@ export function parseStreamInfo(stream: TorrentioStream): {
   return { quality, size, seeds, source, qualityRank, isDirectLink };
 }
 
-// Sort streams by quality (descending) then by seeds (descending)
+// Parse file size string to bytes for comparison
+function parseSizeToBytes(sizeStr: string): number {
+  if (!sizeStr) return Infinity; // No size = sort to end
+  const match = sizeStr.match(/(\d+\.?\d*)\s*(GB|MB)/i);
+  if (!match) return Infinity;
+  const value = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  return unit === 'GB' ? value * 1024 : value; // Convert to MB for comparison
+}
+
+// Sort streams by file size (smallest to largest)
 export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   return [...streams].sort((a, b) => {
     const infoA = parseStreamInfo(a);
     const infoB = parseStreamInfo(b);
     
-    // First sort by quality
-    if (infoB.qualityRank !== infoA.qualityRank) {
-      return infoB.qualityRank - infoA.qualityRank;
-    }
+    const sizeA = parseSizeToBytes(infoA.size);
+    const sizeB = parseSizeToBytes(infoB.size);
     
-    // Then by seeds (if available)
-    const seedsA = infoA.seeds || 0;
-    const seedsB = infoB.seeds || 0;
-    return seedsB - seedsA;
+    return sizeA - sizeB;
   });
 }
 
