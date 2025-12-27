@@ -148,6 +148,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     setPlaybackError(null);
     setShowCopyUrl(false);
     setHasWarnedNoAudio(false);
+    hasTriggeredErrorRef.current = false; // Reset error trigger flag for new stream
     if (audioHealthCheckTimeoutRef.current) {
       window.clearTimeout(audioHealthCheckTimeoutRef.current);
       audioHealthCheckTimeoutRef.current = null;
@@ -322,6 +323,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
   };
 
+  // Ref to prevent multiple error callbacks
+  const hasTriggeredErrorRef = useRef(false);
+
   const handleVideoError = () => {
     const raw = src || media.source_url || "";
     const isBlob = raw.startsWith("blob:");
@@ -331,10 +335,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
     // If we have a callback for playback errors, use it to try next stream
     // This handles format incompatibility by automatically skipping to next stream
-    if (onPlaybackError) {
+    if (onPlaybackError && !hasTriggeredErrorRef.current) {
+      hasTriggeredErrorRef.current = true;
       console.log("Playback error detected, triggering fallback to next stream");
       toast.info("Stream format not supported, trying next...");
-      onClose(); // Close current player before trying next stream
+      // Call onPlaybackError first, then close - this allows parent to set up next stream
       onPlaybackError();
       return;
     }
