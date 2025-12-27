@@ -171,7 +171,6 @@ serve(async (req) => {
     }
 
     const { action, query, id, media_type } = validation.data!;
-    console.log("TMDB request (validated):", { action, query, id, media_type });
 
     let url = "";
     
@@ -195,13 +194,11 @@ serve(async (req) => {
         url = `${TMDB_BASE_URL}/tv/popular?api_key=${TMDB_API_KEY}`;
         break;
       case "get_imdb_id": {
-        // Get external IDs including IMDB ID
         const endpoint = media_type === "movie" ? "movie" : "tv";
         url = `${TMDB_BASE_URL}/${endpoint}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
         break;
       }
       case "get_videos": {
-        // Get videos (trailers, teasers, etc.)
         const endpoint = media_type === "movie" ? "movie" : "tv";
         url = `${TMDB_BASE_URL}/${endpoint}/${id}/videos?api_key=${TMDB_API_KEY}`;
         break;
@@ -212,21 +209,18 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
-
-    console.log("Fetching TMDB:", url.replace(TMDB_API_KEY, "***"));
     
     const response = await fetch(url);
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("TMDB API error:", data);
+      console.error("TMDB API error:", response.status);
       return new Response(
         JSON.stringify({ error: data.status_message || "TMDB API error" }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("TMDB response success");
     return new Response(
       JSON.stringify(data),
       { 
