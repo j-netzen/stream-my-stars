@@ -171,7 +171,6 @@ serve(async (req) => {
     }
 
     const { action, imdbId, type, season, episode } = validation.data!;
-    console.log("Torrentio request (validated):", { action, imdbId, type, season, episode });
 
     if (action === "search") {
       // Get Real-Debrid API key for authenticated streams
@@ -193,7 +192,6 @@ serve(async (req) => {
         torrentioUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
       }
 
-      console.log("Fetching from Torrentio:", torrentioUrl.replace(rdApiKey || '', '***'));
       const response = await fetch(torrentioUrl);
       
       if (!response.ok) {
@@ -205,7 +203,17 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log(`Found ${data.streams?.length || 0} streams`);
+      
+      // SECURITY: Sanitize response to remove any API keys from URLs
+      if (data.streams && Array.isArray(data.streams) && rdApiKey) {
+        data.streams = data.streams.map((stream: { url?: string; [key: string]: unknown }) => {
+          if (stream.url && typeof stream.url === 'string') {
+            // Remove the RD API key from any URLs returned to client
+            stream.url = stream.url.replace(new RegExp(rdApiKey, 'g'), '[REDACTED]');
+          }
+          return stream;
+        });
+      }
 
       return new Response(JSON.stringify(data), {
         headers: { 
