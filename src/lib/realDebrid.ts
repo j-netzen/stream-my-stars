@@ -1,5 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
-import { reportRealDebridFailure, clearRealDebridFailure } from "@/hooks/useRealDebridStatus";
+import {
+  clearRealDebridServiceUnavailable,
+  setRealDebridServiceUnavailable,
+} from "@/lib/realDebridStatusStore";
 
 export interface RealDebridUser {
   id: number;
@@ -59,7 +62,7 @@ async function invokeRealDebrid(body: Record<string, unknown>) {
     const errorMessage = error.message || "";
     if (errorMessage.includes("503") || errorMessage.includes("service_unavailable")) {
       const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
-      reportRealDebridFailure(serviceError);
+      setRealDebridServiceUnavailable(serviceError);
       throw new Error(serviceError);
     }
     throw new Error(error.message || "Real-Debrid API error");
@@ -67,16 +70,16 @@ async function invokeRealDebrid(body: Record<string, unknown>) {
   
   if (data?.error) {
     // Check for service unavailable in data error
-    if (data.details?.error_code === 25 || data.error.includes("overloaded")) {
+    if (data.details?.error_code === 25 || String(data.httpStatus || "").includes("503") || data.error.includes("overloaded")) {
       const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
-      reportRealDebridFailure(serviceError);
+      setRealDebridServiceUnavailable(serviceError);
       throw new Error(serviceError);
     }
     throw new Error(data.error);
   }
   
   // Success - clear any previous failure state
-  clearRealDebridFailure();
+  clearRealDebridServiceUnavailable();
   return data;
 }
 
