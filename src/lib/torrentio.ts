@@ -191,10 +191,16 @@ export async function searchTorrentio(
     body: { action: "search", imdbId, type, season, episode },
   });
 
-  if (error) throw error;
-  
+  // Always throw a normal Error (not a FunctionsHttpError) so callers can safely catch/display it.
+  if (error) throw new Error(error.message);
+
+  const payload = (data || {}) as any;
+  if (payload.error) {
+    throw new Error(payload.message || payload.error);
+  }
+
   // Sort streams by quality and seeds
-  const streams = data.streams || [];
+  const streams: TorrentioStream[] = payload.streams || [];
   return sortStreams(streams);
 }
 
