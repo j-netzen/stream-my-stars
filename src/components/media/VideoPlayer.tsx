@@ -492,9 +492,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           </div>
         </div>
 
-        {/* Center play button */}
+        {/* Center play button with fullscreen option */}
         {!isPlaying && !isBuffering && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-none">
             <Button
               variant="ghost"
               size="icon"
@@ -502,6 +502,21 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
               onClick={handlePlayPause}
             >
               <Play className="h-10 w-10 ml-1" />
+            </Button>
+            
+            {/* Large Play Full Screen button */}
+            <Button
+              variant="default"
+              size="lg"
+              className="pointer-events-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-lg font-semibold gap-3 shadow-2xl"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePlayPause();
+                enterFullscreen();
+              }}
+            >
+              <Maximize className="h-6 w-6" />
+              Play Full Screen
             </Button>
           </div>
         )}
