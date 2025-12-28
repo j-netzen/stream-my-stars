@@ -50,18 +50,29 @@ async function fetchWithTimeout(
   }
 }
 
-// Custom fetch wrapper with retry logic for transient errors
+// Custom fetch wrapper with retry logic for transient errors AND 503 responses
 async function rdFetch(
   url: string, 
   options: RequestInit = {}, 
   timeoutMs: number = REQUEST_TIMEOUT.default,
-  maxRetries: number = 2
+  maxRetries: number = 3
 ): Promise<Response> {
   let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetchWithTimeout(url, options, timeoutMs);
+      
+      // Retry on 503 Service Unavailable (Real-Debrid temporary overload)
+      if (response.status === 503 && attempt < maxRetries) {
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt), 8000); // 1s, 2s, 4s, 8s
+        console.log(`Real-Debrid returned 503, retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        lastResponse = response;
+        continue;
+      }
+      
       return response;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -77,11 +88,16 @@ async function rdFetch(
         throw lastError;
       }
       
-      // Exponential backoff: 500ms, 1000ms, 2000ms
-      const backoffMs = Math.min(500 * Math.pow(2, attempt), 2000);
+      // Exponential backoff: 1s, 2s, 4s
+      const backoffMs = Math.min(1000 * Math.pow(2, attempt), 4000);
       console.log(`Retry ${attempt + 1}/${maxRetries} after ${backoffMs}ms for ${url}`);
       await new Promise(resolve => setTimeout(resolve, backoffMs));
     }
+  }
+  
+  // If we exhausted retries due to 503s, return the last response
+  if (lastResponse) {
+    return lastResponse;
   }
   
   throw lastError || new Error('Unexpected error in rdFetch');
@@ -447,7 +463,9 @@ serve(async (req) => {
         });
       }
       
-      if (data.error === "infringing_file" || errorCode === 35) {
+      if (data.error === "service_unavailable" || errorCode === 25) {
+        userMessage = "Real-Debrid servers are temporarily overloaded. Please wait a moment and try again.";
+      } else if (data.error === "infringing_file" || errorCode === 35) {
         userMessage = "This content is unavailable due to copyright restrictions. Please try a different stream.";
       } else if (data.error === "hoster_unavailable" || errorCode === 7) {
         userMessage = "The file host is temporarily unavailable. Please try again later or choose a different stream.";
