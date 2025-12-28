@@ -9,17 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Film, Loader2 } from "lucide-react";
+import { AuthLoadingOverlay } from "@/components/AuthLoadingOverlay";
 
 export default function AuthPage() {
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
   // Redirect if already logged in
   if (user) {
     navigate("/");
-    return null;
+    return <AuthLoadingOverlay message="Redirecting..." />;
   }
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -32,11 +34,12 @@ export default function AuthPage() {
     const { error } = await signIn(email, password, rememberMe);
     if (error) {
       toast.error(error.message);
+      setIsLoading(false);
     } else {
       toast.success("Welcome back!");
+      setIsRedirecting(true);
       navigate("/");
     }
-    setIsLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -59,11 +62,17 @@ export default function AuthPage() {
       } else {
         toast.error(error.message);
       }
+      setIsLoading(false);
     } else {
       toast.success("Account created! You can now sign in.");
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
+
+  // Show loading overlay during redirect
+  if (isRedirecting) {
+    return <AuthLoadingOverlay message="Signing you in..." />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
