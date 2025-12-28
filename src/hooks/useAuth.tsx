@@ -21,15 +21,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        // Handle token refresh errors by clearing invalid session
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          setSession(null);
+          setUser(null);
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
         setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Get initial session with error handling for invalid tokens
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.warn('Session retrieval error, clearing session:', error.message);
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
+      setLoading(false);
+    }).catch((err) => {
+      console.warn('Failed to get session:', err);
+      setSession(null);
+      setUser(null);
       setLoading(false);
     });
 
