@@ -26,6 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       description: "Your session has expired. Please sign in again.",
       variant: "destructive",
     });
+    // Redirect to auth page after showing toast
+    window.location.href = '/auth';
   };
 
   useEffect(() => {
