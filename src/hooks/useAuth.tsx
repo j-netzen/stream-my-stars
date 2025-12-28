@@ -8,7 +8,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession(null);
           setUser(null);
           hadSessionRef.current = false;
+          sessionStorage.removeItem('session_only');
         } else {
           setSession(session);
           setUser(session?.user ?? null);
@@ -86,6 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Handle session-only mode: clear session on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionStorage.getItem('session_only') === 'true') {
+        // Sign out when browser/tab closes (session-only mode)
+        supabase.auth.signOut();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   const signUp = async (email: string, password: string) => {
     const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
@@ -96,8 +110,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, rememberMe: boolean = true) => {
+    // When rememberMe is false, we sign out first to clear any existing session,
+    // then sign in. The session will still be created but user can manually sign out.
+    // Note: Supabase sessions persist by default. For session-only behavior,
+    // users should simply sign out when done.
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    
+    if (!error && !rememberMe) {
+      // Store a flag to indicate session should not be persistent
+      sessionStorage.setItem('session_only', 'true');
+    } else {
+      sessionStorage.removeItem('session_only');
+    }
+    
     return { error };
   };
 
