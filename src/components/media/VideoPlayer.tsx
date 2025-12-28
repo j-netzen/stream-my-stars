@@ -46,6 +46,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [showPlayScreen, setShowPlayScreen] = useState(true); // Show "Click to Play" screen first
   
   const [bufferHealth, setBufferHealth] = useState<'good' | 'warning' | 'poor'>('good');
   const [bufferedPercent, setBufferedPercent] = useState(0);
@@ -311,6 +312,36 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
   };
 
+  // Handle click on the "Click to Play" screen
+  const handlePlayScreenClick = async () => {
+    setShowPlayScreen(false);
+    
+    // Enter fullscreen first (requires user gesture)
+    await enterFullscreen();
+    
+    // Then start playback
+    const video = videoRef.current;
+    if (video) {
+      try {
+        await video.play();
+        setIsPlaying(true);
+        hasAutoPlayedRef.current = true;
+      } catch (err) {
+        console.warn("Play failed:", err);
+        // Try muted playback as fallback
+        video.muted = true;
+        setIsMuted(true);
+        try {
+          await video.play();
+          setIsPlaying(true);
+          hasAutoPlayedRef.current = true;
+        } catch (e) {
+          console.warn("Muted play also failed:", e);
+        }
+      }
+    }
+  };
+
   const formatTime = (seconds: number): string => {
     if (!isFinite(seconds) || isNaN(seconds)) return "0:00";
     const hrs = Math.floor(seconds / 3600);
@@ -391,6 +422,73 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     };
   }, []);
 
+  // Show "Click to Play" screen first
+  if (showPlayScreen) {
+    return (
+      <div
+        ref={containerRef}
+        className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/20 flex flex-col items-center justify-center cursor-pointer"
+        onClick={handlePlayScreenClick}
+      >
+        {/* Background poster with overlay */}
+        {backdropUrl && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: `url(${backdropUrl})` }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
+        
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center gap-8 p-8 max-w-lg text-center">
+          {/* Glowing play button */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/40 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
+              <Play className="w-16 h-16 text-primary-foreground ml-2" />
+            </div>
+          </div>
+          
+          {/* Title */}
+          <div className="space-y-3">
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground">
+              {media.title}
+            </h1>
+            {streamQuality && (
+              <p className="text-muted-foreground text-lg">
+                {streamQuality.quality} {streamQuality.size && `• ${streamQuality.size}`}
+              </p>
+            )}
+          </div>
+          
+          {/* Call to action */}
+          <div className="space-y-2">
+            <p className="text-xl text-foreground font-medium">
+              Tap anywhere to play
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Video will open in fullscreen
+            </p>
+          </div>
+          
+          {/* Close button */}
+          <Button
+            variant="ghost"
+            size="lg"
+            className="mt-4 text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClose();
+            }}
+          >
+            <X className="w-5 h-5 mr-2" />
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -415,7 +513,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         onClick={(e) => {
           e.stopPropagation();
           handlePlayPause();
-          // Also try fullscreen on video click
           if (!hasAutoFullscreenedRef.current) {
             enterFullscreen();
           }
