@@ -26,6 +26,7 @@ import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, C
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface StreamQualityInfo {
   quality: string;
@@ -783,11 +784,34 @@ export function StreamSelectionDialog({
               </div>
             )}
 
-            {/* Loading state */}
+            {/* Loading skeleton */}
             {isSearching && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <span className="ml-3 text-muted-foreground">Searching for streams...</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Searching for streams...</span>
+                </div>
+                <div className={cn(
+                  "grid gap-1",
+                  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                )}>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "rounded border border-muted-foreground/20 bg-secondary/30",
+                        isTVMode ? "p-3" : "p-2"
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Skeleton className={cn("rounded", isTVMode ? "h-5 w-14" : "h-4 w-12")} />
+                        <Skeleton className={cn("rounded", isTVMode ? "h-4 w-10" : "h-3 w-8")} />
+                      </div>
+                      <Skeleton className={cn("w-full rounded", isTVMode ? "h-4" : "h-3")} />
+                      <Skeleton className={cn("w-3/4 mt-1 rounded", isTVMode ? "h-3" : "h-2.5")} />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
