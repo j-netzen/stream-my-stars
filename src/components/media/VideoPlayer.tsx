@@ -427,7 +427,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return (
       <div
         ref={containerRef}
-        className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/20 flex items-center justify-center cursor-pointer"
+        className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-gradient-to-br from-background via-background to-primary/20 flex items-center justify-center overflow-hidden overscroll-none touch-none cursor-pointer"
         onClick={handlePlayScreenClick}
       >
         {/* Background poster with overlay */}
@@ -484,7 +484,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+      className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-black flex items-center justify-center overflow-hidden overscroll-none touch-none"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
       onClick={handleContainerClick}
