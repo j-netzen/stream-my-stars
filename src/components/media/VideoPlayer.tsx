@@ -464,6 +464,34 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
       )}
 
+      {/* Large Play Full Screen button - ALWAYS visible when paused (outside controls overlay) */}
+      {!isPlaying && !isBuffering && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-none z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto"
+            onClick={handlePlayPause}
+          >
+            <Play className="h-10 w-10 ml-1" />
+          </Button>
+          
+          {/* Large Play Full Screen button */}
+          <Button
+            variant="default"
+            size="lg"
+            className="pointer-events-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-lg font-semibold gap-3 shadow-2xl animate-pulse"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePlayPause();
+              enterFullscreen();
+            }}
+          >
+            <Maximize className="h-6 w-6" />
+            Play Full Screen
+          </Button>
+        </div>
+      )}
 
       {/* Controls overlay */}
       <div
@@ -491,35 +519,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
             </Button>
           </div>
         </div>
-
-        {/* Center play button with fullscreen option */}
-        {!isPlaying && !isBuffering && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-none">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto"
-              onClick={handlePlayPause}
-            >
-              <Play className="h-10 w-10 ml-1" />
-            </Button>
-            
-            {/* Large Play Full Screen button */}
-            <Button
-              variant="default"
-              size="lg"
-              className="pointer-events-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-lg font-semibold gap-3 shadow-2xl"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePlayPause();
-                enterFullscreen();
-              }}
-            >
-              <Maximize className="h-6 w-6" />
-              Play Full Screen
-            </Button>
-          </div>
-        )}
 
         {/* Bottom controls */}
         <div className="bg-gradient-to-t from-black/80 to-transparent p-4">
