@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -758,27 +760,62 @@ export function StreamSelectionDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Select
-                  value={selectedEpisode.toString()}
-                  onValueChange={(v) => {
-                    setSelectedEpisode(parseInt(v));
-                    setStreams([]);
-                  }}
-                >
-                  <SelectTrigger className="w-[140px] h-8 text-xs">
-                    <SelectValue placeholder="Episode" />
-                    <span className="ml-auto text-[10px] text-muted-foreground font-normal">
-                      {selectedEpisode} of 30
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
-                      <SelectItem key={e} value={e.toString()} className="text-xs">
-                        E{e}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Episode Grid Selector */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-[140px] h-8 text-xs justify-between">
+                      <span>E{selectedEpisode}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {selectedEpisode} of 30
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-3" align="start">
+                    <div className="flex flex-col gap-3">
+                      {/* Quick jump input */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Jump to:</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={30}
+                          placeholder="Episode #"
+                          className="w-20 h-7 text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const value = parseInt((e.target as HTMLInputElement).value);
+                              if (value >= 1 && value <= 30) {
+                                setSelectedEpisode(value);
+                                setStreams([]);
+                                (e.target as HTMLInputElement).value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      {/* 3-column episode grid showing 15 at a time */}
+                      <div className="grid grid-cols-3 gap-1 max-h-[200px] overflow-y-auto">
+                        {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
+                          <Button
+                            key={e}
+                            variant={selectedEpisode === e ? "default" : "outline"}
+                            size="sm"
+                            className={cn(
+                              "h-8 text-xs font-medium",
+                              selectedEpisode === e && "ring-2 ring-primary"
+                            )}
+                            onClick={() => {
+                              setSelectedEpisode(e);
+                              setStreams([]);
+                            }}
+                          >
+                            E{e}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="sm" className="gap-1">
                   {isSearching ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
