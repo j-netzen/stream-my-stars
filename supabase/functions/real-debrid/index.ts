@@ -481,9 +481,12 @@ serve(async (req) => {
         userMessage = "Invalid parameter provided.";
       }
       
+      const httpStatus = response.status;
+      const returnStatus = (data.error === "service_unavailable" || errorCode === 25) ? 200 : httpStatus;
+
       return new Response(
-        JSON.stringify({ error: userMessage, details: data }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: userMessage, details: data, httpStatus }),
+        { status: returnStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
