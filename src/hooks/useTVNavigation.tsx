@@ -115,8 +115,51 @@ export function useTVNavigation() {
     const openSelect = document.querySelector('[data-radix-select-content]');
     const openDropdown = document.querySelector('[data-radix-dropdown-menu-content]');
     const openPopover = document.querySelector('[data-radix-popover-content]');
+    const openRadixContent = openSelect || openDropdown || openPopover;
     
-    if (openSelect || openDropdown || openPopover) {
+    if (openRadixContent) {
+      // Handle PageUp/PageDown for faster navigation in dropdowns
+      if (e.key === 'PageUp' || e.key === 'PageDown') {
+        e.preventDefault();
+        const items = openRadixContent.querySelectorAll<HTMLElement>('[data-radix-collection-item]');
+        if (items.length === 0) return;
+        
+        const itemsArray = Array.from(items);
+        const currentIndex = itemsArray.findIndex(item => 
+          item.getAttribute('data-highlighted') === '' || 
+          item.getAttribute('data-state') === 'checked' ||
+          item === document.activeElement
+        );
+        
+        const jumpAmount = 5;
+        let newIndex: number;
+        
+        if (e.key === 'PageUp') {
+          newIndex = Math.max(0, currentIndex - jumpAmount);
+        } else {
+          newIndex = Math.min(itemsArray.length - 1, currentIndex + jumpAmount);
+        }
+        
+        const targetItem = itemsArray[newIndex];
+        if (targetItem) {
+          // Simulate arrow key presses to properly highlight the item
+          const arrowKey = e.key === 'PageUp' ? 'ArrowUp' : 'ArrowDown';
+          const stepsToMove = Math.abs(newIndex - currentIndex);
+          
+          for (let i = 0; i < stepsToMove; i++) {
+            const arrowEvent = new KeyboardEvent('keydown', {
+              key: arrowKey,
+              bubbles: true,
+              cancelable: true
+            });
+            openRadixContent.dispatchEvent(arrowEvent);
+          }
+          
+          targetItem.scrollIntoView({ block: 'nearest' });
+        }
+        return;
+      }
+      
       // Only allow Escape to close the popup, let the component handle arrow keys
       if (e.key !== 'Escape') return;
     }
