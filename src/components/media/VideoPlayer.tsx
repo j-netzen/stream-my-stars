@@ -371,9 +371,20 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isPlaying, volume]);
 
-  // Scroll to top when video player mounts so video is visible immediately
+  // Scroll to top and reset viewport when video player mounts/unmounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
+    
+    // Reset viewport on unmount to fix any zoom issues
+    return () => {
+      // Reset viewport meta tag to ensure proper scale
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+      }
+      // Force layout recalculation
+      document.body.style.zoom = '1';
+    };
   }, []);
 
   return (
