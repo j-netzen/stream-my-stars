@@ -4,11 +4,11 @@ export interface PlaybackSettings {
   // Buffer settings
   bufferAhead: number; // seconds to buffer ahead (5-60)
   autoQualityDowngrade: boolean; // auto switch to lower quality on slow connection
-  preloadOnHover: boolean; // preload video when hovering on media card
   
   // Playback
   autoFullscreen: boolean;
   autoPlay: boolean;
+  limitFps30: boolean; // optional 30 fps limit for slower devices
   
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
@@ -18,9 +18,9 @@ export interface PlaybackSettings {
 const DEFAULT_SETTINGS: PlaybackSettings = {
   bufferAhead: 30,
   autoQualityDowngrade: true,
-  preloadOnHover: true,
   autoFullscreen: true,
   autoPlay: true,
+  limitFps30: false,
   connectionSpeedMbps: null,
   isSlowConnection: false,
 };
@@ -86,13 +86,22 @@ export function usePlaybackSettings() {
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
-  // Measure actual connection speed by downloading a small test file
+  // Measure actual connection speed by downloading a test file
   const measureConnectionSpeed = useCallback(async (): Promise<number | null> => {
     try {
-      const testUrl = 'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png';
+      // Use a reliable CDN file for speed test (Cloudflare's 1MB test file)
+      const testUrl = 'https://speed.cloudflare.com/__down?bytes=500000';
       const startTime = performance.now();
       
-      const response = await fetch(testUrl, { cache: 'no-store' });
+      const response = await fetch(testUrl, { 
+        cache: 'no-store',
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Speed test failed');
+      }
+      
       const blob = await response.blob();
       
       const endTime = performance.now();
@@ -109,6 +118,19 @@ export function usePlaybackSettings() {
       return speedMbps;
     } catch (e) {
       console.warn('Failed to measure connection speed:', e);
+      
+      // Fallback: use Navigator.connection API if available
+      const connection = (navigator as any).connection;
+      if (connection?.downlink) {
+        const speedMbps = connection.downlink;
+        setSettings(prev => ({
+          ...prev,
+          connectionSpeedMbps: speedMbps,
+          isSlowConnection: speedMbps < 5,
+        }));
+        return speedMbps;
+      }
+      
       return null;
     }
   }, []);
