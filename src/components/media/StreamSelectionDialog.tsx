@@ -738,28 +738,65 @@ export function StreamSelectionDialog({
             {/* Season/Episode picker for TV shows */}
             {media?.media_type === "tv" && (
               <div className="relative z-10 flex items-center gap-2 flex-wrap mb-2">
-                <Select
-                  value={selectedSeason.toString()}
-                  onValueChange={(v) => {
-                    setSelectedSeason(parseInt(v));
-                    setSelectedEpisode(1);
-                    setStreams([]);
-                  }}
-                >
-                  <SelectTrigger className="w-[130px] h-8 text-xs">
-                    <SelectValue placeholder="Season" />
-                    <span className="ml-auto text-[10px] text-muted-foreground font-normal">
-                      {selectedSeason} of {media.seasons || 10}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
-                      <SelectItem key={s} value={s.toString()} className="text-xs">
-                        S{s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Season Grid Selector */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-[130px] h-8 text-xs justify-between">
+                      <span>S{selectedSeason}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {selectedSeason} of {media.seasons || 10}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-3" align="start">
+                    <div className="flex flex-col gap-3">
+                      {/* Quick jump input */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Jump to:</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={media.seasons || 10}
+                          placeholder="Season #"
+                          className="w-20 h-7 text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const value = parseInt((e.target as HTMLInputElement).value);
+                              const maxSeasons = media.seasons || 10;
+                              if (value >= 1 && value <= maxSeasons) {
+                                setSelectedSeason(value);
+                                setSelectedEpisode(1);
+                                setStreams([]);
+                                (e.target as HTMLInputElement).value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      {/* 3-column season grid */}
+                      <div className="grid grid-cols-3 gap-1 max-h-[200px] overflow-y-auto">
+                        {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
+                          <Button
+                            key={s}
+                            variant={selectedSeason === s ? "default" : "outline"}
+                            size="sm"
+                            className={cn(
+                              "h-8 text-xs font-medium",
+                              selectedSeason === s && "ring-2 ring-primary"
+                            )}
+                            onClick={() => {
+                              setSelectedSeason(s);
+                              setSelectedEpisode(1);
+                              setStreams([]);
+                            }}
+                          >
+                            S{s}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 {/* Episode Grid Selector */}
                 <Popover>
                   <PopoverTrigger asChild>
