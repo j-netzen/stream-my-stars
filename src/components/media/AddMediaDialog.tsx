@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useCategories } from "@/hooks/useCategories";
 import { useTVMode } from "@/hooks/useTVMode";
+import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
@@ -25,7 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download, Star, Calendar, Clock, X, Check, ListChecks } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, FileVideo, Zap, RefreshCw, Sparkles, Download, Star, Calendar, Clock, X, Check, ListChecks, AlertTriangle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
@@ -46,6 +48,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
   const { categories } = useCategories();
   const { isTVMode } = useTVMode();
+  const { status: rdServiceStatus, isServiceAvailable: isRdAvailable, refresh: refreshRdStatus } = useRealDebridStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -848,6 +851,25 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
         <div className={isTVMode ? "h-[500px]" : "h-[450px]"}>
           <ScrollAreaWithArrows scrollStep={150} isTVMode={isTVMode}>
+            {/* Real-Debrid Service Warning Banner */}
+            {rdServiceStatus === "service_unavailable" && (
+              <Alert variant="destructive" className="mb-4 mx-1">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between">
+                  <span>Real-Debrid servers are experiencing issues. Operations may fail.</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshRdStatus}
+                    className="ml-2 h-7"
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Tabs defaultValue="debrid" className="w-full px-1 pb-4">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="debrid" className="gap-2">
