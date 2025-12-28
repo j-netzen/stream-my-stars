@@ -13,7 +13,7 @@ import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestricte
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { checkBrowserSupport } from "@/lib/ffmpegTranscode";
+
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -26,11 +26,6 @@ export default function SettingsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isTestingSpeed, setIsTestingSpeed] = useState(false);
   
-  // Auto-transcode MKV setting
-  const [autoTranscodeMkv, setAutoTranscodeMkv] = useState(() => {
-    return localStorage.getItem('auto-transcode-mkv') === 'true';
-  });
-  const ffmpegSupport = checkBrowserSupport();
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -73,11 +68,6 @@ export default function SettingsPage() {
     toast.success(`UI scale set to ${SCALE_PRESETS[preset].label} (${SCALE_PRESETS[preset].value}%)`);
   };
 
-  const handleAutoTranscodeChange = (enabled: boolean) => {
-    setAutoTranscodeMkv(enabled);
-    localStorage.setItem('auto-transcode-mkv', enabled ? 'true' : 'false');
-    toast.success(enabled ? "Auto-convert MKV enabled" : "Auto-convert MKV disabled");
-  };
 
   const handleUpdateApp = async () => {
     setIsUpdating(true);
@@ -232,34 +222,23 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* Auto-transcode MKV */}
+          {/* Limit to 30 FPS */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label htmlFor="auto-transcode" className={cn("font-medium", isTVMode && "text-lg")}>
-                Auto-convert MKV files
+              <Label htmlFor="limit-fps" className={cn("font-medium", isTVMode && "text-lg")}>
+                Limit to 30 FPS
               </Label>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                Automatically convert MKV files to MP4 for browser playback
+                Cap video framerate to reduce CPU usage on slower devices
               </p>
             </div>
             <Switch
-              id="auto-transcode"
-              checked={autoTranscodeMkv}
-              onCheckedChange={handleAutoTranscodeChange}
-              disabled={!ffmpegSupport.supported}
+              id="limit-fps"
+              checked={playbackSettings.limitFps30}
+              onCheckedChange={(checked) => updatePlaybackSetting('limitFps30', checked)}
               className={isTVMode ? "scale-125" : ""}
             />
           </div>
-          
-          {!ffmpegSupport.supported && (
-            <div className={cn(
-              "flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive",
-              isTVMode ? "text-base" : "text-sm"
-            )}>
-              <XCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{ffmpegSupport.reason || "Your browser doesn't support MKV conversion"}</span>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -360,24 +339,6 @@ export default function SettingsPage() {
               id="auto-quality"
               checked={playbackSettings.autoQualityDowngrade}
               onCheckedChange={(checked) => updatePlaybackSetting('autoQualityDowngrade', checked)}
-              className={isTVMode ? "scale-125" : ""}
-            />
-          </div>
-
-          {/* Preload on Hover */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="preload-hover" className={cn("font-medium", isTVMode && "text-lg")}>
-                Preload on hover
-              </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                Start loading video when hovering on a title (faster playback start)
-              </p>
-            </div>
-            <Switch
-              id="preload-hover"
-              checked={playbackSettings.preloadOnHover}
-              onCheckedChange={(checked) => updatePlaybackSetting('preloadOnHover', checked)}
               className={isTVMode ? "scale-125" : ""}
             />
           </div>
