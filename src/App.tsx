@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "next-themes";
 import { TVModeProvider } from "@/hooks/useTVMode";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MainLayout } from "@/components/layout/MainLayout";
 import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
@@ -28,6 +29,7 @@ const App = () => (
           <TooltipProvider>
           <Toaster />
           <Sonner />
+          <ErrorBoundary>
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
@@ -98,6 +100,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          </ErrorBoundary>
           </TooltipProvider>
         </AuthProvider>
       </TVModeProvider>
