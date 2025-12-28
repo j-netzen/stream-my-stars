@@ -33,9 +33,9 @@ export function getRealDebridState(): RealDebridState {
   return state;
 }
 
-export function subscribeRealDebridState(listener: () => void) {
+export function subscribeRealDebridState(listener: () => void): () => void {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => { listeners.delete(listener); };
 }
 
 export function setRealDebridState(patch: Partial<RealDebridState>) {
