@@ -54,10 +54,19 @@ async function invokeRealDebrid(body: Record<string, unknown>) {
   
   if (error) {
     console.error("Real-Debrid API error:", error);
+    // Check if it's a service unavailable error
+    const errorMessage = error.message || "";
+    if (errorMessage.includes("503") || errorMessage.includes("service_unavailable")) {
+      throw new Error("Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.");
+    }
     throw new Error(error.message || "Real-Debrid API error");
   }
   
   if (data?.error) {
+    // Check for service unavailable in data error
+    if (data.details?.error_code === 25 || data.error.includes("overloaded")) {
+      throw new Error("Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.");
+    }
     throw new Error(data.error);
   }
   
