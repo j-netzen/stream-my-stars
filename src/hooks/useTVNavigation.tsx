@@ -111,6 +111,16 @@ export function useTVNavigation() {
   const handleNavigation = useCallback((e: KeyboardEvent) => {
     if (!isTVMode) return;
 
+    // Don't handle if a Radix select/dropdown is open - let it handle its own navigation
+    const openSelect = document.querySelector('[data-radix-select-content]');
+    const openDropdown = document.querySelector('[data-radix-dropdown-menu-content]');
+    const openPopover = document.querySelector('[data-radix-popover-content]');
+    
+    if (openSelect || openDropdown || openPopover) {
+      // Only allow Escape to close the popup, let the component handle arrow keys
+      if (e.key !== 'Escape') return;
+    }
+
     // Don't handle if in an input
     const activeElement = document.activeElement as HTMLElement;
     if (
