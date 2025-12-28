@@ -192,36 +192,89 @@ serve(async (req) => {
         torrentioUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
       }
 
-      const response = await fetch(torrentioUrl);
+      // Retry logic with exponential backoff for transient errors
+      const MAX_RETRIES = 3;
+      const RETRY_DELAYS = [1000, 2000, 4000]; // ms
       
-      if (!response.ok) {
-        console.error("Torrentio API error:", response.status);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch streams", status: response.status }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      let lastError: Error | null = null;
+      let lastStatus = 0;
+      
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          console.log(`Torrentio request attempt ${attempt + 1}/${MAX_RETRIES}`);
+          
+          const response = await fetch(torrentioUrl, {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'MediaHub/1.0',
+            },
+          });
+          
+          lastStatus = response.status;
+          
+          // Success
+          if (response.ok) {
+            const data = await response.json();
+            
+            // SECURITY: Sanitize response to remove any API keys from URLs
+            if (data.streams && Array.isArray(data.streams) && rdApiKey) {
+              data.streams = data.streams.map((stream: { url?: string; [key: string]: unknown }) => {
+                if (stream.url && typeof stream.url === 'string') {
+                  // Remove the RD API key from any URLs returned to client
+                  stream.url = stream.url.replace(new RegExp(rdApiKey, 'g'), '[REDACTED]');
+                }
+                return stream;
+              });
+            }
 
-      const data = await response.json();
-      
-      // SECURITY: Sanitize response to remove any API keys from URLs
-      if (data.streams && Array.isArray(data.streams) && rdApiKey) {
-        data.streams = data.streams.map((stream: { url?: string; [key: string]: unknown }) => {
-          if (stream.url && typeof stream.url === 'string') {
-            // Remove the RD API key from any URLs returned to client
-            stream.url = stream.url.replace(new RegExp(rdApiKey, 'g'), '[REDACTED]');
+            console.log(`Torrentio returned ${data.streams?.length || 0} streams`);
+            
+            return new Response(JSON.stringify(data), {
+              headers: { 
+                ...corsHeaders, 
+                'Content-Type': 'application/json',
+                "X-RateLimit-Remaining": String(rateLimit.remaining),
+              },
+            });
           }
-          return stream;
-        });
+          
+          // Non-retryable client errors (4xx except 429)
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            console.error(`Torrentio client error: ${response.status}`);
+            return new Response(
+              JSON.stringify({ error: "Failed to fetch streams", status: response.status }),
+              { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          // Retryable errors (5xx, 429)
+          console.warn(`Torrentio returned ${response.status}, will retry...`);
+          lastError = new Error(`HTTP ${response.status}`);
+          
+        } catch (err) {
+          console.warn(`Torrentio fetch error on attempt ${attempt + 1}:`, err);
+          lastError = err instanceof Error ? err : new Error(String(err));
+        }
+        
+        // Wait before retry (except on last attempt)
+        if (attempt < MAX_RETRIES - 1) {
+          const delay = RETRY_DELAYS[attempt];
+          console.log(`Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-
-      return new Response(JSON.stringify(data), {
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json',
-          "X-RateLimit-Remaining": String(rateLimit.remaining),
-        },
-      });
+      
+      // All retries exhausted
+      console.error(`Torrentio failed after ${MAX_RETRIES} attempts, last status: ${lastStatus}`);
+      return new Response(
+        JSON.stringify({ 
+          error: "Torrentio service temporarily unavailable", 
+          status: lastStatus || 503,
+          message: "The stream service is temporarily unavailable. Please try again in a few moments.",
+          retryable: true,
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(
