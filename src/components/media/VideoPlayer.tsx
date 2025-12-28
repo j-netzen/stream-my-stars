@@ -452,27 +452,27 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           <X className="w-6 h-6" />
         </Button>
         
-        {/* Content - horizontal layout for landscape, vertical for portrait */}
-        <div className="relative z-10 flex flex-col landscape:flex-row items-center gap-4 landscape:gap-8 p-4 landscape:p-6 max-w-4xl text-center landscape:text-left">
+        {/* Content - always horizontal, centered in viewport */}
+        <div className="relative z-10 flex flex-row items-center gap-6 p-4">
           {/* Glowing play button */}
           <div className="relative flex-shrink-0">
-            <div className="absolute inset-0 bg-primary/40 rounded-full blur-2xl animate-pulse" />
-            <div className="relative w-20 h-20 landscape:w-24 landscape:h-24 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
-              <Play className="w-10 h-10 landscape:w-12 landscape:h-12 text-primary-foreground ml-1" />
+            <div className="absolute inset-0 bg-primary/40 rounded-full blur-xl animate-pulse" />
+            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
+              <Play className="w-8 h-8 text-primary-foreground ml-0.5" />
             </div>
           </div>
           
           {/* Title and info */}
-          <div className="space-y-1 landscape:space-y-2">
-            <h1 className="text-xl landscape:text-2xl font-bold text-foreground line-clamp-1">
+          <div className="text-left">
+            <h1 className="text-lg font-bold text-foreground line-clamp-1">
               {media.title}
             </h1>
             {streamQuality && (
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-foreground text-xs">
                 {streamQuality.quality} {streamQuality.size && `• ${streamQuality.size}`}
               </p>
             )}
-            <p className="text-foreground/80 text-sm">
+            <p className="text-foreground/80 text-xs mt-1">
               Tap anywhere to play
             </p>
           </div>
