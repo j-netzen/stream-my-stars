@@ -383,10 +383,18 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     };
   }, []);
 
+  // Prevent body scroll and hide other elements when video is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+      className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
       onClick={handleContainerClick}
