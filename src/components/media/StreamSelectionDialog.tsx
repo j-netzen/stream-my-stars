@@ -744,8 +744,11 @@ export function StreamSelectionDialog({
                     setStreams([]);
                   }}
                 >
-                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                  <SelectTrigger className="w-[130px] h-8 text-xs">
                     <SelectValue placeholder="Season" />
+                    <span className="ml-auto text-[10px] text-muted-foreground font-normal">
+                      {selectedSeason} of {media.seasons || 10}
+                    </span>
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
@@ -762,8 +765,11 @@ export function StreamSelectionDialog({
                     setStreams([]);
                   }}
                 >
-                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
                     <SelectValue placeholder="Episode" />
+                    <span className="ml-auto text-[10px] text-muted-foreground font-normal">
+                      {selectedEpisode} of 30
+                    </span>
                   </SelectTrigger>
                   <SelectContent className="max-h-[200px]">
                     {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
