@@ -46,7 +46,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  
   const [bufferHealth, setBufferHealth] = useState<'good' | 'warning' | 'poor'>('good');
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [showBufferWarning, setShowBufferWarning] = useState(false);
@@ -300,7 +300,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   };
 
   const handleVideoError = () => {
-    setPlaybackError("Failed to load video. The format may not be supported.");
+    // Just call the error callback silently - no error message displayed
     if (onPlaybackError) {
       onPlaybackError();
     }
@@ -453,17 +453,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
       )}
 
-      {/* Error overlay */}
-      {playbackError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center p-6 max-w-md">
-            <p className="text-white text-lg mb-4">{playbackError}</p>
-            <Button variant="outline" onClick={handleClose}>
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Controls overlay */}
       <div
@@ -493,7 +482,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
 
         {/* Center play button */}
-        {!isPlaying && !isBuffering && !playbackError && (
+        {!isPlaying && !isBuffering && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Button
               variant="ghost"
