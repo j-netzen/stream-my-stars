@@ -70,12 +70,13 @@ async function invokeRealDebrid(body: Record<string, unknown>) {
   
   if (data?.error) {
     // Check for service unavailable in data error
-    if (data.details?.error_code === 25 || String(data.httpStatus || "").includes("503") || data.error.includes("overloaded")) {
+    const errorString = String(data.error || "");
+    if (data.details?.error_code === 25 || String(data.httpStatus || "").includes("503") || errorString.includes("overloaded")) {
       const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
       setRealDebridServiceUnavailable(serviceError);
       throw new Error(serviceError);
     }
-    throw new Error(data.error);
+    throw new Error(errorString || "Unknown Real-Debrid error");
   }
   
   // Success - clear any previous failure state

@@ -402,6 +402,11 @@ export function StreamSelectionDialog({
 
   const resolveStream = async (stream: TorrentioStream): Promise<string> => {
     let streamUrl: string;
+    
+    if (!stream.url) {
+      throw new Error("Stream URL is missing or invalid");
+    }
+    
     const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
     
     const handleProgress = (progress: number) => {
