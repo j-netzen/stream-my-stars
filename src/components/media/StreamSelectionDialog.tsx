@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Media, useMedia } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
+import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
@@ -21,9 +22,10 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List, XCircle } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export interface StreamQualityInfo {
   quality: string;
@@ -46,6 +48,7 @@ export function StreamSelectionDialog({
 }: StreamSelectionDialogProps) {
   const { updateMedia } = useMedia();
   const { isTVMode } = useTVMode();
+  const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
   const [activeTab, setActiveTab] = useState<string>("downloads");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
@@ -704,6 +707,27 @@ export function StreamSelectionDialog({
                 </TabsTrigger>
               </TabsList>
             </div>
+          )}
+
+          {/* Real-Debrid Service Warning Banner */}
+          {(rdStatus === "service_unavailable" || rdStatus === "error") && (
+            <Alert variant="destructive" className="shrink-0 mt-2">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="flex items-center justify-between gap-2">
+                <span className="text-sm">
+                  {rdError || "Real-Debrid service is temporarily unavailable"}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refreshRdStatus}
+                  className="shrink-0 h-7 px-2 text-xs"
+                >
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Search Tab */}

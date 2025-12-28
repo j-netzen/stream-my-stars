@@ -371,6 +371,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isPlaying, volume]);
 
+  // Scroll to top when video player mounts so video is visible immediately
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   return (
     <div
       ref={containerRef}
