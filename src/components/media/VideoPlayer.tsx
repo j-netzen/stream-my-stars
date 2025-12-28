@@ -427,7 +427,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return (
       <div
         ref={containerRef}
-        className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/20 flex flex-col items-center justify-center cursor-pointer"
+        className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-primary/20 flex items-center justify-center cursor-pointer"
         onClick={handlePlayScreenClick}
       >
         {/* Background poster with overlay */}
@@ -439,51 +439,43 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
         
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center gap-8 p-8 max-w-lg text-center">
+        {/* Close button - positioned top right */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-4 right-4 z-20 text-muted-foreground hover:text-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+        >
+          <X className="w-6 h-6" />
+        </Button>
+        
+        {/* Content - horizontal layout for landscape, vertical for portrait */}
+        <div className="relative z-10 flex flex-col landscape:flex-row items-center gap-4 landscape:gap-8 p-4 landscape:p-6 max-w-4xl text-center landscape:text-left">
           {/* Glowing play button */}
-          <div className="relative">
+          <div className="relative flex-shrink-0">
             <div className="absolute inset-0 bg-primary/40 rounded-full blur-2xl animate-pulse" />
-            <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
-              <Play className="w-16 h-16 text-primary-foreground ml-2" />
+            <div className="relative w-20 h-20 landscape:w-24 landscape:h-24 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
+              <Play className="w-10 h-10 landscape:w-12 landscape:h-12 text-primary-foreground ml-1" />
             </div>
           </div>
           
-          {/* Title */}
-          <div className="space-y-3">
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground">
+          {/* Title and info */}
+          <div className="space-y-1 landscape:space-y-2">
+            <h1 className="text-xl landscape:text-2xl font-bold text-foreground line-clamp-1">
               {media.title}
             </h1>
             {streamQuality && (
-              <p className="text-muted-foreground text-lg">
+              <p className="text-muted-foreground text-sm">
                 {streamQuality.quality} {streamQuality.size && `• ${streamQuality.size}`}
               </p>
             )}
-          </div>
-          
-          {/* Call to action */}
-          <div className="space-y-2">
-            <p className="text-xl text-foreground font-medium">
+            <p className="text-foreground/80 text-sm">
               Tap anywhere to play
             </p>
-            <p className="text-muted-foreground text-sm">
-              Video will open in fullscreen
-            </p>
           </div>
-          
-          {/* Close button */}
-          <Button
-            variant="ghost"
-            size="lg"
-            className="mt-4 text-muted-foreground hover:text-foreground"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClose();
-            }}
-          >
-            <X className="w-5 h-5 mr-2" />
-            Cancel
-          </Button>
         </div>
       </div>
     );
