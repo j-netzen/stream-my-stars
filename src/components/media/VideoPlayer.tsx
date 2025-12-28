@@ -153,7 +153,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     };
   }, [isPlaying, updateBufferHealth]);
 
-  // Auto-play and auto-fullscreen when video can play
+  // Auto-play and auto-fullscreen when video can play - ALWAYS enabled
   const handleCanPlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -162,15 +162,13 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     video.muted = isMuted;
     video.volume = volume;
 
-    // Auto-play if not already playing and autoPlay is enabled
-    if (!hasAutoPlayedRef.current && settings.autoPlay) {
+    // Always auto-play and enter fullscreen
+    if (!hasAutoPlayedRef.current) {
       video.play().then(() => {
         setIsPlaying(true);
         hasAutoPlayedRef.current = true;
-        // Enter fullscreen after playback starts if enabled
-        if (settings.autoFullscreen) {
-          enterFullscreen();
-        }
+        // Always enter fullscreen after playback starts
+        enterFullscreen();
       }).catch((err) => {
         console.warn("Auto-play failed:", err);
         // Try muted autoplay as fallback
@@ -179,15 +177,13 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         video.play().then(() => {
           setIsPlaying(true);
           hasAutoPlayedRef.current = true;
-          if (settings.autoFullscreen) {
-            enterFullscreen();
-          }
+          enterFullscreen();
         }).catch(() => {
           console.warn("Muted auto-play also failed");
         });
       });
     }
-  }, [isMuted, volume, enterFullscreen, settings.autoPlay, settings.autoFullscreen]);
+  }, [isMuted, volume, enterFullscreen]);
 
   // Reset auto-play/fullscreen refs when media changes
   useEffect(() => {
@@ -464,31 +460,16 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
       )}
 
-      {/* Large Play Full Screen button - ALWAYS visible when paused (outside controls overlay) */}
+      {/* Center play button - visible when paused */}
       {!isPlaying && !isBuffering && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 pointer-events-none z-10">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <Button
             variant="ghost"
             size="icon"
-            className="w-20 h-20 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto"
+            className="w-24 h-24 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto"
             onClick={handlePlayPause}
           >
-            <Play className="h-10 w-10 ml-1" />
-          </Button>
-          
-          {/* Large Play Full Screen button */}
-          <Button
-            variant="default"
-            size="lg"
-            className="pointer-events-auto bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-lg font-semibold gap-3 shadow-2xl animate-pulse"
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePlayPause();
-              enterFullscreen();
-            }}
-          >
-            <Maximize className="h-6 w-6" />
-            Play Full Screen
+            <Play className="h-12 w-12 ml-1" />
           </Button>
         </div>
       )}
