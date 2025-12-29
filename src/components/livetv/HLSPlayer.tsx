@@ -1,9 +1,16 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, Shield } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+
+// CORS proxy options - user can configure in settings
+const CORS_PROXIES = [
+  '', // Direct (no proxy)
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+];
 
 interface HLSPlayerProps {
   url: string;
@@ -34,6 +41,15 @@ export function HLSPlayer({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [proxyIndex, setProxyIndex] = useState(0);
+  const [usingProxy, setUsingProxy] = useState(false);
+
+  // Get proxied URL
+  const getProxiedUrl = useCallback((originalUrl: string, proxyIdx: number) => {
+    const proxy = CORS_PROXIES[proxyIdx];
+    if (!proxy) return originalUrl;
+    return proxy + encodeURIComponent(originalUrl);
+  }, []);
 
   // Initialize HLS
   useEffect(() => {
@@ -49,18 +65,26 @@ export function HLSPlayer({
       hlsRef.current = null;
     }
 
+    const streamUrl = getProxiedUrl(url, proxyIndex);
+    setUsingProxy(proxyIndex > 0);
+
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 90,
+        // Allow cross-origin requests
+        xhrSetup: function (xhr, url) {
+          xhr.withCredentials = false;
+        },
       });
 
-      hls.loadSource(url);
+      hls.loadSource(streamUrl);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
+        setError(null);
         video.play().catch(() => {
           // Autoplay blocked
           setIsPlaying(false);
@@ -71,8 +95,13 @@ export function HLSPlayer({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              setError('Network error - stream may be offline');
-              hls.startLoad();
+              // If direct failed and we haven't tried all proxies, try next proxy
+              if (proxyIndex < CORS_PROXIES.length - 1) {
+                console.log('Network error, trying CORS proxy...');
+                setProxyIndex(prev => prev + 1);
+              } else {
+                setError('Network error - stream may be blocked by CORS or offline');
+              }
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               setError('Media error - attempting recovery');
@@ -89,10 +118,17 @@ export function HLSPlayer({
       hlsRef.current = hls;
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS support (Safari)
-      video.src = url;
+      video.src = streamUrl;
       video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
         video.play().catch(() => setIsPlaying(false));
+      });
+      video.addEventListener('error', () => {
+        if (proxyIndex < CORS_PROXIES.length - 1) {
+          setProxyIndex(prev => prev + 1);
+        } else {
+          setError('Network error - stream may be blocked by CORS or offline');
+        }
       });
     } else {
       setError('HLS not supported in this browser');
@@ -104,7 +140,7 @@ export function HLSPlayer({
         hlsRef.current = null;
       }
     };
-  }, [url, onError]);
+  }, [url, proxyIndex, getProxiedUrl, onError]);
 
   // Handle play/pause
   const togglePlay = useCallback(() => {
@@ -200,15 +236,21 @@ export function HLSPlayer({
     }
   }, [isPlaying]);
 
-  // Retry loading
+  // Retry loading - reset to direct first, then try proxies
   const retry = useCallback(() => {
-    const hls = hlsRef.current;
-    if (hls) {
+    setProxyIndex(0);
+    setError(null);
+    setIsLoading(true);
+  }, []);
+
+  // Try with CORS proxy
+  const tryWithProxy = useCallback(() => {
+    if (proxyIndex < CORS_PROXIES.length - 1) {
+      setProxyIndex(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      hls.loadSource(url);
     }
-  }, [url]);
+  }, [proxyIndex]);
 
   return (
     <div
@@ -245,12 +287,26 @@ export function HLSPlayer({
               <RefreshCw className="mr-2 h-4 w-4" />
               Retry
             </Button>
+            {proxyIndex < CORS_PROXIES.length - 1 && (
+              <Button variant="secondary" onClick={tryWithProxy}>
+                <Shield className="mr-2 h-4 w-4" />
+                Try with Proxy
+              </Button>
+            )}
             {onError && (
               <Button variant="destructive" onClick={onError}>
                 Mark as Unstable
               </Button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Using Proxy Indicator */}
+      {usingProxy && !error && (
+        <div className="absolute top-4 right-4 flex items-center gap-2 bg-blue-500/80 text-white px-3 py-1 rounded-full text-sm">
+          <Shield className="h-4 w-4" />
+          Via Proxy
         </div>
       )}
 
