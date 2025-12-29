@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { Media } from "@/hooks/useMedia";
-import { getImageUrl, getVideos, TMDBVideo } from "@/lib/tmdb";
+import { Media, useMedia } from "@/hooks/useMedia";
+import { getImageUrl, getVideos, TMDBVideo, getMovieDetails, getTVDetails } from "@/lib/tmdb";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Play, X, Star, Calendar, Clock, Film, Tv, Youtube, ArrowLeft } from "lucide-react";
+import { Play, X, Star, Calendar, Clock, Film, Tv, Youtube, ArrowLeft, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface MediaDetailsDialogProps {
   media: Media | null;
@@ -16,9 +17,11 @@ interface MediaDetailsDialogProps {
 }
 
 export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaDetailsDialogProps) {
+  const { refreshMetadata } = useMedia();
   const [trailer, setTrailer] = useState<TMDBVideo | null>(null);
   const [loadingTrailer, setLoadingTrailer] = useState(false);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (open && media?.tmdb_id) {
@@ -41,6 +44,53 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
   }, [open, media?.tmdb_id, media?.media_type]);
 
   if (!media) return null;
+
+  const handleRefreshMetadata = async () => {
+    if (!media.tmdb_id) {
+      toast.error("No TMDB ID available for this media");
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      let details: any = null;
+      if (media.media_type === "movie") {
+        details = await getMovieDetails(media.tmdb_id);
+      } else if (media.media_type === "tv") {
+        details = await getTVDetails(media.tmdb_id);
+      }
+
+      if (!details) {
+        toast.error("Failed to fetch metadata from TMDB");
+        return;
+      }
+
+      const genres = details?.genres?.map((g: any) => g.name) || [];
+      
+      // For TV shows, use episode_run_time array (first value), for movies use runtime
+      const runtime = media.media_type === "movie" 
+        ? details?.runtime 
+        : (details?.episode_run_time?.[0] || undefined);
+
+      await refreshMetadata.mutateAsync({
+        id: media.id,
+        poster_path: details.poster_path || media.poster_path,
+        backdrop_path: details.backdrop_path || media.backdrop_path,
+        overview: details.overview || media.overview,
+        rating: details.vote_average,
+        genres,
+        runtime,
+        seasons: details?.number_of_seasons,
+        episodes: details?.number_of_episodes,
+        cast_members: details?.credits?.cast?.slice(0, 10) || [],
+        release_date: details.release_date || details.first_air_date,
+      });
+    } catch (error) {
+      console.error("Failed to refresh metadata:", error);
+      toast.error("Failed to refresh metadata");
+    }
+    setIsRefreshing(false);
+  };
 
   const backdropUrl = media.backdrop_path
     ? getImageUrl(media.backdrop_path, "original")
@@ -110,7 +160,7 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
           {/* Title and Play */}
           <div className="absolute bottom-0 left-0 right-0 p-6">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">{media.title}</h2>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
               <Button size="lg" className="gap-2" onClick={() => {
                 onOpenChange(false);
                 onPlay(media);
@@ -122,6 +172,22 @@ export function MediaDetailsDialog({ media, open, onOpenChange, onPlay }: MediaD
                 <Button size="lg" variant="secondary" className="gap-2" onClick={() => setShowTrailer(true)}>
                   <Youtube className="w-5 h-5" />
                   Trailer
+                </Button>
+              )}
+              {media.tmdb_id && (
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="gap-2" 
+                  onClick={handleRefreshMetadata}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-5 h-5" />
+                  )}
+                  Refresh
                 </Button>
               )}
             </div>
