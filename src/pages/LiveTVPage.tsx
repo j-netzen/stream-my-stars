@@ -225,6 +225,7 @@ export default function LiveTVPage() {
         onDelete={removeChannel}
         onToggleUnstable={toggleUnstable}
         onToggleFavorite={toggleFavorite}
+        onToggleProxy={setChannelUseProxy}
       />
 
       <EPGSettingsDialog

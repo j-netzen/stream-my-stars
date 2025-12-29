@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Star, Trash2 } from 'lucide-react';
+import { AlertTriangle, Star, Trash2, Shield } from 'lucide-react';
 
 interface ChannelSettingsDialogProps {
   channel: Channel | null;
@@ -22,6 +22,7 @@ interface ChannelSettingsDialogProps {
   onDelete: (channelId: string) => void;
   onToggleUnstable: (channelId: string) => void;
   onToggleFavorite: (channelId: string) => void;
+  onToggleProxy: (channelId: string, useProxy: boolean) => void;
 }
 
 export function ChannelSettingsDialog({
@@ -32,6 +33,7 @@ export function ChannelSettingsDialog({
   onDelete,
   onToggleUnstable,
   onToggleFavorite,
+  onToggleProxy,
 }: ChannelSettingsDialogProps) {
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
@@ -149,6 +151,28 @@ export function ChannelSettingsDialog({
           {channel.isFavorite && (
             <p className="text-xs text-muted-foreground bg-yellow-500/10 p-2 rounded">
               Favorite channels appear at the top of your channel list.
+            </p>
+          )}
+
+          {/* Proxy Mode Toggle */}
+          <div className="flex items-center justify-between py-2 px-1">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-blue-500" />
+              <Label htmlFor="proxy-toggle" className="cursor-pointer">
+                Use Proxy Mode
+              </Label>
+            </div>
+            <Switch
+              id="proxy-toggle"
+              checked={channel.useProxy}
+              onCheckedChange={(checked) => onToggleProxy(channel.id, checked)}
+            />
+          </div>
+
+          {channel.useProxy && (
+            <p className="text-xs text-muted-foreground bg-blue-500/10 p-2 rounded">
+              This channel will always use a CORS proxy to bypass streaming restrictions.
+              The original URL is preserved for EPG matching.
             </p>
           )}
 
