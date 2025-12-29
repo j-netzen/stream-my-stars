@@ -103,3 +103,15 @@ export async function getVideos(id: number, mediaType: "movie" | "tv"): Promise<
   if (error) throw error;
   return data.results || [];
 }
+
+export async function getTVAiringToday(): Promise<TMDBSearchResult[]> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "tv_airing_today" },
+  });
+
+  if (error) throw error;
+  return (data.results || []).map((item: TMDBSearchResult) => ({
+    ...item,
+    media_type: "tv" as const,
+  }));
+}
