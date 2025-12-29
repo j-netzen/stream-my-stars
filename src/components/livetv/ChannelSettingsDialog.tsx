@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,7 +72,7 @@ export function ChannelSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Channel Settings</DialogTitle>
           <DialogDescription>
@@ -79,7 +80,8 @@ export function ChannelSettingsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-4 py-4">
           {/* Channel Name */}
           <div className="space-y-2">
             <Label htmlFor="ch-name">Channel Name</Label>
@@ -197,9 +199,10 @@ export function ChannelSettingsDialog({
               They may have playback issues.
             </p>
           )}
-        </div>
+          </div>
+        </ScrollArea>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
           <Button
             variant="destructive"
             onClick={handleDelete}
