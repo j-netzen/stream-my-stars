@@ -6,12 +6,14 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 // CORS proxy options - can be extended with custom proxies
 const CORS_PROXIES = [
   '', // Direct (no proxy)
   'https://corsproxy.io/?',
   'https://api.allorigins.win/raw?url=',
+  'https://cors-anywhere.herokuapp.com/',
   'https://cors.eu.org/',
 ];
 
@@ -68,9 +70,11 @@ const detectErrorType = (error: any, response?: any): StreamError => {
 
 interface HLSPlayerProps {
   url: string;
+  originalUrl?: string; // Preserved URL for EPG matching (use this for identification)
   channelName: string;
   channelLogo?: string;
   isUnstable?: boolean;
+  globalProxyEnabled?: boolean;
   proxyModeEnabled?: boolean;
   onProxyModeChange?: (enabled: boolean) => void;
   onError?: () => void;
@@ -79,9 +83,11 @@ interface HLSPlayerProps {
 
 export function HLSPlayer({ 
   url, 
+  originalUrl,
   channelName, 
   channelLogo,
   isUnstable,
+  globalProxyEnabled = false,
   proxyModeEnabled = false,
   onProxyModeChange,
   onError, 
@@ -91,6 +97,7 @@ export function HLSPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasShownProxyToast = useRef(false);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -99,18 +106,25 @@ export function HLSPlayer({
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [proxyIndex, setProxyIndex] = useState(proxyModeEnabled ? 1 : 0);
-  const [usingProxy, setUsingProxy] = useState(proxyModeEnabled);
+  
+  // Start with proxy if global proxy is enabled
+  const initialProxyIndex = globalProxyEnabled || proxyModeEnabled ? 1 : 0;
+  const [proxyIndex, setProxyIndex] = useState(initialProxyIndex);
+  const [usingProxy, setUsingProxy] = useState(globalProxyEnabled || proxyModeEnabled);
   const [autoProxyAttempted, setAutoProxyAttempted] = useState(false);
 
-  // Sync proxy mode with external state
+  // Store the original URL for EPG matching - never modify this
+  const epgMatchUrl = originalUrl || url;
+
+  // Sync proxy mode with global setting or external state
   useEffect(() => {
-    if (proxyModeEnabled && proxyIndex === 0) {
+    const shouldUseProxy = globalProxyEnabled || proxyModeEnabled;
+    if (shouldUseProxy && proxyIndex === 0) {
       setProxyIndex(1);
-    } else if (!proxyModeEnabled && proxyIndex > 0 && !autoProxyAttempted) {
+    } else if (!shouldUseProxy && proxyIndex > 0 && !autoProxyAttempted) {
       setProxyIndex(0);
     }
-  }, [proxyModeEnabled]);
+  }, [globalProxyEnabled, proxyModeEnabled]);
 
   // Get proxied URL
   const getProxiedUrl = useCallback((originalUrl: string, proxyIdx: number) => {
@@ -206,12 +220,24 @@ export function HLSPlayer({
           
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Auto-fallback to proxy on network errors
-              if (proxyIndex < CORS_PROXIES.length - 1 && !autoProxyAttempted) {
-                console.log(`Network error (${errorInfo.type}), trying CORS proxy ${proxyIndex + 1}...`);
+              // Auto-fallback to proxy on network errors - don't show error immediately
+              if (proxyIndex < CORS_PROXIES.length - 1) {
+                const nextProxyIndex = proxyIndex + 1;
+                console.log(`Network error (${errorInfo.type}), trying CORS proxy ${nextProxyIndex}...`);
+                
+                // Show toast notification only once per session
+                if (!hasShownProxyToast.current && proxyIndex === 0) {
+                  hasShownProxyToast.current = true;
+                  toast.info('Direct stream blocked; attempting connection via proxy...', {
+                    duration: 3000,
+                  });
+                }
+                
                 setAutoProxyAttempted(true);
-                setProxyIndex(prev => prev + 1);
+                setProxyIndex(nextProxyIndex);
+                // Don't show error - let it retry automatically
               } else {
+                // All proxies exhausted, show error
                 setStreamError(errorInfo);
                 setIsLoading(false);
               }
@@ -238,7 +264,14 @@ export function HLSPlayer({
         video.play().catch(() => setIsPlaying(false));
       });
       video.addEventListener('error', () => {
-        if (proxyIndex < CORS_PROXIES.length - 1 && !autoProxyAttempted) {
+        // Auto-fallback to proxy on network errors
+        if (proxyIndex < CORS_PROXIES.length - 1) {
+          if (!hasShownProxyToast.current && proxyIndex === 0) {
+            hasShownProxyToast.current = true;
+            toast.info('Direct stream blocked; attempting connection via proxy...', {
+              duration: 3000,
+            });
+          }
           setAutoProxyAttempted(true);
           setProxyIndex(prev => prev + 1);
         } else {
@@ -363,14 +396,16 @@ export function HLSPlayer({
 
   // Retry loading - reset to direct first, then try proxies
   const retry = useCallback(() => {
+    hasShownProxyToast.current = false;
     setAutoProxyAttempted(false);
-    setProxyIndex(proxyModeEnabled ? 1 : 0);
+    setProxyIndex(globalProxyEnabled || proxyModeEnabled ? 1 : 0);
     setStreamError(null);
     setIsLoading(true);
-  }, [proxyModeEnabled]);
+  }, [globalProxyEnabled, proxyModeEnabled]);
 
   // Toggle proxy mode
   const handleProxyModeToggle = useCallback((enabled: boolean) => {
+    hasShownProxyToast.current = false;
     setAutoProxyAttempted(false);
     setStreamError(null);
     setIsLoading(true);

@@ -2,11 +2,16 @@ export interface Channel {
   id: string;
   name: string;
   url: string;
+  originalUrl?: string; // Preserved for EPG matching when using proxy
   logo: string;
   isUnstable: boolean;
   isFavorite: boolean;
   epgId: string;
   group: string;
+}
+
+export interface LiveTVSettings {
+  globalProxyEnabled: boolean;
 }
 
 export interface Program {

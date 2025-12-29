@@ -17,6 +17,7 @@ export default function LiveTVPage() {
     programs,
     selectedRegion,
     isLoading,
+    settings,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -27,6 +28,7 @@ export default function LiveTVPage() {
     getCurrentProgram,
     clearAllData,
     setSelectedRegion,
+    setGlobalProxyEnabled,
   } = useLiveTV();
 
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -150,9 +152,11 @@ export default function LiveTVPage() {
               {selectedChannel ? (
                 <HLSPlayer
                   url={selectedChannel.url}
+                  originalUrl={selectedChannel.originalUrl}
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
+                  globalProxyEnabled={settings.globalProxyEnabled}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />
@@ -170,9 +174,11 @@ export default function LiveTVPage() {
               <div className="h-64 flex-shrink-0">
                 <HLSPlayer
                   url={selectedChannel.url}
+                  originalUrl={selectedChannel.originalUrl}
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
+                  globalProxyEnabled={settings.globalProxyEnabled}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />
@@ -216,6 +222,8 @@ export default function LiveTVPage() {
         onSelectRegion={setSelectedRegion}
         onRefreshEPG={() => fetchEPG()}
         isLoading={isLoading}
+        globalProxyEnabled={settings.globalProxyEnabled}
+        onGlobalProxyChange={setGlobalProxyEnabled}
       />
     </div>
   );
