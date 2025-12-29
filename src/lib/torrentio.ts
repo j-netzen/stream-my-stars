@@ -134,9 +134,14 @@ export function parseSizeToBytes(sizeStr: string): number {
 }
 
 // Calculate optimal max file size (in MB) based on duration in minutes
-// Pattern: 45min=750MB, 90min=1500MB, 120min=1900MB, 150min=2000MB, 180min=2500MB
+// Pattern: ≤30min=500MB, 45min=750MB, 90min=1500MB, 120min=1900MB, 150min=2000MB, 180min=2500MB
 export function calculateOptimalMaxSize(durationMinutes: number): number {
   if (durationMinutes <= 0) return 2500; // Default max if no duration
+  
+  // Shows 30 minutes or less cap at 500MB
+  if (durationMinutes <= 30) {
+    return 500;
+  }
   
   // Define breakpoints: [minutes, maxSizeMB]
   const breakpoints = [
@@ -147,9 +152,10 @@ export function calculateOptimalMaxSize(durationMinutes: number): number {
     { minutes: 180, sizeMB: 2500 },
   ];
   
-  // If duration is less than first breakpoint, interpolate from 0
-  if (durationMinutes <= breakpoints[0].minutes) {
-    return (durationMinutes / breakpoints[0].minutes) * breakpoints[0].sizeMB;
+  // If duration is between 30 and 45, interpolate from 500MB to 750MB
+  if (durationMinutes < breakpoints[0].minutes) {
+    const ratio = (durationMinutes - 30) / (breakpoints[0].minutes - 30);
+    return 500 + ratio * (breakpoints[0].sizeMB - 500);
   }
   
   // If duration exceeds last breakpoint, cap at max
