@@ -721,7 +721,11 @@ export function StreamSelectionDialog({
                   {media.runtime && media.runtime > 0 && (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {Math.floor(media.runtime / 60)}h {media.runtime % 60}m
+                      {media.media_type === "tv" ? (
+                        <>~{media.runtime} min/ep</>
+                      ) : (
+                        <>{Math.floor(media.runtime / 60)}h {media.runtime % 60}m</>
+                      )}
                     </span>
                   )}
                 </div>
