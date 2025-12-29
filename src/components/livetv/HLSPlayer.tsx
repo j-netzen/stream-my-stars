@@ -600,6 +600,28 @@ export function HLSPlayer({
 
           <div className="flex-1" />
 
+          {/* Quick Proxy Toggle */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "hover:bg-white/20",
+                    usingProxy ? "text-blue-400" : "text-white"
+                  )}
+                  onClick={() => handleProxyModeToggle(!usingProxy)}
+                >
+                  <Shield className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{usingProxy ? 'Proxy On - Click to disable' : 'Proxy Off - Click to enable'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <Button
             variant="ghost"
             size="icon"
