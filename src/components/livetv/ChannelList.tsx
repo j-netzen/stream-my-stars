@@ -4,7 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ChevronDown, ChevronRight, Search, Settings } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Search, Settings, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChannelListProps {
@@ -13,6 +13,7 @@ interface ChannelListProps {
   selectedChannelId?: string;
   onSelectChannel: (channel: Channel) => void;
   onChannelSettings: (channel: Channel) => void;
+  onToggleFavorite: (channelId: string) => void;
 }
 
 export function ChannelList({
@@ -21,19 +22,31 @@ export function ChannelList({
   selectedChannelId,
   onSelectChannel,
   onChannelSettings,
+  onToggleFavorite,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['All Channels']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels']));
 
-  // Filter and group channels
+  // Filter and group channels with favorites at the top
   const { filteredChannels, groups } = useMemo(() => {
     const filtered = channels.filter(c =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.group.toLowerCase().includes(search.toLowerCase())
     );
 
+    // Separate favorites
+    const favorites = filtered.filter(c => c.isFavorite);
+    const nonFavorites = filtered.filter(c => !c.isFavorite);
+
     const groupMap = new Map<string, Channel[]>();
-    filtered.forEach(channel => {
+    
+    // Add favorites group first if there are any
+    if (favorites.length > 0) {
+      groupMap.set('⭐ Favorites', favorites);
+    }
+    
+    // Group the rest by their group
+    nonFavorites.forEach(channel => {
       const group = channel.group || 'Uncategorized';
       if (!groupMap.has(group)) {
         groupMap.set(group, []);
@@ -43,7 +56,7 @@ export function ChannelList({
 
     return {
       filteredChannels: filtered,
-      groups: Array.from(groupMap.entries()).sort((a, b) => a[0].localeCompare(b[0])),
+      groups: Array.from(groupMap.entries()),
     };
   }, [channels, search]);
 
@@ -134,6 +147,9 @@ export function ChannelList({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm truncate">{channel.name}</span>
+                            {channel.isFavorite && (
+                              <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                            )}
                             {channel.isUnstable && (
                               <AlertTriangle className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                             )}
@@ -144,6 +160,25 @@ export function ChannelList({
                             </p>
                           )}
                         </div>
+
+                        {/* Favorite Button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-7 w-7 transition-opacity",
+                            channel.isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite(channel.id);
+                          }}
+                        >
+                          <Star className={cn(
+                            "h-4 w-4",
+                            channel.isFavorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
+                          )} />
+                        </Button>
 
                         {/* Settings Button */}
                         <Button

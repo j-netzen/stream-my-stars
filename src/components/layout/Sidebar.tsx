@@ -24,6 +24,7 @@ import {
   CloudOff,
   Loader2,
   AlertCircle,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +48,7 @@ const defaultNavItems: NavItemData[] = [
   { icon: Home, label: "Home", path: "/" },
   { icon: Film, label: "Movies", path: "/movies" },
   { icon: Tv, label: "TV Shows", path: "/tv-shows" },
+  { icon: Radio, label: "Live TV", path: "/live-tv" },
   { icon: Video, label: "Home Videos", path: "/home-movies" },
   { icon: ListVideo, label: "Playlists", path: "/playlists" },
   { icon: FolderOpen, label: "Categories", path: "/categories" },

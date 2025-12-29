@@ -4,6 +4,7 @@ export interface Channel {
   url: string;
   logo: string;
   isUnstable: boolean;
+  isFavorite: boolean;
   epgId: string;
   group: string;
 }
