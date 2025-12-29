@@ -115,3 +115,27 @@ export async function getTVAiringToday(): Promise<TMDBSearchResult[]> {
     media_type: "tv" as const,
   }));
 }
+
+export async function getPopularMovies(): Promise<TMDBSearchResult[]> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "popular_movies" },
+  });
+
+  if (error) throw error;
+  return (data.results || []).map((item: TMDBSearchResult) => ({
+    ...item,
+    media_type: "movie" as const,
+  }));
+}
+
+export async function getNowPlayingMovies(): Promise<TMDBSearchResult[]> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "now_playing_movies" },
+  });
+
+  if (error) throw error;
+  return (data.results || []).map((item: TMDBSearchResult) => ({
+    ...item,
+    media_type: "movie" as const,
+  }));
+}

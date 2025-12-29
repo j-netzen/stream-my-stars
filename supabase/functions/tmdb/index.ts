@@ -17,7 +17,7 @@ const RATE_LIMIT = {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos", "tv_airing_today"] as const;
+const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos", "tv_airing_today", "now_playing_movies"] as const;
 const VALID_MEDIA_TYPES = ["movie", "tv", "all"] as const;
 const MAX_QUERY_LENGTH = 200;
 const MAX_ID_VALUE = 999999999; // TMDB IDs are large integers
@@ -205,6 +205,9 @@ serve(async (req) => {
       }
       case "tv_airing_today":
         url = `${TMDB_BASE_URL}/tv/airing_today?api_key=${TMDB_API_KEY}`;
+        break;
+      case "now_playing_movies":
+        url = `${TMDB_BASE_URL}/movie/now_playing?api_key=${TMDB_API_KEY}`;
         break;
       default:
         return new Response(
