@@ -4,7 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ChevronDown, ChevronRight, Search, Settings, Star, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Download, Search, Settings, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -12,24 +12,35 @@ interface ChannelListProps {
   channels: Channel[];
   currentPrograms: Map<string, Program | undefined>;
   selectedChannelId?: string;
+  sortEnabled?: boolean;
   onSelectChannel: (channel: Channel) => void;
   onChannelSettings: (channel: Channel) => void;
   onToggleFavorite: (channelId: string) => void;
   onDeleteChannel: (channelId: string) => void;
+  onToggleSort?: () => void;
+  onDownloadM3U8?: () => void;
 }
 
 export function ChannelList({
   channels,
   currentPrograms,
   selectedChannelId,
+  sortEnabled = false,
   onSelectChannel,
   onChannelSettings,
   onToggleFavorite,
   onDeleteChannel,
+  onToggleSort,
+  onDownloadM3U8,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels']));
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const handleDownload = () => {
+    onDownloadM3U8?.();
+    toast.success('List Exported!');
+  };
 
   const handleDeleteClick = (e: React.MouseEvent, channel: Channel) => {
     e.stopPropagation();
@@ -108,9 +119,34 @@ export function ChannelList({
             className="pl-9"
           />
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          {filteredChannels.length} channel{filteredChannels.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-muted-foreground">
+            {filteredChannels.length} channel{filteredChannels.length !== 1 ? 's' : ''}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={sortEnabled ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={onToggleSort}
+              title="Sort A-Z"
+            >
+              <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />
+              A-Z
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={handleDownload}
+              disabled={channels.length === 0}
+              title="Download playlist"
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Export
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Channel Groups */}
