@@ -72,6 +72,7 @@ export function parseM3U(content: string): Channel[] {
           group: currentInfo.group || 'Uncategorized',
           epgId: currentInfo.epgId || '',
           isUnstable: false,
+          isFavorite: false,
         });
       }
       

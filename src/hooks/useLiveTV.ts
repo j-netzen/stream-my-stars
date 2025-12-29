@@ -67,6 +67,7 @@ export function useLiveTV() {
       group: 'Custom',
       epgId: '',
       isUnstable: false,
+      isFavorite: false,
     };
     
     setChannels(prev => {
@@ -77,6 +78,15 @@ export function useLiveTV() {
     });
     
     return newChannel;
+  }, []);
+
+  // Toggle channel favorite status
+  const toggleFavorite = useCallback((channelId: string) => {
+    setChannels(prev => 
+      prev.map(c => 
+        c.id === channelId ? { ...c, isFavorite: !c.isFavorite } : c
+      )
+    );
   }, []);
 
   // Toggle channel unstable status
@@ -216,6 +226,20 @@ export function useLiveTV() {
     });
   }, [programs]);
 
+  // Get favorite channels
+  const getFavoriteChannels = useCallback(() => {
+    return channels.filter(c => c.isFavorite);
+  }, [channels]);
+
+  // Get channels sorted with favorites first
+  const getSortedChannels = useCallback(() => {
+    return [...channels].sort((a, b) => {
+      if (a.isFavorite && !b.isFavorite) return -1;
+      if (!a.isFavorite && b.isFavorite) return 1;
+      return 0;
+    });
+  }, [channels]);
+
   // Clear all data
   const clearAllData = useCallback(() => {
     setChannels([]);
@@ -233,12 +257,15 @@ export function useLiveTV() {
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
+    toggleFavorite,
     removeChannel,
     updateChannel,
     fetchEPG,
     getChannelsByGroup,
     getProgramsForChannel,
     getCurrentProgram,
+    getFavoriteChannels,
+    getSortedChannels,
     clearAllData,
     setSelectedRegion,
   };

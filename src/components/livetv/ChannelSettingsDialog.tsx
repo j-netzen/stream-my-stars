@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Trash2 } from 'lucide-react';
+import { AlertTriangle, Star, Trash2 } from 'lucide-react';
 
 interface ChannelSettingsDialogProps {
   channel: Channel | null;
@@ -21,6 +21,7 @@ interface ChannelSettingsDialogProps {
   onUpdate: (channelId: string, updates: Partial<Channel>) => void;
   onDelete: (channelId: string) => void;
   onToggleUnstable: (channelId: string) => void;
+  onToggleFavorite: (channelId: string) => void;
 }
 
 export function ChannelSettingsDialog({
@@ -30,6 +31,7 @@ export function ChannelSettingsDialog({
   onUpdate,
   onDelete,
   onToggleUnstable,
+  onToggleFavorite,
 }: ChannelSettingsDialogProps) {
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
@@ -128,6 +130,27 @@ export function ChannelSettingsDialog({
               className="bg-muted text-muted-foreground"
             />
           </div>
+
+          {/* Favorite Toggle */}
+          <div className="flex items-center justify-between py-2 px-1">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4 text-yellow-500" />
+              <Label htmlFor="favorite-toggle" className="cursor-pointer">
+                Add to Favorites
+              </Label>
+            </div>
+            <Switch
+              id="favorite-toggle"
+              checked={channel.isFavorite}
+              onCheckedChange={() => onToggleFavorite(channel.id)}
+            />
+          </div>
+
+          {channel.isFavorite && (
+            <p className="text-xs text-muted-foreground bg-yellow-500/10 p-2 rounded">
+              Favorite channels appear at the top of your channel list.
+            </p>
+          )}
 
           {/* Unstable Toggle */}
           <div className="flex items-center justify-between py-2 px-1">

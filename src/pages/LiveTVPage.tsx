@@ -20,6 +20,7 @@ export default function LiveTVPage() {
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
+    toggleFavorite,
     removeChannel,
     updateChannel,
     fetchEPG,
@@ -140,6 +141,7 @@ export default function LiveTVPage() {
                 selectedChannelId={selectedChannel?.id}
                 onSelectChannel={handleSelectChannel}
                 onChannelSettings={handleChannelSettings}
+                onToggleFavorite={toggleFavorite}
               />
             </div>
 
@@ -204,6 +206,7 @@ export default function LiveTVPage() {
         onUpdate={updateChannel}
         onDelete={removeChannel}
         onToggleUnstable={toggleUnstable}
+        onToggleFavorite={toggleFavorite}
       />
 
       <EPGSettingsDialog
