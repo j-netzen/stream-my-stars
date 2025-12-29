@@ -156,27 +156,6 @@ export function ChannelSettingsDialog({
             </p>
           )}
 
-          {/* Proxy Mode Toggle */}
-          <div className="flex items-center justify-between py-2 px-1">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-blue-500" />
-              <Label htmlFor="proxy-toggle" className="cursor-pointer">
-                Use Proxy Mode
-              </Label>
-            </div>
-            <Switch
-              id="proxy-toggle"
-              checked={channel.useProxy}
-              onCheckedChange={(checked) => onToggleProxy(channel.id, checked)}
-            />
-          </div>
-
-          {channel.useProxy && (
-            <p className="text-xs text-muted-foreground bg-blue-500/10 p-2 rounded">
-              This channel will always use a CORS proxy to bypass streaming restrictions.
-              The original URL is preserved for EPG matching.
-            </p>
-          )}
 
           {/* Unstable Toggle */}
           <div className="flex items-center justify-between py-2 px-1">
