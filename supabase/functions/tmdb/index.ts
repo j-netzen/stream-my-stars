@@ -17,7 +17,7 @@ const RATE_LIMIT = {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos", "tv_airing_today", "now_playing_movies"] as const;
+const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos", "tv_airing_today", "now_playing_movies", "watch_providers"] as const;
 const VALID_MEDIA_TYPES = ["movie", "tv", "all"] as const;
 const MAX_QUERY_LENGTH = 200;
 const MAX_ID_VALUE = 999999999; // TMDB IDs are large integers
@@ -56,14 +56,14 @@ function validateTmdbInput(body: unknown): ValidationResult {
   }
   
   // Validate id for detail actions
-  if (["movie_details", "tv_details", "get_imdb_id", "get_videos"].includes(action)) {
+  if (["movie_details", "tv_details", "get_imdb_id", "get_videos", "watch_providers"].includes(action)) {
     if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || id > MAX_ID_VALUE) {
       return { valid: false, error: "ID must be a positive integer" };
     }
   }
   
   // Validate media_type for actions that use it
-  if (["trending", "get_imdb_id", "get_videos"].includes(action)) {
+  if (["trending", "get_imdb_id", "get_videos", "watch_providers"].includes(action)) {
     if (media_type !== undefined) {
       if (typeof media_type !== 'string' || !VALID_MEDIA_TYPES.includes(media_type as typeof VALID_MEDIA_TYPES[number])) {
         return { valid: false, error: `Invalid media_type. Must be one of: ${VALID_MEDIA_TYPES.join(', ')}` };
@@ -209,6 +209,11 @@ serve(async (req) => {
       case "now_playing_movies":
         url = `${TMDB_BASE_URL}/movie/now_playing?api_key=${TMDB_API_KEY}`;
         break;
+      case "watch_providers": {
+        const endpoint = media_type === "movie" ? "movie" : "tv";
+        url = `${TMDB_BASE_URL}/${endpoint}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
+        break;
+      }
       default:
         return new Response(
           JSON.stringify({ error: "Validation error", message: "Invalid action" }),

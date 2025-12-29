@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
-import { useCategories } from "@/hooks/useCategories";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
@@ -46,7 +45,6 @@ interface AddMediaDialogProps {
 
 export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
-  const { categories } = useCategories();
   const { isTVMode } = useTVMode();
   const { status: rdServiceStatus, isServiceAvailable: isRdAvailable, refresh: refreshRdStatus } = useRealDebridStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);

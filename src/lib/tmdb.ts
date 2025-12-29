@@ -96,6 +96,26 @@ export interface TMDBVideo {
   type: string;
 }
 
+export interface TMDBWatchProvider {
+  logo_path: string;
+  provider_id: number;
+  provider_name: string;
+  display_priority: number;
+}
+
+export interface TMDBWatchProviders {
+  id: number;
+  results: {
+    [countryCode: string]: {
+      link: string;
+      flatrate?: TMDBWatchProvider[];
+      rent?: TMDBWatchProvider[];
+      buy?: TMDBWatchProvider[];
+      free?: TMDBWatchProvider[];
+    };
+  };
+}
+
 export async function getVideos(id: number, mediaType: "movie" | "tv"): Promise<TMDBVideo[]> {
   const { data, error } = await supabase.functions.invoke("tmdb", {
     body: { action: "get_videos", id, media_type: mediaType },
@@ -139,4 +159,13 @@ export async function getNowPlayingMovies(): Promise<TMDBSearchResult[]> {
     ...item,
     media_type: "movie" as const,
   }));
+}
+
+export async function getWatchProviders(id: number, mediaType: "movie" | "tv"): Promise<TMDBWatchProviders> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "watch_providers", id, media_type: mediaType },
+  });
+
+  if (error) throw error;
+  return data;
 }

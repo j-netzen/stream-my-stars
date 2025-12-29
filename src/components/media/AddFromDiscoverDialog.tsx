@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
-import { useCategories } from "@/hooks/useCategories";
 import { getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import {
   Dialog,
@@ -9,14 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Loader2, Film, Tv, Star, Calendar, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,11 +35,9 @@ interface TMDBDetails {
 
 export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDiscoverDialogProps) {
   const { addMedia } = useMedia();
-  const { categories } = useCategories();
 
   const [tmdbDetails, setTmdbDetails] = useState<TMDBDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isAdding, setIsAdding] = useState(false);
 
   // Fetch TMDB details when item changes
@@ -88,17 +77,6 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
           media_type: mediaType,
           imdb_id: details?.external_ids?.imdb_id,
         });
-
-        // Auto-select category based on first genre
-        if (genres.length > 0 && categories && categories.length > 0) {
-          const firstGenre = genres[0].toLowerCase();
-          const matchingCategory = categories.find(
-            (cat) => cat.name.toLowerCase() === firstGenre
-          );
-          if (matchingCategory) {
-            setSelectedCategory(matchingCategory.id);
-          }
-        }
       } catch (error) {
         // Use basic info if details fail
         const mediaType = item.media_type === "movie" ? "movie" : "tv" as const;
@@ -116,12 +94,11 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
     };
 
     fetchDetails();
-  }, [item, open, categories]);
+  }, [item, open]);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setSelectedCategory("");
       setTmdbDetails(null);
     }
   }, [open]);
@@ -140,7 +117,6 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
         media_type: tmdbDetails.media_type,
         source_type: "url",
         source_url: undefined,
-        category_id: selectedCategory || undefined,
         overview: tmdbDetails.overview,
         tmdb_id: tmdbDetails.tmdb_id,
         poster_path: tmdbDetails.poster_path,
@@ -224,23 +200,6 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
                   </p>
                 )}
               </div>
-            </div>
-
-            {/* Category Selection */}
-            <div className="space-y-2">
-              <Label>Category (Optional)</Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories?.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Add Button */}

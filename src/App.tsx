@@ -13,7 +13,7 @@ import HomePage from "./pages/HomePage";
 import MoviesPage from "./pages/MoviesPage";
 import TVShowsPage from "./pages/TVShowsPage";
 import HomeMoviesPage from "./pages/HomeMoviesPage";
-import CategoriesPage from "./pages/CategoriesPage";
+import NetworksPage from "./pages/NetworksPage";
 import PlaylistsPage from "./pages/PlaylistsPage";
 import DiscoverPage from "./pages/DiscoverPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -67,10 +67,10 @@ const App = () => (
                 }
               />
               <Route
-                path="/categories"
+                path="/networks"
                 element={
                   <MainLayout>
-                    <CategoriesPage />
+                    <NetworksPage />
                   </MainLayout>
                 }
               />

@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
-import { useCategories } from "@/hooks/useCategories";
 import { useTVMode } from "@/hooks/useTVMode";
 import { MediaRow } from "@/components/media/MediaRow";
 import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
@@ -17,7 +16,6 @@ import { cn } from "@/lib/utils";
 export default function HomePage() {
   const { media, isLoading: mediaLoading, deleteMedia, refetch } = useMedia();
   const { progress, getContinueWatching } = useWatchProgress();
-  const { categories } = useCategories();
   const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
@@ -195,27 +193,6 @@ export default function HomePage() {
             onAddToPlaylist={setPlaylistMedia}
           />
         )}
-
-        {/* Category Rows */}
-        {categories.map((category) => {
-          const categoryMedia = media.filter(
-            (m) => m.category_id === category.id
-          );
-          if (categoryMedia.length === 0) return null;
-          return (
-            <MediaRow
-              key={category.id}
-              title={category.name}
-              media={categoryMedia}
-              progress={progress}
-              showContinue={false}
-              onPlay={handlePlay}
-              onDelete={handleDelete}
-              onMoreInfo={setDetailsMedia}
-              onAddToPlaylist={setPlaylistMedia}
-            />
-          );
-        })}
 
         {/* Empty State */}
         {media.length === 0 && (

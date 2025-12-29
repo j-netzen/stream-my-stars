@@ -70,6 +70,7 @@ export type Database = {
           tmdb_id: number | null
           updated_at: string
           user_id: string
+          watch_providers: Json | null
         }
         Insert: {
           backdrop_path?: string | null
@@ -93,6 +94,7 @@ export type Database = {
           tmdb_id?: number | null
           updated_at?: string
           user_id: string
+          watch_providers?: Json | null
         }
         Update: {
           backdrop_path?: string | null
@@ -116,6 +118,7 @@ export type Database = {
           tmdb_id?: number | null
           updated_at?: string
           user_id?: string
+          watch_providers?: Json | null
         }
         Relationships: [
           {
