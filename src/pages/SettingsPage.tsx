@@ -186,42 +186,6 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Auto-play */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="auto-play" className={cn("font-medium", isTVMode && "text-lg")}>
-                Auto-play videos
-              </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                Automatically start playing when a video is opened
-              </p>
-            </div>
-            <Switch
-              id="auto-play"
-              checked={playbackSettings.autoPlay}
-              onCheckedChange={(checked) => updatePlaybackSetting('autoPlay', checked)}
-              className={isTVMode ? "scale-125" : ""}
-            />
-          </div>
-
-          {/* Auto-fullscreen */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="auto-fullscreen" className={cn("font-medium", isTVMode && "text-lg")}>
-                Auto-fullscreen
-              </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                Automatically enter fullscreen when video starts playing
-              </p>
-            </div>
-            <Switch
-              id="auto-fullscreen"
-              checked={playbackSettings.autoFullscreen}
-              onCheckedChange={(checked) => updatePlaybackSetting('autoFullscreen', checked)}
-              className={isTVMode ? "scale-125" : ""}
-            />
-          </div>
-
           {/* Limit to 30 FPS */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">

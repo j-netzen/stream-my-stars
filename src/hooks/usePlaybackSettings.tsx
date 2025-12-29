@@ -6,8 +6,6 @@ export interface PlaybackSettings {
   autoQualityDowngrade: boolean; // auto switch to lower quality on slow connection
   
   // Playback
-  autoFullscreen: boolean;
-  autoPlay: boolean;
   limitFps30: boolean; // optional 30 fps limit for slower devices
   
   // Network detection
@@ -18,8 +16,6 @@ export interface PlaybackSettings {
 const DEFAULT_SETTINGS: PlaybackSettings = {
   bufferAhead: 30,
   autoQualityDowngrade: true,
-  autoFullscreen: true,
-  autoPlay: true,
   limitFps30: false,
   connectionSpeedMbps: null,
   isSlowConnection: false,
