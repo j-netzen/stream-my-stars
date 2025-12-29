@@ -54,26 +54,6 @@ export function EPGSettingsDialog({
         </DialogHeader>
 
         <ScrollArea className="flex-1 -mx-6 px-6">
-          {/* Global Proxy Setting */}
-          <div className="py-4">
-            <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/50">
-              <div className="flex items-center gap-3">
-                <Shield className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="font-medium">Global Proxy Mode</p>
-                  <p className="text-sm text-muted-foreground">
-                    Route all streams through a CORS proxy by default
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={globalProxyEnabled}
-                onCheckedChange={onGlobalProxyChange}
-              />
-            </div>
-          </div>
-
-          <Separator />
 
           {/* EPG Region Selection */}
           <div className="py-4">
