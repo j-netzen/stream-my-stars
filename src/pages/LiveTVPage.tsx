@@ -152,43 +152,63 @@ export default function LiveTVPage() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header - hidden in fullscreen mode */}
       {viewMode !== 'fullscreen' && (
-        <div className="flex items-center justify-between p-4 border-b border-border z-30 bg-background flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Tv className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Live TV</h1>
-            <span className="text-sm text-muted-foreground">
-              {channels.length} channel{channels.length !== 1 ? 's' : ''}
-            </span>
-            {/* Sync Status Indicator */}
-            {isSyncing && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full animate-pulse">
-                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                Syncing...
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-muted rounded-lg p-1">
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 px-2"
-                onClick={() => handleViewModeChange('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode !== 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 px-2"
-                onClick={() => handleViewModeChange('guide')}
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </Button>
+        <div className="flex flex-col gap-2 p-4 border-b border-border z-30 bg-background flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Tv className="h-6 w-6 text-primary" />
+              <h1 className="text-xl font-semibold">Live TV</h1>
+              <span className="text-sm text-muted-foreground">
+                {channels.length} channel{channels.length !== 1 ? 's' : ''}
+              </span>
+              {/* Sync Status Indicator */}
+              {isSyncing && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full animate-pulse">
+                  <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                  Syncing...
+                </div>
+              )}
             </div>
 
+            <div className="flex items-center gap-2">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-muted rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => handleViewModeChange('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode !== 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => handleViewModeChange('guide')}
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {channels.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Clear all channels and data?')) {
+                      clearAllData();
+                      setSelectedChannel(null);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Second row with EPG and Add Channels */}
+          <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowEPGDialog(true)}>
               <Globe className="mr-2 h-4 w-4" />
               EPG
@@ -198,21 +218,6 @@ export default function LiveTVPage() {
               <Plus className="mr-2 h-4 w-4" />
               Add Channels
             </Button>
-
-            {channels.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (confirm('Clear all channels and data?')) {
-                    clearAllData();
-                    setSelectedChannel(null);
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
           </div>
         </div>
       )}
