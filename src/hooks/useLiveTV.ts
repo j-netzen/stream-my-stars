@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Channel, Program, EPG_SOURCES, LiveTVSettings } from '@/types/livetv';
 import { parseM3U, mergeChannels, hashUrl } from '@/lib/m3uParser';
 import { parseEPGXML, matchEPGToChannels, generateMockEPG } from '@/lib/epgParser';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
-const CHANNELS_STORAGE_KEY = 'livetv_channels';
 const PROGRAMS_STORAGE_KEY = 'livetv_programs';
 const EPG_REGION_KEY = 'livetv_epg_region';
 const SETTINGS_STORAGE_KEY = 'livetv_settings';
@@ -12,6 +13,7 @@ const SORT_ENABLED_KEY = 'livetv_sort_enabled';
 const DEFAULT_SETTINGS: LiveTVSettings = {};
 
 export function useLiveTV() {
+  const { user } = useAuth();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedRegion, setSelectedRegion] = useState<string>('us');
@@ -19,6 +21,7 @@ export function useLiveTV() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
   const [sortEnabled, setSortEnabled] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Sort channels alphabetically (case-insensitive)
   const sortChannelsAlphabetically = useCallback((channelList: Channel[]): Channel[] => {
@@ -27,46 +30,132 @@ export function useLiveTV() {
     );
   }, []);
 
-  // Load from localStorage on mount
-  useEffect(() => {
+  // Sync channels to database
+  const syncChannelsToDb = useCallback(async (channelList: Channel[]) => {
+    if (!user) return;
+
     try {
-      const storedChannels = localStorage.getItem(CHANNELS_STORAGE_KEY);
-      const storedPrograms = localStorage.getItem(PROGRAMS_STORAGE_KEY);
-      const storedRegion = localStorage.getItem(EPG_REGION_KEY);
-      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      const storedSortEnabled = localStorage.getItem(SORT_ENABLED_KEY);
-      
-      if (storedChannels) {
-        let parsedChannels = JSON.parse(storedChannels);
-        // Apply sorting if enabled
-        if (storedSortEnabled === 'true') {
-          parsedChannels = sortChannelsAlphabetically(parsedChannels);
+      // Delete existing channels for this user
+      await supabase
+        .from('livetv_channels')
+        .delete()
+        .eq('user_id', user.id);
+
+      // Insert all current channels
+      if (channelList.length > 0) {
+        const dbChannels = channelList.map((channel, index) => ({
+          user_id: user.id,
+          channel_id: channel.id,
+          name: channel.name,
+          url: channel.url,
+          original_url: channel.originalUrl || null,
+          logo: channel.logo || '',
+          channel_group: channel.group || 'My Channels',
+          epg_id: channel.epgId || '',
+          is_unstable: channel.isUnstable,
+          is_favorite: channel.isFavorite,
+          sort_order: index,
+        }));
+
+        const { error } = await supabase
+          .from('livetv_channels')
+          .insert(dbChannels);
+
+        if (error) {
+          console.error('Error syncing channels to database:', error);
         }
-        setChannels(parsedChannels);
-      }
-      if (storedPrograms) {
-        setPrograms(JSON.parse(storedPrograms));
-      }
-      if (storedRegion) {
-        setSelectedRegion(storedRegion);
-      }
-      if (storedSettings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
-      }
-      if (storedSortEnabled) {
-        setSortEnabled(storedSortEnabled === 'true');
       }
     } catch (err) {
-      console.error('Error loading from localStorage:', err);
+      console.error('Error syncing channels:', err);
     }
-  }, [sortChannelsAlphabetically]);
+  }, [user]);
 
-  // Save channels to localStorage
-  useEffect(() => {
-    if (channels.length > 0) {
-      localStorage.setItem(CHANNELS_STORAGE_KEY, JSON.stringify(channels));
+  // Load channels from database
+  const loadChannelsFromDb = useCallback(async () => {
+    if (!user) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('livetv_channels')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error loading channels from database:', error);
+        return [];
+      }
+
+      if (data && data.length > 0) {
+        return data.map((row) => ({
+          id: row.channel_id,
+          name: row.name,
+          url: row.url,
+          originalUrl: row.original_url || undefined,
+          logo: row.logo || '',
+          group: row.channel_group || 'My Channels',
+          epgId: row.epg_id || '',
+          isUnstable: row.is_unstable || false,
+          isFavorite: row.is_favorite || false,
+        })) as Channel[];
+      }
+    } catch (err) {
+      console.error('Error loading channels:', err);
     }
-  }, [channels]);
+    return [];
+  }, [user]);
+
+  // Load data on mount and when user changes
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const storedPrograms = localStorage.getItem(PROGRAMS_STORAGE_KEY);
+        const storedRegion = localStorage.getItem(EPG_REGION_KEY);
+        const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        const storedSortEnabled = localStorage.getItem(SORT_ENABLED_KEY);
+        
+        // Load channels from database if user is logged in
+        if (user) {
+          const dbChannels = await loadChannelsFromDb();
+          let channelList = dbChannels;
+          
+          // Apply sorting if enabled
+          if (storedSortEnabled === 'true' && channelList.length > 0) {
+            channelList = sortChannelsAlphabetically(channelList);
+          }
+          setChannels(channelList);
+        } else {
+          setChannels([]);
+        }
+
+        if (storedPrograms) {
+          setPrograms(JSON.parse(storedPrograms));
+        }
+        if (storedRegion) {
+          setSelectedRegion(storedRegion);
+        }
+        if (storedSettings) {
+          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
+        }
+        if (storedSortEnabled) {
+          setSortEnabled(storedSortEnabled === 'true');
+        }
+      } catch (err) {
+        console.error('Error loading data:', err);
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    loadData();
+  }, [user, loadChannelsFromDb, sortChannelsAlphabetically]);
+
+  // Sync channels to database when they change (after initialization)
+  useEffect(() => {
+    if (isInitialized && user) {
+      syncChannelsToDb(channels);
+    }
+  }, [channels, isInitialized, user, syncChannelsToDb]);
 
   // Save programs to localStorage
   useEffect(() => {
@@ -321,12 +410,19 @@ export function useLiveTV() {
   }, [channels]);
 
   // Clear all data
-  const clearAllData = useCallback(() => {
+  const clearAllData = useCallback(async () => {
     setChannels([]);
     setPrograms([]);
-    localStorage.removeItem(CHANNELS_STORAGE_KEY);
     localStorage.removeItem(PROGRAMS_STORAGE_KEY);
-  }, []);
+    
+    // Also clear from database
+    if (user) {
+      await supabase
+        .from('livetv_channels')
+        .delete()
+        .eq('user_id', user.id);
+    }
+  }, [user]);
 
   return {
     channels,
