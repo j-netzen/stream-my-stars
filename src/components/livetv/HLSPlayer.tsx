@@ -103,12 +103,14 @@ export function HLSPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownProxyToast = useRef(false);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [showControls, setShowControls] = useState(true);
+  const [isProxyOverlayVisible, setIsProxyOverlayVisible] = useState(true);
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -126,6 +128,31 @@ export function HLSPlayer({
 
   // Store the original URL for EPG matching - never modify this
   const epgMatchUrl = originalUrl || url;
+
+  // Auto-hide proxy overlay after 5 seconds
+  const resetOverlayTimer = useCallback(() => {
+    if (overlayTimeoutRef.current) {
+      clearTimeout(overlayTimeoutRef.current);
+    }
+    setIsProxyOverlayVisible(true);
+    
+    overlayTimeoutRef.current = setTimeout(() => {
+      setIsProxyOverlayVisible(false);
+    }, 5000);
+  }, []);
+
+  // Start overlay timer when stream starts playing
+  useEffect(() => {
+    if (!isLoading && !streamError) {
+      resetOverlayTimer();
+    }
+    
+    return () => {
+      if (overlayTimeoutRef.current) {
+        clearTimeout(overlayTimeoutRef.current);
+      }
+    };
+  }, [isLoading, streamError, url]); // Reset timer when stream changes
 
   // Sync proxy mode with global setting or external state
   useEffect(() => {
@@ -443,6 +470,12 @@ export function HLSPlayer({
     }
   }, [proxyIndex]);
 
+  // Handle player area interaction - reset both controls and overlay timer
+  const handlePlayerInteraction = useCallback(() => {
+    resetControlsTimer();
+    resetOverlayTimer();
+  }, [resetControlsTimer, resetOverlayTimer]);
+
   return (
     <div
       ref={containerRef}
@@ -450,8 +483,9 @@ export function HLSPlayer({
         "relative bg-black group",
         isFullscreen ? "fixed inset-0 z-50" : "w-full aspect-video rounded-lg overflow-hidden"
       )}
-      onMouseMove={resetControlsTimer}
-      onTouchStart={resetControlsTimer}
+      onMouseMove={handlePlayerInteraction}
+      onTouchStart={handlePlayerInteraction}
+      onClick={handlePlayerInteraction}
     >
       {/* Video Element */}
       <video
@@ -514,36 +548,43 @@ export function HLSPlayer({
         </div>
       )}
 
-      {/* Proxy Mode Toggle & Indicator */}
+      {/* Proxy Mode Toggle & Indicator - auto-hides after 5 seconds */}
       {!streamError && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div 
-                className={cn(
-                  "absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-sm cursor-pointer transition-colors",
-                  usingProxy 
-                    ? "bg-blue-500/80 text-white" 
-                    : "bg-black/50 text-white/70 hover:bg-black/70"
-                )}
-                onClick={() => handleProxyModeToggle(!usingProxy)}
-              >
-                <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {usingProxy ? 'Proxy On' : 'Proxy Off'}
-                </span>
-                {usingProxy ? (
-                  <ToggleRight className="h-4 w-4" />
-                ) : (
-                  <ToggleLeft className="h-4 w-4" />
-                )}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>{usingProxy ? 'Disable proxy mode' : 'Enable proxy mode to bypass CORS'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div
+          className={cn(
+            "absolute top-4 right-4 transition-opacity duration-500 ease-in-out",
+            isProxyOverlayVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+        >
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm cursor-pointer transition-colors",
+                    usingProxy 
+                      ? "bg-blue-500/80 text-white" 
+                      : "bg-black/50 text-white/70 hover:bg-black/70"
+                  )}
+                  onClick={() => handleProxyModeToggle(!usingProxy)}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {usingProxy ? 'Proxy On' : 'Proxy Off'}
+                  </span>
+                  {usingProxy ? (
+                    <ToggleRight className="h-4 w-4" />
+                  ) : (
+                    <ToggleLeft className="h-4 w-4" />
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>{usingProxy ? 'Disable proxy mode' : 'Enable proxy mode to bypass CORS'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       )}
 
       {/* Unstable Warning */}
