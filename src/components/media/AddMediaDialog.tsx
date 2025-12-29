@@ -55,7 +55,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedResult, setSelectedResult] = useState<TMDBSearchResult | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  
   const [manualTitle, setManualTitle] = useState("");
   const [manualOverview, setManualOverview] = useState("");
   const [manualType, setManualType] = useState<"movie" | "tv" | "custom">("custom");
@@ -383,7 +383,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           media_type: "tv",
           source_type: "url",
           source_url: downloadUrl,
-          category_id: selectedCategory || undefined,
           overview: manualOverview,
           ...(selectedTmdbForDebrid && {
             tmdb_id: selectedTmdbForDebrid.tmdb_id,
@@ -501,7 +500,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         media_type: selectedResult.media_type as "movie" | "tv",
         source_type: "url",
         source_url: sourceUrl,
-        category_id: selectedCategory || undefined,
         tmdb_id: selectedResult.id,
         poster_path: selectedResult.poster_path,
         backdrop_path: selectedResult.backdrop_path,
@@ -545,7 +543,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         source_type: "url",
         // Use marker URL for stored handle; otherwise use whatever user entered
         source_url: useStoredHandle ? LOCAL_FILE_MARKER : sourceUrl,
-        category_id: selectedCategory || undefined,
         overview: manualOverview,
       };
 
@@ -566,8 +563,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
   const handleBulkAdd = async (
     entries: Array<{ title: string; path: string }>,
-    mediaType: string,
-    categoryId?: string
+    mediaType: string
   ) => {
     setIsAdding(true);
     try {
@@ -577,7 +573,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           media_type: mediaType as "movie" | "tv" | "custom",
           source_type: "url",
           source_url: entry.path,
-          category_id: categoryId,
         };
         await addMedia.mutateAsync(input);
       }
@@ -611,7 +606,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         media_type: manualType,
         source_type: "url",
         source_url: null, // No URL - will be selected at play time
-        category_id: selectedCategory || undefined,
         overview: manualOverview,
         tmdb_id: selectedTmdbForDebrid.tmdb_id,
         poster_path: selectedTmdbForDebrid.poster_path,
@@ -716,7 +710,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         media_type: manualType,
         source_type: "url",
         source_url: streamUrl,
-        category_id: selectedCategory || undefined,
+        
         overview: manualOverview,
         // Include TMDB metadata if available
         ...(selectedTmdbForDebrid && {
@@ -815,7 +809,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setSearchResults([]);
     setSelectedResult(null);
     setSourceUrl("");
-    setSelectedCategory("");
+    
     setManualTitle("");
     setManualOverview("");
     setManualType("custom");
@@ -988,23 +982,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Category (Optional)</Label>
-                  <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No category</SelectItem>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <Button
                   onClick={handleAddFromTMDB}
                   disabled={isAdding}
@@ -1057,23 +1034,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
                 value={manualOverview}
                 onChange={(e) => setManualOverview(e.target.value)}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Category (Optional)</Label>
-              <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <Button
@@ -1442,23 +1402,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Category (Optional)</Label>
-              <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <Button
               onClick={handleAddWithMetadata}
               disabled={isAdding || !selectedTmdbForDebrid}
@@ -1556,23 +1499,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Category (Optional)</Label>
-              <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <Button
               onClick={handleAddManual}
               disabled={isAdding}
@@ -1581,14 +1507,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               {isAdding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Add to Library
             </Button>
-          </TabsContent>
-
-          <TabsContent value="bulk" className="mt-4">
-            <NetworkPathHelper
-              onAddEntries={handleBulkAdd}
-              categories={categories}
-              isAdding={isAdding}
-            />
           </TabsContent>
             </Tabs>
           </ScrollAreaWithArrows>
