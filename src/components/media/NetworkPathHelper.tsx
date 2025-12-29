@@ -19,16 +19,14 @@ interface GeneratedEntry {
 }
 
 interface NetworkPathHelperProps {
-  onAddEntries: (entries: GeneratedEntry[], mediaType: string, categoryId?: string) => void;
-  categories: Array<{ id: string; name: string }>;
+  onAddEntries: (entries: GeneratedEntry[], mediaType: string) => void;
   isAdding?: boolean;
 }
 
-export function NetworkPathHelper({ onAddEntries, categories, isAdding }: NetworkPathHelperProps) {
+export function NetworkPathHelper({ onAddEntries, isAdding }: NetworkPathHelperProps) {
   const [basePath, setBasePath] = useState("");
   const [fileNames, setFileNames] = useState("");
   const [mediaType, setMediaType] = useState<"movie" | "tv" | "custom">("custom");
-  const [selectedCategory, setSelectedCategory] = useState("");
   const [generatedEntries, setGeneratedEntries] = useState<GeneratedEntry[]>([]);
 
   const generateEntries = () => {
@@ -67,7 +65,7 @@ export function NetworkPathHelper({ onAddEntries, categories, isAdding }: Networ
 
   const handleAddAll = () => {
     if (generatedEntries.length === 0) return;
-    onAddEntries(generatedEntries, mediaType, selectedCategory || undefined);
+    onAddEntries(generatedEntries, mediaType);
     setGeneratedEntries([]);
     setFileNames("");
   };
@@ -88,37 +86,18 @@ export function NetworkPathHelper({ onAddEntries, categories, isAdding }: Networ
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Type</Label>
-          <Select value={mediaType} onValueChange={(v) => setMediaType(v as any)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="movie">Movie</SelectItem>
-              <SelectItem value="tv">TV Show</SelectItem>
-              <SelectItem value="custom">Home Video</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <Select value={selectedCategory || "none"} onValueChange={(v) => setSelectedCategory(v === "none" ? "" : v)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No category</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-2">
+        <Label>Type</Label>
+        <Select value={mediaType} onValueChange={(v) => setMediaType(v as any)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="movie">Movie</SelectItem>
+            <SelectItem value="tv">TV Show</SelectItem>
+            <SelectItem value="custom">Home Video</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
