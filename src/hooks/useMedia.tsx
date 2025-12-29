@@ -108,6 +108,28 @@ export function useMedia() {
     },
   });
 
+  const refreshMetadata = useMutation({
+    mutationFn: async (input: Partial<CreateMediaInput> & { id: string }) => {
+      const { id, ...updates } = input;
+      const { data, error } = await supabase
+        .from("media")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as Media;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["media"] });
+      toast.success("Metadata refreshed");
+    },
+    onError: (error) => {
+      toast.error("Failed to refresh metadata: " + error.message);
+    },
+  });
+
   const deleteMedia = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("media").delete().eq("id", id);
@@ -122,5 +144,5 @@ export function useMedia() {
     },
   });
 
-  return { media, isLoading, addMedia, updateMedia, deleteMedia, refetch };
+  return { media, isLoading, addMedia, updateMedia, deleteMedia, refreshMetadata, refetch };
 }
