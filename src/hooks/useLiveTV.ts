@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Channel, Program, EPG_SOURCES } from '@/types/livetv';
+import { Channel, Program, EPG_SOURCES, LiveTVSettings } from '@/types/livetv';
 import { parseM3U, mergeChannels, hashUrl } from '@/lib/m3uParser';
 import { parseEPGXML, matchEPGToChannels, generateMockEPG } from '@/lib/epgParser';
 
 const CHANNELS_STORAGE_KEY = 'livetv_channels';
 const PROGRAMS_STORAGE_KEY = 'livetv_programs';
 const EPG_REGION_KEY = 'livetv_epg_region';
+const SETTINGS_STORAGE_KEY = 'livetv_settings';
+
+const DEFAULT_SETTINGS: LiveTVSettings = {
+  globalProxyEnabled: false,
+};
 
 export function useLiveTV() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -13,6 +18,7 @@ export function useLiveTV() {
   const [selectedRegion, setSelectedRegion] = useState<string>('us');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -20,6 +26,7 @@ export function useLiveTV() {
       const storedChannels = localStorage.getItem(CHANNELS_STORAGE_KEY);
       const storedPrograms = localStorage.getItem(PROGRAMS_STORAGE_KEY);
       const storedRegion = localStorage.getItem(EPG_REGION_KEY);
+      const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
       
       if (storedChannels) {
         setChannels(JSON.parse(storedChannels));
@@ -29,6 +36,9 @@ export function useLiveTV() {
       }
       if (storedRegion) {
         setSelectedRegion(storedRegion);
+      }
+      if (storedSettings) {
+        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
       }
     } catch (err) {
       console.error('Error loading from localStorage:', err);
@@ -48,6 +58,16 @@ export function useLiveTV() {
       localStorage.setItem(PROGRAMS_STORAGE_KEY, JSON.stringify(programs));
     }
   }, [programs]);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  }, [settings]);
+
+  // Update global proxy setting
+  const setGlobalProxyEnabled = useCallback((enabled: boolean) => {
+    setSettings(prev => ({ ...prev, globalProxyEnabled: enabled }));
+  }, []);
 
   // Add channels from M3U content
   const addChannelsFromM3U = useCallback((m3uContent: string) => {
@@ -254,6 +274,7 @@ export function useLiveTV() {
     selectedRegion,
     isLoading,
     error,
+    settings,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -268,5 +289,6 @@ export function useLiveTV() {
     getSortedChannels,
     clearAllData,
     setSelectedRegion,
+    setGlobalProxyEnabled,
   };
 }
