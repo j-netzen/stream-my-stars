@@ -257,7 +257,7 @@ export function StreamSelectionDialog({
       setError(null);
       setSelectedSeason(1);
       setSelectedEpisode(1);
-      setQualityFilter("all");
+      setQualityFilter("best");
       setActiveTab("search"); // Start with streams tab
       setDownloadSearchQuery("");
       setFailedStreams(new Set());
