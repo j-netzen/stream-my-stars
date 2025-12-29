@@ -23,6 +23,7 @@ export function useLiveTV() {
   const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
   const [sortEnabled, setSortEnabled] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isSyncingState, setIsSyncingState] = useState(false); // Exposed sync status
   const isSyncing = useRef(false); // Prevent sync loops from realtime updates
 
   // Sort channels alphabetically (case-insensitive)
@@ -203,8 +204,10 @@ export function useLiveTV() {
           filter: `user_id=eq.${user.id}`,
         },
         async () => {
-          // Debounce and reload channels from DB
+          // Show syncing indicator
+          setIsSyncingState(true);
           isSyncing.current = true;
+          
           const dbChannels = await loadChannelsFromDb();
           if (dbChannels.length > 0 || channels.length === 0) {
             let channelList = dbChannels;
@@ -213,8 +216,10 @@ export function useLiveTV() {
             }
             setChannels(channelList);
           }
+          
           setTimeout(() => {
             isSyncing.current = false;
+            setIsSyncingState(false);
           }, 1000);
         }
       )
@@ -608,5 +613,6 @@ export function useLiveTV() {
     copyShareableData,
     importFromShareableData,
     refreshChannels,
+    isSyncing: isSyncingState,
   };
 }
