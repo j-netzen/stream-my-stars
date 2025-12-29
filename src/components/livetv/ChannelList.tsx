@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Channel, Program } from '@/types/livetv';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Download, Search, Settings, Star, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, Search, Settings, Share2, Star, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -19,6 +20,10 @@ interface ChannelListProps {
   onDeleteChannel: (channelId: string) => void;
   onToggleSort?: () => void;
   onDownloadM3U8?: () => void;
+  onDownloadJSON?: () => void;
+  onImportJSON?: (content: string) => number;
+  onCopyShareable?: () => void;
+  onImportShareable?: (data: string) => number;
 }
 
 export function ChannelList({
@@ -32,14 +37,50 @@ export function ChannelList({
   onDeleteChannel,
   onToggleSort,
   onDownloadM3U8,
+  onDownloadJSON,
+  onImportJSON,
+  onCopyShareable,
+  onImportShareable,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels']));
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDownload = () => {
+  const handleDownloadM3U = () => {
     onDownloadM3U8?.();
-    toast.success('List Exported!');
+  };
+
+  const handleDownloadJSON = () => {
+    onDownloadJSON?.();
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const count = onImportJSON?.(content) ?? 0;
+        toast.success(`Imported ${count} channels`);
+      } catch (err) {
+        toast.error('Failed to import backup file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleImportFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const count = onImportShareable?.(text) ?? 0;
+      toast.success(`Imported ${count} channels from clipboard`);
+    } catch {
+      toast.error('Failed to read from clipboard or invalid share data');
+    }
   };
 
   const handleDeleteClick = (e: React.MouseEvent, channel: Channel) => {
@@ -108,6 +149,15 @@ export function ChannelList({
 
   return (
     <div className="flex flex-col h-full bg-card border-r border-border">
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleFileImport}
+      />
+
       {/* Search */}
       <div className="p-3 border-b border-border">
         <div className="relative">
@@ -134,17 +184,45 @@ export function ChannelList({
               <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />
               A-Z
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={handleDownload}
-              disabled={channels.length === 0}
-              title="Download playlist"
-            >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Export
-            </Button>
+            
+            {/* Import/Export Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={channels.length === 0 && !onImportJSON}
+                >
+                  <Share2 className="h-3.5 w-3.5 mr-1" />
+                  Share
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleDownloadJSON} disabled={channels.length === 0}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export Backup (JSON)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadM3U} disabled={channels.length === 0}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Playlist (M3U)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <FileUp className="h-4 w-4 mr-2" />
+                  Import from File
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onCopyShareable} disabled={channels.length === 0}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy to Clipboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleImportFromClipboard}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import from Clipboard
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

@@ -35,6 +35,10 @@ export default function LiveTVPage() {
     setSelectedRegion,
     toggleSort,
     downloadM3U8,
+    downloadJSON,
+    importFromJSON,
+    copyShareableData,
+    importFromShareableData,
   } = useLiveTV();
 
   // Load persisted view mode
@@ -235,6 +239,10 @@ export default function LiveTVPage() {
                 onDeleteChannel={removeChannel}
                 onToggleSort={toggleSort}
                 onDownloadM3U8={downloadM3U8}
+                onDownloadJSON={downloadJSON}
+                onImportJSON={importFromJSON}
+                onCopyShareable={copyShareableData}
+                onImportShareable={importFromShareableData}
               />
             </div>
 
