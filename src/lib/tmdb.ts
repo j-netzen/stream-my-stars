@@ -169,3 +169,15 @@ export async function getWatchProviders(id: number, mediaType: "movie" | "tv"): 
   if (error) throw error;
   return data;
 }
+
+export async function discoverByProvider(providerId: number, mediaType: "movie" | "tv"): Promise<TMDBSearchResult[]> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "discover_by_provider", id: providerId, media_type: mediaType },
+  });
+
+  if (error) throw error;
+  return (data.results || []).map((item: TMDBSearchResult) => ({
+    ...item,
+    media_type: mediaType,
+  }));
+}

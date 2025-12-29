@@ -3,6 +3,7 @@ import { useMedia, Media, WatchProviderInfo } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "@/components/media/MediaCard";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { TrendingNetworkRow } from "@/components/networks/TrendingNetworkRow";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Tv2, RefreshCw } from "lucide-react";
@@ -155,7 +156,7 @@ export default function NetworksPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -185,7 +186,24 @@ export default function NetworksPage() {
         </Button>
       </div>
 
-      <div className="flex gap-6">
+      {/* Trending Content Rows */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">Trending on Networks</h2>
+        {KNOWN_NETWORKS.slice(0, 6).map((network) => (
+          <TrendingNetworkRow
+            key={network.id}
+            providerId={network.id}
+            providerName={network.name}
+            providerLogo={network.logo}
+          />
+        ))}
+      </div>
+
+      {/* My Library Section */}
+      <div className="pt-4 border-t border-border space-y-4">
+        <h2 className="text-xl font-semibold">My Library</h2>
+
+        <div className="flex gap-6">
         {/* Networks List */}
         <div className="w-64 flex-shrink-0 space-y-2">
           {/* Uncategorized filter */}
@@ -321,6 +339,7 @@ export default function NetworksPage() {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {activeMedia && (
