@@ -63,7 +63,7 @@ export function StreamSelectionDialog({
   const [resolveStatus, setResolveStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
-  const [qualityFilter, setQualityFilter] = useState<string>("all");
+  const [qualityFilter, setQualityFilter] = useState<string>("best");
   const [isCompactView, setIsCompactView] = useState(() => {
     const saved = localStorage.getItem("streamDialog-compactView");
     return saved !== null ? saved === "true" : true;
@@ -128,6 +128,14 @@ export function StreamSelectionDialog({
   useEffect(() => {
     filteredStreamsRef.current = filteredStreams;
   }, [filteredStreams]);
+
+  // Auto-fallback to "all" filter if "best" filter yields no results
+  useEffect(() => {
+    if (qualityFilter === "best" && streams.length > 0 && filteredStreams.length === 0) {
+      setQualityFilter("all");
+      toast.info("No streams matched 'Best' filter, showing all streams");
+    }
+  }, [qualityFilter, streams.length, filteredStreams.length]);
 
   // Filter downloads based on media title and episode
   const filteredDownloads = myDownloads.filter((download) => {
