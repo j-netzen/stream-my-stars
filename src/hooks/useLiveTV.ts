@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Channel, Program, EPG_SOURCES, LiveTVSettings } from '@/types/livetv';
 import { parseM3U, mergeChannels, hashUrl } from '@/lib/m3uParser';
 import { parseEPGXML, matchEPGToChannels, generateMockEPG } from '@/lib/epgParser';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 const PROGRAMS_STORAGE_KEY = 'livetv_programs';
 const EPG_REGION_KEY = 'livetv_epg_region';
@@ -22,6 +23,7 @@ export function useLiveTV() {
   const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
   const [sortEnabled, setSortEnabled] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const isSyncing = useRef(false); // Prevent sync loops from realtime updates
 
   // Sort channels alphabetically (case-insensitive)
   const sortChannelsAlphabetically = useCallback((channelList: Channel[]): Channel[] => {
@@ -152,10 +154,47 @@ export function useLiveTV() {
 
   // Sync channels to database when they change (after initialization)
   useEffect(() => {
-    if (isInitialized && user) {
+    if (isInitialized && user && !isSyncing.current) {
       syncChannelsToDb(channels);
     }
   }, [channels, isInitialized, user, syncChannelsToDb]);
+
+  // Real-time subscription for channel changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('livetv-channels-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'livetv_channels',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async () => {
+          // Debounce and reload channels from DB
+          isSyncing.current = true;
+          const dbChannels = await loadChannelsFromDb();
+          if (dbChannels.length > 0 || channels.length === 0) {
+            let channelList = dbChannels;
+            if (sortEnabled && channelList.length > 0) {
+              channelList = sortChannelsAlphabetically(channelList);
+            }
+            setChannels(channelList);
+          }
+          setTimeout(() => {
+            isSyncing.current = false;
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadChannelsFromDb, sortEnabled, sortChannelsAlphabetically, channels.length]);
 
   // Save programs to localStorage
   useEffect(() => {
@@ -213,6 +252,93 @@ export function useLiveTV() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [exportToM3U8]);
+
+  // Export channels to JSON format (with all metadata)
+  const exportToJSON = useCallback((): string => {
+    const exportData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      channels: channels.map(channel => ({
+        id: channel.id,
+        name: channel.name,
+        url: channel.url,
+        originalUrl: channel.originalUrl,
+        logo: channel.logo,
+        group: channel.group,
+        epgId: channel.epgId,
+        isFavorite: channel.isFavorite,
+        isUnstable: channel.isUnstable,
+      })),
+    };
+    return JSON.stringify(exportData, null, 2);
+  }, [channels]);
+
+  // Download JSON backup file
+  const downloadJSON = useCallback(() => {
+    const jsonContent = exportToJSON();
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `livetv-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Channels exported successfully');
+  }, [exportToJSON]);
+
+  // Import channels from JSON backup
+  const importFromJSON = useCallback((jsonContent: string): number => {
+    try {
+      const data = JSON.parse(jsonContent);
+      
+      if (!data.channels || !Array.isArray(data.channels)) {
+        throw new Error('Invalid backup format');
+      }
+
+      const importedChannels: Channel[] = data.channels.map((ch: any) => ({
+        id: ch.id || hashUrl(ch.url),
+        name: ch.name,
+        url: ch.url,
+        originalUrl: ch.originalUrl,
+        logo: ch.logo || '',
+        group: ch.group || 'Imported',
+        epgId: ch.epgId || '',
+        isFavorite: ch.isFavorite || false,
+        isUnstable: ch.isUnstable || false,
+      }));
+
+      setChannels(prev => {
+        const merged = mergeChannels(prev, importedChannels);
+        return sortEnabled ? sortChannelsAlphabetically(merged) : merged;
+      });
+
+      return importedChannels.length;
+    } catch (err) {
+      console.error('Error importing JSON:', err);
+      throw new Error('Failed to parse backup file');
+    }
+  }, [sortEnabled, sortChannelsAlphabetically]);
+
+  // Copy shareable link to clipboard
+  const copyShareableData = useCallback(async () => {
+    const jsonContent = exportToJSON();
+    const base64 = btoa(unescape(encodeURIComponent(jsonContent)));
+    await navigator.clipboard.writeText(base64);
+    toast.success('Channel list copied to clipboard! Share this with others to import.');
+  }, [exportToJSON]);
+
+  // Import from shareable data
+  const importFromShareableData = useCallback((base64Data: string): number => {
+    try {
+      const jsonContent = decodeURIComponent(escape(atob(base64Data)));
+      return importFromJSON(jsonContent);
+    } catch {
+      throw new Error('Invalid share data');
+    }
+  }, [importFromJSON]);
 
   // Add channels from M3U content
   const addChannelsFromM3U = useCallback((m3uContent: string) => {
@@ -448,5 +574,9 @@ export function useLiveTV() {
     setSelectedRegion,
     toggleSort,
     downloadM3U8,
+    downloadJSON,
+    importFromJSON,
+    copyShareableData,
+    importFromShareableData,
   };
 }
