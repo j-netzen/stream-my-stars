@@ -3,6 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
 
+export interface WatchProviderInfo {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+  display_priority?: number;
+}
+
+export interface WatchProvidersData {
+  link?: string;
+  flatrate?: WatchProviderInfo[];
+  rent?: WatchProviderInfo[];
+  buy?: WatchProviderInfo[];
+  free?: WatchProviderInfo[];
+}
+
 export interface Media {
   id: string;
   user_id: string;
@@ -23,6 +38,7 @@ export interface Media {
   seasons: number | null;
   episodes: number | null;
   cast_members: any | null;
+  watch_providers: WatchProvidersData | null;
   created_at: string;
   updated_at: string;
 }

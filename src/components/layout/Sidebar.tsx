@@ -51,7 +51,7 @@ const defaultNavItems: NavItemData[] = [
   { icon: Radio, label: "Live TV", path: "/live-tv" },
   { icon: Video, label: "Home Videos", path: "/home-movies" },
   { icon: ListVideo, label: "Playlists", path: "/playlists" },
-  { icon: FolderOpen, label: "Categories", path: "/categories" },
+  { icon: FolderOpen, label: "Networks", path: "/networks" },
 ];
 
 const STORAGE_KEY = "sidebar-nav-order-v2";
