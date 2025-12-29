@@ -1,21 +1,10 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, Shield, ToggleLeft, ToggleRight } from 'lucide-react';
+import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-
-// CORS proxy options - can be extended with custom proxies
-const CORS_PROXIES = [
-  '', // Direct (no proxy)
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-  'https://cors-anywhere.herokuapp.com/',
-  'https://cors.eu.org/',
-];
 
 // Error type detection
 interface StreamError {
@@ -25,14 +14,13 @@ interface StreamError {
 }
 
 const detectErrorType = (error: any, response?: any): StreamError => {
-  // Handle HLS.js LoaderResponse or standard Response/XMLHttpRequest
   const status = response?.code || response?.status;
   
   if (status === 403) {
     return {
       type: 'forbidden',
       message: 'Stream blocked by provider (403 Forbidden)',
-      suggestion: 'Enable Proxy Mode or try a different source'
+      suggestion: 'Try a different source'
     };
   }
   
@@ -44,12 +32,11 @@ const detectErrorType = (error: any, response?: any): StreamError => {
     };
   }
   
-  // CORS detection - typically shows as network error with no status
   if (!status && (error?.message?.includes('network') || error?.type === Hls?.ErrorTypes?.NETWORK_ERROR)) {
     return {
       type: 'cors',
-      message: 'Stream blocked by CORS policy',
-      suggestion: 'Enable Proxy Mode to bypass CORS restrictions'
+      message: 'Can not add - proxy required',
+      suggestion: 'This stream requires a proxy which is not supported'
     };
   }
   
@@ -64,22 +51,18 @@ const detectErrorType = (error: any, response?: any): StreamError => {
   return {
     type: 'unknown',
     message: 'Stream failed to load',
-    suggestion: 'Try enabling Proxy Mode or check if the stream is online'
+    suggestion: 'Check if the stream is online'
   };
 };
 
 interface HLSPlayerProps {
   url: string;
-  originalUrl?: string; // Preserved URL for EPG matching (use this for identification)
-  channelId?: string; // Channel ID for proxy persistence
+  originalUrl?: string;
+  channelId?: string;
   channelName: string;
   channelLogo?: string;
   isUnstable?: boolean;
-  globalProxyEnabled?: boolean;
-  proxyModeEnabled?: boolean;
-  controlsVisible?: boolean; // External control for controls visibility
-  onProxyModeChange?: (enabled: boolean) => void;
-  onProxyRequired?: (channelId: string) => void; // Callback when proxy is needed
+  controlsVisible?: boolean;
   onError?: () => void;
   onClose?: () => void;
 }
@@ -91,11 +74,7 @@ export function HLSPlayer({
   channelName, 
   channelLogo,
   isUnstable,
-  globalProxyEnabled = false,
-  proxyModeEnabled = false,
   controlsVisible: externalControlsVisible,
-  onProxyModeChange,
-  onProxyRequired,
   onError, 
   onClose 
 }: HLSPlayerProps) {
@@ -103,14 +82,12 @@ export function HLSPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownProxyToast = useRef(false);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(1);
   const [showControls, setShowControls] = useState(true);
-  const [isProxyOverlayVisible, setIsProxyOverlayVisible] = useState(true);
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -119,65 +96,6 @@ export function HLSPlayer({
   const effectiveShowControls = externalControlsVisible !== undefined 
     ? externalControlsVisible && showControls 
     : showControls;
-  
-  // Start with proxy if global proxy is enabled
-  const initialProxyIndex = globalProxyEnabled || proxyModeEnabled ? 1 : 0;
-  const [proxyIndex, setProxyIndex] = useState(initialProxyIndex);
-  const [usingProxy, setUsingProxy] = useState(globalProxyEnabled || proxyModeEnabled);
-  const [autoProxyAttempted, setAutoProxyAttempted] = useState(false);
-
-  // Store the original URL for EPG matching - never modify this
-  const epgMatchUrl = originalUrl || url;
-
-  // Auto-hide proxy overlay after 5 seconds
-  const resetOverlayTimer = useCallback(() => {
-    if (overlayTimeoutRef.current) {
-      clearTimeout(overlayTimeoutRef.current);
-    }
-    setIsProxyOverlayVisible(true);
-    
-    overlayTimeoutRef.current = setTimeout(() => {
-      setIsProxyOverlayVisible(false);
-    }, 5000);
-  }, []);
-
-  // Start overlay timer when stream starts playing
-  useEffect(() => {
-    if (!isLoading && !streamError) {
-      resetOverlayTimer();
-    }
-    
-    return () => {
-      if (overlayTimeoutRef.current) {
-        clearTimeout(overlayTimeoutRef.current);
-      }
-    };
-  }, [isLoading, streamError, url]); // Reset timer when stream changes
-
-  // Sync proxy mode with global setting or external state
-  useEffect(() => {
-    const shouldUseProxy = globalProxyEnabled || proxyModeEnabled;
-    if (shouldUseProxy && proxyIndex === 0) {
-      setProxyIndex(1);
-    } else if (!shouldUseProxy && proxyIndex > 0 && !autoProxyAttempted) {
-      setProxyIndex(0);
-    }
-  }, [globalProxyEnabled, proxyModeEnabled]);
-
-  // Get proxied URL
-  const getProxiedUrl = useCallback((originalUrl: string, proxyIdx: number) => {
-    const proxy = CORS_PROXIES[proxyIdx];
-    if (!proxy) return originalUrl;
-    
-    // Different proxy services have different URL formats
-    if (proxy.includes('allorigins')) {
-      return proxy + encodeURIComponent(originalUrl);
-    }
-    if (proxy.includes('cors.eu.org')) {
-      return proxy + originalUrl;
-    }
-    return proxy + encodeURIComponent(originalUrl);
-  }, []);
 
   // Initialize HLS
   useEffect(() => {
@@ -186,15 +104,13 @@ export function HLSPlayer({
 
     setStreamError(null);
     setIsLoading(true);
+    hasShownProxyToast.current = false;
 
     // Cleanup previous instance
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-
-    const streamUrl = getProxiedUrl(url, proxyIndex);
-    setUsingProxy(proxyIndex > 0);
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -203,21 +119,15 @@ export function HLSPlayer({
         backBufferLength: 90,
         maxBufferLength: 30,
         maxMaxBufferLength: 600,
-        // Enhanced XHR setup with header spoofing
         xhrSetup: function (xhr: XMLHttpRequest, xhrUrl: string) {
           xhr.withCredentials = false;
           
-          // Add common headers to appear as a browser request
           try {
             xhr.setRequestHeader('Accept', '*/*');
-            // Note: Some headers like Origin, Referer are restricted by browsers
-            // and will be ignored, but we try anyway
           } catch (e) {
-            // Header setting may fail for some restricted headers
             console.debug('Could not set some headers:', e);
           }
           
-          // Track response for error detection
           xhr.addEventListener('load', function() {
             if (xhr.status >= 400) {
               console.warn(`Stream request failed with status ${xhr.status}`);
@@ -228,29 +138,26 @@ export function HLSPlayer({
             console.warn('XHR network error - likely CORS blocked');
           });
         },
-        // Custom loader error handling
         fragLoadingTimeOut: 20000,
         manifestLoadingTimeOut: 10000,
         levelLoadingTimeOut: 10000,
       });
 
-      hls.loadSource(streamUrl);
+      hls.loadSource(url);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsLoading(false);
         setStreamError(null);
-        setAutoProxyAttempted(false);
         video.play().catch(() => {
-          // Autoplay blocked
           setIsPlaying(false);
         });
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        console.log('HLS Error:', data.type, data.details, data);
-        
         if (data.fatal) {
+          console.error('Fatal HLS error:', data.type, data.details);
+          
           const errorInfo = detectErrorType(
             { type: data.type, message: data.details },
             data.response
@@ -276,43 +183,32 @@ export function HLSPlayer({
               setStreamError(errorInfo);
               setIsLoading(false);
               onError?.();
-              break;
           }
         }
       });
 
       hlsRef.current = hls;
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS support (Safari)
-      video.src = streamUrl;
+      // Safari native HLS support
+      video.src = url;
       video.addEventListener('loadedmetadata', () => {
         setIsLoading(false);
         video.play().catch(() => setIsPlaying(false));
       });
+      
       video.addEventListener('error', () => {
-        // Auto-fallback to proxy on network errors
-        if (proxyIndex < CORS_PROXIES.length - 1) {
-          if (!hasShownProxyToast.current && proxyIndex === 0) {
-            hasShownProxyToast.current = true;
-            toast.info('CORS detected; switching to Proxy Mode...', {
-              duration: 3000,
-            });
-            
-            // Persist proxy requirement for this channel
-            if (channelId && onProxyRequired) {
-              onProxyRequired(channelId);
-            }
-          }
-          setAutoProxyAttempted(true);
-          setProxyIndex(prev => prev + 1);
-        } else {
-          setStreamError({
-            type: 'cors',
-            message: 'Stream blocked by CORS policy',
-            suggestion: 'Enable Proxy Mode or use a CORS browser extension'
+        if (!hasShownProxyToast.current) {
+          hasShownProxyToast.current = true;
+          toast.error('Can not add - proxy required', {
+            duration: 5000,
           });
-          setIsLoading(false);
         }
+        setStreamError({
+          type: 'cors',
+          message: 'Can not add - proxy required',
+          suggestion: 'This stream requires a proxy which is not supported'
+        });
+        setIsLoading(false);
       });
     } else {
       setStreamError({
@@ -329,7 +225,7 @@ export function HLSPlayer({
         hlsRef.current = null;
       }
     };
-  }, [url, proxyIndex, getProxiedUrl, onError, autoProxyAttempted]);
+  }, [url, onError]);
 
   // Handle play/pause
   const togglePlay = useCallback(() => {
@@ -402,13 +298,14 @@ export function HLSPlayer({
     }
   }, []);
 
-  // Handle fullscreen change
+  // Listen for fullscreen change
   useEffect(() => {
-    const handleChange = () => {
+    const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
-    document.addEventListener('fullscreenchange', handleChange);
-    return () => document.removeEventListener('fullscreenchange', handleChange);
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   // Auto-hide controls
@@ -425,39 +322,58 @@ export function HLSPlayer({
     }
   }, [isPlaying]);
 
-  // Retry loading - reset to direct first, then try proxies
+  // Retry loading
   const retry = useCallback(() => {
     hasShownProxyToast.current = false;
-    setAutoProxyAttempted(false);
-    setProxyIndex(globalProxyEnabled || proxyModeEnabled ? 1 : 0);
     setStreamError(null);
     setIsLoading(true);
-  }, [globalProxyEnabled, proxyModeEnabled]);
-
-  // Toggle proxy mode
-  const handleProxyModeToggle = useCallback((enabled: boolean) => {
-    hasShownProxyToast.current = false;
-    setAutoProxyAttempted(false);
-    setStreamError(null);
-    setIsLoading(true);
-    setProxyIndex(enabled ? 1 : 0);
-    onProxyModeChange?.(enabled);
-  }, [onProxyModeChange]);
-
-  // Try next proxy
-  const tryNextProxy = useCallback(() => {
-    if (proxyIndex < CORS_PROXIES.length - 1) {
-      setProxyIndex(prev => prev + 1);
-      setStreamError(null);
-      setIsLoading(true);
+    
+    // Re-trigger effect by updating a dependency
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
-  }, [proxyIndex]);
+    
+    const video = videoRef.current;
+    if (video && url) {
+      if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setIsLoading(false);
+          setStreamError(null);
+          video.play().catch(() => setIsPlaying(false));
+        });
+        
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) {
+            const errorInfo = detectErrorType(
+              { type: data.type, message: data.details },
+              data.response
+            );
+            if (!hasShownProxyToast.current && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hasShownProxyToast.current = true;
+              toast.error('Can not add - proxy required', { duration: 5000 });
+            }
+            setStreamError(errorInfo);
+            setIsLoading(false);
+          }
+        });
+        
+        hlsRef.current = hls;
+      }
+    }
+  }, [url]);
 
-  // Handle player area interaction - reset both controls and overlay timer
+  // Handle player area interaction
   const handlePlayerInteraction = useCallback(() => {
     resetControlsTimer();
-    resetOverlayTimer();
-  }, [resetControlsTimer, resetOverlayTimer]);
+  }, [resetControlsTimer]);
 
   return (
     <div
@@ -499,74 +415,17 @@ export function HLSPlayer({
             <p className="text-white/70 text-sm">{streamError.suggestion}</p>
           </div>
           
-          {/* Proxy Mode Toggle in Error State */}
-          {(streamError.type === 'cors' || streamError.type === 'forbidden') && (
-            <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-lg">
-              <Shield className="h-5 w-5 text-blue-400" />
-              <span className="text-white text-sm">Proxy Mode</span>
-              <Switch
-                checked={proxyIndex > 0}
-                onCheckedChange={handleProxyModeToggle}
-              />
-            </div>
-          )}
-          
           <div className="flex flex-wrap gap-2 justify-center">
             <Button variant="outline" onClick={retry} size="sm">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Retry Direct
+              Retry
             </Button>
-            {proxyIndex < CORS_PROXIES.length - 1 && (
-              <Button variant="secondary" onClick={tryNextProxy} size="sm">
-                <Shield className="mr-2 h-4 w-4" />
-                Try Next Proxy
-              </Button>
-            )}
             {onError && (
               <Button variant="destructive" onClick={onError} size="sm">
                 Mark Unstable
               </Button>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Proxy Mode Toggle & Indicator - auto-hides after 5 seconds */}
-      {!streamError && (
-        <div
-          className={cn(
-            "absolute top-4 right-4 transition-opacity duration-500 ease-in-out",
-            isProxyOverlayVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-        >
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div 
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm cursor-pointer transition-colors",
-                    usingProxy 
-                      ? "bg-blue-500/80 text-white" 
-                      : "bg-black/50 text-white/70 hover:bg-black/70"
-                  )}
-                  onClick={() => handleProxyModeToggle(!usingProxy)}
-                >
-                  <Shield className="h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    {usingProxy ? 'Proxy On' : 'Proxy Off'}
-                  </span>
-                  {usingProxy ? (
-                    <ToggleRight className="h-4 w-4" />
-                  ) : (
-                    <ToggleLeft className="h-4 w-4" />
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p>{usingProxy ? 'Disable proxy mode' : 'Enable proxy mode to bypass CORS'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         </div>
       )}
 
@@ -630,28 +489,6 @@ export function HLSPlayer({
           </div>
 
           <div className="flex-1" />
-
-          {/* Quick Proxy Toggle */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "hover:bg-white/20",
-                    usingProxy ? "text-blue-400" : "text-white"
-                  )}
-                  onClick={() => handleProxyModeToggle(!usingProxy)}
-                >
-                  <Shield className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{usingProxy ? 'Proxy On - Click to disable' : 'Proxy Off - Click to enable'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
 
           <Button
             variant="ghost"
