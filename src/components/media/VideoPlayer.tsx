@@ -172,13 +172,20 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         enterFullscreen();
       }).catch((err) => {
         console.warn("Auto-play failed:", err);
-        // Try muted autoplay as fallback
+        // Try muted autoplay as fallback, then unmute after a short delay
         video.muted = true;
         setIsMuted(true);
         video.play().then(() => {
           setIsPlaying(true);
           hasAutoPlayedRef.current = true;
           enterFullscreen();
+          // Unmute after successful muted playback (user gesture already happened)
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.muted = false;
+              setIsMuted(false);
+            }
+          }, 500);
         }).catch(() => {
           console.warn("Muted auto-play also failed");
         });
@@ -328,13 +335,20 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         hasAutoPlayedRef.current = true;
       } catch (err) {
         console.warn("Play failed:", err);
-        // Try muted playback as fallback
+        // Try muted playback as fallback, then unmute
         video.muted = true;
         setIsMuted(true);
         try {
           await video.play();
           setIsPlaying(true);
           hasAutoPlayedRef.current = true;
+          // Unmute after successful muted playback (user gesture already happened)
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.muted = false;
+              setIsMuted(false);
+            }
+          }, 500);
         } catch (e) {
           console.warn("Muted play also failed:", e);
         }
