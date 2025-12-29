@@ -66,6 +66,8 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
         }
 
         const mediaType = item.media_type === "movie" ? "movie" : "tv" as const;
+        const genres = details?.genres?.map((g: any) => g.name) || [];
+        
         setTmdbDetails({
           tmdb_id: item.id,
           poster_path: item.poster_path,
@@ -73,7 +75,7 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
           release_date: item.release_date || item.first_air_date,
           rating: item.vote_average,
           overview: item.overview,
-          genres: details?.genres?.map((g: any) => g.name) || [],
+          genres,
           runtime: details?.runtime,
           seasons: details?.number_of_seasons,
           episodes: details?.number_of_episodes,
@@ -81,6 +83,17 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
           media_type: mediaType,
           imdb_id: details?.external_ids?.imdb_id,
         });
+
+        // Auto-select category based on first genre
+        if (genres.length > 0 && categories && categories.length > 0) {
+          const firstGenre = genres[0].toLowerCase();
+          const matchingCategory = categories.find(
+            (cat) => cat.name.toLowerCase() === firstGenre
+          );
+          if (matchingCategory) {
+            setSelectedCategory(matchingCategory.id);
+          }
+        }
       } catch (error) {
         // Use basic info if details fail
         const mediaType = item.media_type === "movie" ? "movie" : "tv" as const;
@@ -98,7 +111,7 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
     };
 
     fetchDetails();
-  }, [item, open]);
+  }, [item, open, categories]);
 
   // Reset form when dialog closes
   useEffect(() => {
