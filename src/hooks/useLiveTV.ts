@@ -88,6 +88,7 @@ export function useLiveTV() {
       epgId: '',
       isUnstable: false,
       isFavorite: false,
+      useProxy: false,
     };
     
     setChannels(prev => {
@@ -98,6 +99,15 @@ export function useLiveTV() {
     });
     
     return newChannel;
+  }, []);
+
+  // Set useProxy flag for a channel (smart persistence for CORS bypass)
+  const setChannelUseProxy = useCallback((channelId: string, useProxy: boolean) => {
+    setChannels(prev =>
+      prev.map(c =>
+        c.id === channelId ? { ...c, useProxy } : c
+      )
+    );
   }, []);
 
   // Toggle channel favorite status
@@ -281,6 +291,7 @@ export function useLiveTV() {
     toggleFavorite,
     removeChannel,
     updateChannel,
+    setChannelUseProxy,
     fetchEPG,
     getChannelsByGroup,
     getProgramsForChannel,

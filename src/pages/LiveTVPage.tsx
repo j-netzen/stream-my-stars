@@ -24,6 +24,7 @@ export default function LiveTVPage() {
     toggleFavorite,
     removeChannel,
     updateChannel,
+    setChannelUseProxy,
     fetchEPG,
     getCurrentProgram,
     clearAllData,
@@ -65,6 +66,11 @@ export default function LiveTVPage() {
       toggleUnstable(selectedChannel.id);
     }
   }, [selectedChannel, toggleUnstable]);
+
+  const handleProxyRequired = useCallback((channelId: string) => {
+    // Smart persistence: mark this channel as requiring proxy
+    setChannelUseProxy(channelId, true);
+  }, [setChannelUseProxy]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -153,10 +159,13 @@ export default function LiveTVPage() {
                 <HLSPlayer
                   url={selectedChannel.url}
                   originalUrl={selectedChannel.originalUrl}
+                  channelId={selectedChannel.id}
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
                   globalProxyEnabled={settings.globalProxyEnabled}
+                  proxyModeEnabled={selectedChannel.useProxy}
+                  onProxyRequired={handleProxyRequired}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />
@@ -175,10 +184,13 @@ export default function LiveTVPage() {
                 <HLSPlayer
                   url={selectedChannel.url}
                   originalUrl={selectedChannel.originalUrl}
+                  channelId={selectedChannel.id}
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
                   globalProxyEnabled={settings.globalProxyEnabled}
+                  proxyModeEnabled={selectedChannel.useProxy}
+                  onProxyRequired={handleProxyRequired}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />

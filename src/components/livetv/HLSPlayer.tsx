@@ -71,12 +71,14 @@ const detectErrorType = (error: any, response?: any): StreamError => {
 interface HLSPlayerProps {
   url: string;
   originalUrl?: string; // Preserved URL for EPG matching (use this for identification)
+  channelId?: string; // Channel ID for proxy persistence
   channelName: string;
   channelLogo?: string;
   isUnstable?: boolean;
   globalProxyEnabled?: boolean;
   proxyModeEnabled?: boolean;
   onProxyModeChange?: (enabled: boolean) => void;
+  onProxyRequired?: (channelId: string) => void; // Callback when proxy is needed
   onError?: () => void;
   onClose?: () => void;
 }
@@ -84,12 +86,14 @@ interface HLSPlayerProps {
 export function HLSPlayer({ 
   url, 
   originalUrl,
+  channelId,
   channelName, 
   channelLogo,
   isUnstable,
   globalProxyEnabled = false,
   proxyModeEnabled = false,
   onProxyModeChange,
+  onProxyRequired,
   onError, 
   onClose 
 }: HLSPlayerProps) {
@@ -228,9 +232,14 @@ export function HLSPlayer({
                 // Show toast notification only once per session
                 if (!hasShownProxyToast.current && proxyIndex === 0) {
                   hasShownProxyToast.current = true;
-                  toast.info('Direct stream blocked; attempting connection via proxy...', {
+                  toast.info('CORS detected; switching to Proxy Mode...', {
                     duration: 3000,
                   });
+                  
+                  // Persist proxy requirement for this channel
+                  if (channelId && onProxyRequired) {
+                    onProxyRequired(channelId);
+                  }
                 }
                 
                 setAutoProxyAttempted(true);
@@ -268,9 +277,14 @@ export function HLSPlayer({
         if (proxyIndex < CORS_PROXIES.length - 1) {
           if (!hasShownProxyToast.current && proxyIndex === 0) {
             hasShownProxyToast.current = true;
-            toast.info('Direct stream blocked; attempting connection via proxy...', {
+            toast.info('CORS detected; switching to Proxy Mode...', {
               duration: 3000,
             });
+            
+            // Persist proxy requirement for this channel
+            if (channelId && onProxyRequired) {
+              onProxyRequired(channelId);
+            }
           }
           setAutoProxyAttempted(true);
           setProxyIndex(prev => prev + 1);
