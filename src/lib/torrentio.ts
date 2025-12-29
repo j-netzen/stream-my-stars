@@ -124,13 +124,52 @@ export function parseStreamInfo(stream: TorrentioStream): {
 }
 
 // Parse file size string to bytes for comparison
-function parseSizeToBytes(sizeStr: string): number {
+export function parseSizeToBytes(sizeStr: string): number {
   if (!sizeStr) return 0; // No size = sort to end
   const match = sizeStr.match(/(\d+\.?\d*)\s*(GB|MB)/i);
   if (!match) return 0;
   const value = parseFloat(match[1]);
   const unit = match[2].toUpperCase();
   return unit === 'GB' ? value * 1024 : value; // Convert to MB for comparison
+}
+
+// Calculate optimal max file size (in MB) based on duration in minutes
+// Pattern: 45min=750MB, 90min=1500MB, 120min=1900MB, 150min=2000MB, 180min=2500MB
+export function calculateOptimalMaxSize(durationMinutes: number): number {
+  if (durationMinutes <= 0) return 2500; // Default max if no duration
+  
+  // Define breakpoints: [minutes, maxSizeMB]
+  const breakpoints = [
+    { minutes: 45, sizeMB: 750 },
+    { minutes: 90, sizeMB: 1500 },
+    { minutes: 120, sizeMB: 1900 },
+    { minutes: 150, sizeMB: 2000 },
+    { minutes: 180, sizeMB: 2500 },
+  ];
+  
+  // If duration is less than first breakpoint, interpolate from 0
+  if (durationMinutes <= breakpoints[0].minutes) {
+    return (durationMinutes / breakpoints[0].minutes) * breakpoints[0].sizeMB;
+  }
+  
+  // If duration exceeds last breakpoint, cap at max
+  if (durationMinutes >= breakpoints[breakpoints.length - 1].minutes) {
+    return breakpoints[breakpoints.length - 1].sizeMB;
+  }
+  
+  // Find the two breakpoints to interpolate between
+  for (let i = 0; i < breakpoints.length - 1; i++) {
+    const lower = breakpoints[i];
+    const upper = breakpoints[i + 1];
+    
+    if (durationMinutes >= lower.minutes && durationMinutes <= upper.minutes) {
+      // Linear interpolation between breakpoints
+      const ratio = (durationMinutes - lower.minutes) / (upper.minutes - lower.minutes);
+      return lower.sizeMB + ratio * (upper.sizeMB - lower.sizeMB);
+    }
+  }
+  
+  return 2500; // Fallback to max
 }
 
 // Check if stream uses browser-compatible codecs (H264/AAC/MP4 preferred)

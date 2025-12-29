@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Media, useMedia } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
 import {
@@ -95,6 +95,20 @@ export function StreamSelectionDialog({
     if (qualityFilter === "all") return true;
     const info = parseStreamInfo(stream);
     const quality = info.quality?.toLowerCase() || "";
+    
+    // "Best" filter: optimal file size based on duration
+    if (qualityFilter === "best") {
+      if (!info.size) return false; // Skip streams without size info
+      const sizeInMB = parseSizeToBytes(info.size);
+      if (sizeInMB === 0) return false;
+      
+      // Get duration from media (runtime is in minutes)
+      const durationMinutes = media?.runtime || 90; // Default to 90 min if unknown
+      const optimalMaxSize = calculateOptimalMaxSize(durationMinutes);
+      
+      // Accept streams that are within the optimal size range
+      return sizeInMB <= optimalMaxSize;
+    }
     
     switch (qualityFilter) {
       case "4k":
@@ -946,6 +960,7 @@ export function StreamSelectionDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="best">Best</SelectItem>
                         <SelectItem value="4k">4K</SelectItem>
                         <SelectItem value="1080p">1080p</SelectItem>
                         <SelectItem value="720p">720p</SelectItem>
