@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { searchTMDB, getTrending, getTVAiringToday, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
+import { searchTMDB, getTrending, getTVAiringToday, getPopularMovies, getNowPlayingMovies, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +95,16 @@ export default function DiscoverPage() {
   const { data: airingToday = [], isLoading: airingTodayLoading } = useQuery({
     queryKey: ["tv-airing-today"],
     queryFn: getTVAiringToday,
+  });
+
+  const { data: popularMovies = [], isLoading: popularMoviesLoading } = useQuery({
+    queryKey: ["popular-movies"],
+    queryFn: getPopularMovies,
+  });
+
+  const { data: nowPlayingMovies = [], isLoading: nowPlayingMoviesLoading } = useQuery({
+    queryKey: ["now-playing-movies"],
+    queryFn: getNowPlayingMovies,
   });
 
   const handleSearch = async () => {
@@ -204,6 +214,48 @@ export default function DiscoverPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {airingToday.map((item) => (
                 <MediaResultCard key={`tv-${item.id}`} item={item} onSelect={setSelectedItem} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Popular Movies */}
+      {!searchResults.length && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Film className="w-5 h-5 text-blue-500" />
+            Popular Movies
+          </h2>
+          {popularMoviesLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {popularMovies.map((item) => (
+                <MediaResultCard key={`movie-${item.id}`} item={item} onSelect={setSelectedItem} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Now Playing Movies */}
+      {!searchResults.length && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Film className="w-5 h-5 text-orange-500" />
+            Now Playing
+          </h2>
+          {nowPlayingMoviesLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {nowPlayingMovies.map((item) => (
+                <MediaResultCard key={`movie-${item.id}`} item={item} onSelect={setSelectedItem} />
               ))}
             </div>
           )}
