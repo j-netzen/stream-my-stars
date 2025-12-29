@@ -1,6 +1,5 @@
 import { useRef, useEffect, useMemo, useState } from 'react';
 import { Channel, Program } from '@/types/livetv';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format, addHours, startOfHour, differenceInMinutes } from 'date-fns';
 
@@ -105,10 +104,25 @@ export function EPGTimeline({
     return now >= start && now < end;
   };
 
+  // Sync horizontal scroll between header and content
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleHeaderScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  };
+
+  const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background border rounded-lg overflow-hidden">
-      {/* Header with time slots */}
-      <div className="flex border-b border-border">
+      {/* Header with time slots - fixed */}
+      <div className="flex border-b border-border flex-shrink-0">
         {/* Channel header placeholder */}
         <div 
           className="flex-shrink-0 bg-muted/50 border-r border-border flex items-center justify-center"
@@ -117,12 +131,13 @@ export function EPGTimeline({
           <span className="text-sm font-medium">Channels</span>
         </div>
 
-        {/* Time slots */}
+        {/* Time slots - horizontal scroll synced with content */}
         <div className="flex-1 overflow-hidden">
           <div 
             ref={scrollRef}
             className="overflow-x-auto scrollbar-thin"
             style={{ height: TIME_HEADER_HEIGHT }}
+            onScroll={handleHeaderScroll}
           >
             <div 
               className="relative flex"
@@ -142,7 +157,7 @@ export function EPGTimeline({
 
               {/* Current time marker in header */}
               <div
-                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+                className="absolute top-0 bottom-0 w-0.5 bg-destructive z-10 pointer-events-none"
                 style={{ left: currentTimeOffset }}
               />
             </div>
@@ -150,10 +165,13 @@ export function EPGTimeline({
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Channel sidebar */}
-        <ScrollArea className="flex-shrink-0 border-r border-border" style={{ width: CHANNEL_SIDEBAR_WIDTH }}>
+      {/* Main content - scrollable vertically */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Channel sidebar - vertical scroll */}
+        <div 
+          className="flex-shrink-0 border-r border-border overflow-y-auto" 
+          style={{ width: CHANNEL_SIDEBAR_WIDTH }}
+        >
           <div>
             {channels.map((channel) => (
               <div
@@ -185,80 +203,81 @@ export function EPGTimeline({
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
 
-        {/* Program grid */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div 
-              className="relative"
-              style={{ 
-                width: HOUR_WIDTH * TOTAL_HOURS,
-                minHeight: channels.length * CHANNEL_HEIGHT 
-              }}
-              ref={timelineRef}
+        {/* Program grid - both horizontal and vertical scroll */}
+        <div 
+          ref={contentScrollRef}
+          className="flex-1 overflow-auto"
+          onScroll={handleContentScroll}
+        >
+          <div 
+            className="relative"
+            style={{ 
+              width: HOUR_WIDTH * TOTAL_HOURS,
+              minHeight: channels.length * CHANNEL_HEIGHT 
+            }}
+            ref={timelineRef}
+          >
+            {/* Current time marker */}
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-destructive z-20 pointer-events-none"
+              style={{ left: currentTimeOffset }}
             >
-              {/* Current time marker */}
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
-                style={{ left: currentTimeOffset }}
-              >
-                <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
-              </div>
-
-              {/* Programs */}
-              {channels.map((channel, channelIndex) => {
-                const channelPrograms = getProgramsForChannel(channel.id);
-
-                return (
-                  <div
-                    key={channel.id}
-                    className="absolute left-0 right-0 border-b border-border"
-                    style={{
-                      top: channelIndex * CHANNEL_HEIGHT,
-                      height: CHANNEL_HEIGHT,
-                    }}
-                  >
-                    {channelPrograms.map((program) => {
-                      const style = getProgramStyle(program);
-                      const live = isLive(program);
-
-                      return (
-                        <div
-                          key={program.id}
-                          className={cn(
-                            "absolute top-1 bottom-1 rounded px-2 py-1 overflow-hidden cursor-pointer transition-all",
-                            "border border-border hover:border-primary hover:z-10",
-                            live ? "bg-primary/20 border-primary" : "bg-muted hover:bg-muted/80",
-                            channel.isUnstable && "opacity-50"
-                          )}
-                          style={{
-                            left: style.left,
-                            width: style.width,
-                          }}
-                          onClick={() => onSelectProgram(program, channel)}
-                          title={`${program.title}\n${format(new Date(program.start), 'h:mm a')} - ${format(new Date(program.stop), 'h:mm a')}`}
-                        >
-                          <p className="text-xs font-medium truncate">{program.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {format(new Date(program.start), 'h:mm a')}
-                          </p>
-                        </div>
-                      );
-                    })}
-
-                    {/* Empty state for channels without programs */}
-                    {channelPrograms.length === 0 && (
-                      <div className="absolute inset-1 flex items-center justify-center text-xs text-muted-foreground bg-muted/30 rounded">
-                        No program data
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-destructive rounded-full pointer-events-none" />
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+
+            {/* Programs */}
+            {channels.map((channel, channelIndex) => {
+              const channelPrograms = getProgramsForChannel(channel.id);
+
+              return (
+                <div
+                  key={channel.id}
+                  className="absolute left-0 right-0 border-b border-border"
+                  style={{
+                    top: channelIndex * CHANNEL_HEIGHT,
+                    height: CHANNEL_HEIGHT,
+                  }}
+                >
+                  {channelPrograms.map((program) => {
+                    const style = getProgramStyle(program);
+                    const live = isLive(program);
+
+                    return (
+                      <div
+                        key={program.id}
+                        className={cn(
+                          "absolute top-1 bottom-1 rounded px-2 py-1 overflow-hidden cursor-pointer transition-all",
+                          "border border-border hover:border-primary hover:z-10",
+                          live ? "bg-primary/20 border-primary" : "bg-muted hover:bg-muted/80",
+                          channel.isUnstable && "opacity-50"
+                        )}
+                        style={{
+                          left: style.left,
+                          width: style.width,
+                        }}
+                        onClick={() => onSelectProgram(program, channel)}
+                        title={`${program.title}\n${format(new Date(program.start), 'h:mm a')} - ${format(new Date(program.stop), 'h:mm a')}`}
+                      >
+                        <p className="text-xs font-medium truncate">{program.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {format(new Date(program.start), 'h:mm a')}
+                        </p>
+                      </div>
+                    );
+                  })}
+
+                  {/* Empty state for channels without programs */}
+                  {channelPrograms.length === 0 && (
+                    <div className="absolute inset-1 flex items-center justify-center text-xs text-muted-foreground bg-muted/30 rounded pointer-events-none">
+                      No program data
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

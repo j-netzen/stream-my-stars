@@ -262,17 +262,20 @@ export default function LiveTVPage() {
           </div>
         ) : (
           /* Guide / Fullscreen View */
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Player Section - Sticky at top */}
-            {selectedChannel && viewMode === 'guide' && (
-              <div 
-                className="relative flex-shrink-0 z-10"
-                onMouseMove={handlePlayerAreaActivity}
-                onTouchStart={handlePlayerAreaActivity}
-              >
+          <div className="flex-1 flex flex-col overflow-hidden relative">
+            {/* Player Section - Sticky at top, always mounted to keep stream running */}
+            <div 
+              className={cn(
+                "flex-shrink-0 z-20 relative",
+                viewMode === 'fullscreen' && "hidden"
+              )}
+              onMouseMove={handlePlayerAreaActivity}
+              onTouchStart={handlePlayerAreaActivity}
+            >
+              {selectedChannel ? (
                 <div className={cn(
                   "h-48 md:h-64 transition-opacity duration-300",
-                  !playerControlsVisible && "opacity-80"
+                  !playerControlsVisible && "opacity-90"
                 )}>
                   <HLSPlayer
                     url={selectedChannel.url}
@@ -289,16 +292,20 @@ export default function LiveTVPage() {
                     controlsVisible={playerControlsVisible}
                   />
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="h-48 md:h-64 flex items-center justify-center bg-muted/50">
+                  <p className="text-muted-foreground">Select a channel from the guide below</p>
+                </div>
+              )}
+            </div>
 
-            {/* EPG Timeline Section - Scrolls underneath */}
+            {/* EPG Timeline Section - Scrolls independently with fixed height */}
             <div className={cn(
-              "flex-1 min-h-0 z-20 bg-background",
+              "flex-1 flex flex-col min-h-0 z-10 bg-background",
               viewMode === 'fullscreen' && "absolute inset-0"
             )}>
               {/* Guide Header with controls */}
-              <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background z-30 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="ghost" 
@@ -307,11 +314,11 @@ export default function LiveTVPage() {
                     className="h-8"
                   >
                     <X className="h-4 w-4 mr-1" />
-                    {viewMode === 'fullscreen' ? 'Exit Full Guide' : 'Back to List'}
+                    {viewMode === 'fullscreen' ? 'Exit Full Guide' : 'Close Guide'}
                   </Button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Press ESC to go back</span>
+                  <span className="text-sm text-muted-foreground hidden sm:inline">ESC to go back</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -327,8 +334,8 @@ export default function LiveTVPage() {
                 </div>
               </div>
 
-              {/* EPG Content */}
-              <div className="flex-1 h-[calc(100%-44px)] p-4">
+              {/* EPG Content - scrollable container with fixed height */}
+              <div className="flex-1 min-h-0 overflow-hidden p-4">
                 <EPGTimeline
                   channels={channels}
                   programs={programs}
