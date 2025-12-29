@@ -17,6 +17,7 @@ import CategoriesPage from "./pages/CategoriesPage";
 import PlaylistsPage from "./pages/PlaylistsPage";
 import DiscoverPage from "./pages/DiscoverPage";
 import SettingsPage from "./pages/SettingsPage";
+import LiveTVPage from "./pages/LiveTVPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -94,6 +95,14 @@ const App = () => (
                 element={
                   <MainLayout>
                     <SettingsPage />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/live-tv"
+                element={
+                  <MainLayout>
+                    <LiveTVPage />
                   </MainLayout>
                 }
               />
