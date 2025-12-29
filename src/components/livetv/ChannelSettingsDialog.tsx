@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { AlertTriangle, Star, Trash2, Shield } from 'lucide-react';
+import { AlertTriangle, Star, Trash2 } from 'lucide-react';
 
 interface ChannelSettingsDialogProps {
   channel: Channel | null;
@@ -23,7 +23,6 @@ interface ChannelSettingsDialogProps {
   onDelete: (channelId: string) => void;
   onToggleUnstable: (channelId: string) => void;
   onToggleFavorite: (channelId: string) => void;
-  onToggleProxy: (channelId: string, useProxy: boolean) => void;
 }
 
 export function ChannelSettingsDialog({
@@ -34,7 +33,6 @@ export function ChannelSettingsDialog({
   onDelete,
   onToggleUnstable,
   onToggleFavorite,
-  onToggleProxy,
 }: ChannelSettingsDialogProps) {
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');

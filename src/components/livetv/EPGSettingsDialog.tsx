@@ -9,10 +9,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { EPG_SOURCES } from '@/types/livetv';
-import { Loader2, Globe, RefreshCw, Shield } from 'lucide-react';
+import { Loader2, Globe, RefreshCw } from 'lucide-react';
 
 interface EPGSettingsDialogProps {
   open: boolean;
@@ -21,8 +20,6 @@ interface EPGSettingsDialogProps {
   onSelectRegion: (region: string) => void;
   onRefreshEPG: () => void;
   isLoading: boolean;
-  globalProxyEnabled?: boolean;
-  onGlobalProxyChange?: (enabled: boolean) => void;
 }
 
 export function EPGSettingsDialog({
@@ -32,8 +29,6 @@ export function EPGSettingsDialog({
   onSelectRegion,
   onRefreshEPG,
   isLoading,
-  globalProxyEnabled = false,
-  onGlobalProxyChange,
 }: EPGSettingsDialogProps) {
   const handleRefresh = () => {
     onRefreshEPG();

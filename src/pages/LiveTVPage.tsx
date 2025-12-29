@@ -29,12 +29,10 @@ export default function LiveTVPage() {
     toggleFavorite,
     removeChannel,
     updateChannel,
-    setChannelUseProxy,
     fetchEPG,
     getCurrentProgram,
     clearAllData,
     setSelectedRegion,
-    setGlobalProxyEnabled,
     toggleSort,
     downloadM3U8,
   } = useLiveTV();
@@ -120,9 +118,6 @@ export default function LiveTVPage() {
     }
   }, [selectedChannel, toggleUnstable]);
 
-  const handleProxyRequired = useCallback((channelId: string) => {
-    setChannelUseProxy(channelId, true);
-  }, [setChannelUseProxy]);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
@@ -253,9 +248,6 @@ export default function LiveTVPage() {
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
-                  globalProxyEnabled={settings.globalProxyEnabled}
-                  proxyModeEnabled={selectedChannel.useProxy}
-                  onProxyRequired={handleProxyRequired}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />
@@ -290,9 +282,6 @@ export default function LiveTVPage() {
                     channelName={selectedChannel.name}
                     channelLogo={selectedChannel.logo}
                     isUnstable={selectedChannel.isUnstable}
-                    globalProxyEnabled={settings.globalProxyEnabled}
-                    proxyModeEnabled={selectedChannel.useProxy}
-                    onProxyRequired={handleProxyRequired}
                     onError={handleStreamError}
                     onClose={() => setSelectedChannel(null)}
                     controlsVisible={playerControlsVisible}
@@ -371,7 +360,6 @@ export default function LiveTVPage() {
         onDelete={removeChannel}
         onToggleUnstable={toggleUnstable}
         onToggleFavorite={toggleFavorite}
-        onToggleProxy={setChannelUseProxy}
       />
 
       <EPGSettingsDialog
@@ -381,8 +369,6 @@ export default function LiveTVPage() {
         onSelectRegion={setSelectedRegion}
         onRefreshEPG={() => fetchEPG()}
         isLoading={isLoading}
-        globalProxyEnabled={settings.globalProxyEnabled}
-        onGlobalProxyChange={setGlobalProxyEnabled}
       />
     </div>
   );
