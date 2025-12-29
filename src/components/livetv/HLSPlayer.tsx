@@ -258,32 +258,15 @@ export function HLSPlayer({
           
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Auto-fallback to proxy on network errors - don't show error immediately
-              if (proxyIndex < CORS_PROXIES.length - 1) {
-                const nextProxyIndex = proxyIndex + 1;
-                console.log(`Network error (${errorInfo.type}), trying CORS proxy ${nextProxyIndex}...`);
-                
-                // Show toast notification only once per session
-                if (!hasShownProxyToast.current && proxyIndex === 0) {
-                  hasShownProxyToast.current = true;
-                  toast.info('CORS detected; switching to Proxy Mode...', {
-                    duration: 3000,
-                  });
-                  
-                  // Persist proxy requirement for this channel
-                  if (channelId && onProxyRequired) {
-                    onProxyRequired(channelId);
-                  }
-                }
-                
-                setAutoProxyAttempted(true);
-                setProxyIndex(nextProxyIndex);
-                // Don't show error - let it retry automatically
-              } else {
-                // All proxies exhausted, show error
-                setStreamError(errorInfo);
-                setIsLoading(false);
+              // Show message that proxy is required but not supported
+              if (!hasShownProxyToast.current) {
+                hasShownProxyToast.current = true;
+                toast.error('Can not add - proxy required', {
+                  duration: 5000,
+                });
               }
+              setStreamError(errorInfo);
+              setIsLoading(false);
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               console.log('Media error, attempting recovery...');
