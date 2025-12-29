@@ -52,7 +52,7 @@ const defaultNavItems: NavItemData[] = [
   { icon: FolderOpen, label: "Categories", path: "/categories" },
 ];
 
-const STORAGE_KEY = "sidebar-nav-order";
+const STORAGE_KEY = "sidebar-nav-order-v2";
 
 interface SidebarProps {
   onAddMedia?: () => void;
