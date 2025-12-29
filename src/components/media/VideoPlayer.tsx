@@ -38,15 +38,30 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
   const { settings } = usePlaybackSettings();
 
+  // Load persisted volume from localStorage
+  const getPersistedVolume = () => {
+    try {
+      const saved = localStorage.getItem('videoPlayerVolume');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        return isNaN(parsed) ? 1 : Math.max(0, Math.min(1, parsed));
+      }
+    } catch (e) {
+      console.warn('Failed to load volume from localStorage');
+    }
+    return 1;
+  };
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(getPersistedVolume);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [showPlayScreen, setShowPlayScreen] = useState(true); // Show "Click to Play" screen first
+  const [showPlayScreen, setShowPlayScreen] = useState(true);
+  const [showMutedOverlay, setShowMutedOverlay] = useState(false); // Shows when video starts muted due to autoplay policy
   
   const [bufferHealth, setBufferHealth] = useState<'good' | 'warning' | 'poor'>('good');
   const [bufferedPercent, setBufferedPercent] = useState(0);
@@ -172,20 +187,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         enterFullscreen();
       }).catch((err) => {
         console.warn("Auto-play failed:", err);
-        // Try muted autoplay as fallback, then unmute after a short delay
+        // Try muted autoplay as fallback and show unmute overlay
         video.muted = true;
         setIsMuted(true);
         video.play().then(() => {
           setIsPlaying(true);
           hasAutoPlayedRef.current = true;
           enterFullscreen();
-          // Unmute after successful muted playback (user gesture already happened)
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.muted = false;
-              setIsMuted(false);
-            }
-          }, 500);
+          // Show muted overlay so user can tap to unmute
+          setShowMutedOverlay(true);
         }).catch(() => {
           console.warn("Muted auto-play also failed");
         });
@@ -273,6 +283,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       videoRef.current.volume = newVolume;
       setIsMuted(newVolume === 0);
     }
+    // Persist volume to localStorage
+    try {
+      localStorage.setItem('videoPlayerVolume', String(newVolume));
+    } catch (e) {
+      console.warn('Failed to save volume to localStorage');
+    }
   };
 
   const toggleMute = () => {
@@ -280,6 +296,17 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       const newMuted = !isMuted;
       videoRef.current.muted = newMuted;
       setIsMuted(newMuted);
+      setShowMutedOverlay(false); // Hide overlay when user manually unmutes
+    }
+  };
+
+  // Handle tap-to-unmute from overlay
+  const handleUnmuteFromOverlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      setIsMuted(false);
+      setShowMutedOverlay(false);
     }
   };
 
@@ -335,20 +362,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         hasAutoPlayedRef.current = true;
       } catch (err) {
         console.warn("Play failed:", err);
-        // Try muted playback as fallback, then unmute
+        // Try muted playback as fallback and show unmute overlay
         video.muted = true;
         setIsMuted(true);
         try {
           await video.play();
           setIsPlaying(true);
           hasAutoPlayedRef.current = true;
-          // Unmute after successful muted playback (user gesture already happened)
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.muted = false;
-              setIsMuted(false);
-            }
-          }, 500);
+          // Show muted overlay so user can tap to unmute
+          setShowMutedOverlay(true);
         } catch (e) {
           console.warn("Muted play also failed:", e);
         }
@@ -568,6 +590,22 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
               {settings.connectionSpeedMbps.toFixed(1)} Mbps
             </span>
           )}
+        </div>
+      )}
+
+      {/* Tap to unmute overlay - shown when video started muted due to autoplay policy */}
+      {showMutedOverlay && isMuted && (
+        <div 
+          className="absolute top-20 left-1/2 -translate-x-1/2 z-20 cursor-pointer"
+          onClick={handleUnmuteFromOverlay}
+        >
+          <div className="bg-black/80 backdrop-blur-sm text-white px-5 py-3 rounded-full flex items-center gap-3 shadow-lg border border-white/20 hover:bg-black/90 transition-colors">
+            <div className="relative">
+              <VolumeX className="w-5 h-5" />
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+            </div>
+            <span className="text-sm font-medium">Tap to unmute</span>
+          </div>
         </div>
       )}
 
