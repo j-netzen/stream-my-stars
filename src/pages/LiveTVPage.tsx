@@ -150,6 +150,7 @@ export default function LiveTVPage() {
                 onSelectChannel={handleSelectChannel}
                 onChannelSettings={handleChannelSettings}
                 onToggleFavorite={toggleFavorite}
+                onDeleteChannel={removeChannel}
               />
             </div>
 
