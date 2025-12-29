@@ -43,13 +43,13 @@ interface NavItemData {
 }
 
 const defaultNavItems: NavItemData[] = [
+  { icon: Search, label: "Discover", path: "/discover" },
   { icon: Home, label: "Home", path: "/" },
   { icon: Film, label: "Movies", path: "/movies" },
   { icon: Tv, label: "TV Shows", path: "/tv-shows" },
   { icon: Video, label: "Home Videos", path: "/home-movies" },
   { icon: ListVideo, label: "Playlists", path: "/playlists" },
   { icon: FolderOpen, label: "Categories", path: "/categories" },
-  { icon: Search, label: "Discover", path: "/discover" },
 ];
 
 const STORAGE_KEY = "sidebar-nav-order";
