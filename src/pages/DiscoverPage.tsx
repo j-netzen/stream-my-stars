@@ -1,15 +1,8 @@
 import { useState } from "react";
 import { searchTMDB, getTrending, getTVAiringToday, getPopularMovies, getNowPlayingMovies, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
-import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";
 import { Search, Compass, Film, Tv, Loader2, Star, Calendar, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -79,13 +72,10 @@ function MediaResultCard({ item, onSelect }: { item: TMDBSearchResult; onSelect:
 }
 
 export default function DiscoverPage() {
-  const { addMedia } = useMedia();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedItem, setSelectedItem] = useState<TMDBSearchResult | null>(null);
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
 
   const { data: trending = [], isLoading: trendingLoading } = useQuery({
     queryKey: ["trending"],
@@ -117,36 +107,6 @@ export default function DiscoverPage() {
       toast.error("Search failed");
     }
     setIsSearching(false);
-  };
-
-  const handleAddToLibrary = async () => {
-    if (!selectedItem || !sourceUrl.trim()) {
-      toast.error("Please provide a video source URL");
-      return;
-    }
-
-    setIsAdding(true);
-    try {
-      const input: CreateMediaInput = {
-        title: selectedItem.title || selectedItem.name || "Unknown",
-        media_type: selectedItem.media_type as "movie" | "tv",
-        source_type: "url",
-        source_url: sourceUrl,
-        tmdb_id: selectedItem.id,
-        poster_path: selectedItem.poster_path,
-        backdrop_path: selectedItem.backdrop_path,
-        overview: selectedItem.overview,
-        release_date: selectedItem.release_date || selectedItem.first_air_date,
-        rating: selectedItem.vote_average,
-      };
-
-      await addMedia.mutateAsync(input);
-      setSelectedItem(null);
-      setSourceUrl("");
-    } catch (error) {
-      toast.error("Failed to add to library");
-    }
-    setIsAdding(false);
   };
 
   return (
@@ -281,56 +241,11 @@ export default function DiscoverPage() {
       )}
 
       {/* Add to Library Dialog */}
-      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add to Library</DialogTitle>
-          </DialogHeader>
-          
-          {selectedItem && (
-            <div className="space-y-4">
-              <div className="flex gap-4 p-4 bg-secondary/30 rounded-lg">
-                {selectedItem.poster_path && (
-                  <img
-                    src={getImageUrl(selectedItem.poster_path, "w200")!}
-                    alt={selectedItem.title || selectedItem.name}
-                    className="w-20 rounded"
-                  />
-                )}
-                <div className="flex-1">
-                  <h3 className="font-semibold">
-                    {selectedItem.title || selectedItem.name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {selectedItem.overview}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Video Source URL *</Label>
-                <Input
-                  placeholder="https://example.com/video.mp4"
-                  value={sourceUrl}
-                  onChange={(e) => setSourceUrl(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Enter the URL where this media can be streamed from
-                </p>
-              </div>
-
-              <Button
-                onClick={handleAddToLibrary}
-                disabled={isAdding}
-                className="w-full"
-              >
-                {isAdding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Add to Library
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AddFromDiscoverDialog
+        item={selectedItem}
+        open={!!selectedItem}
+        onOpenChange={(open) => !open && setSelectedItem(null)}
+      />
     </div>
   );
 }
