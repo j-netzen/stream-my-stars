@@ -68,6 +68,11 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
         const mediaType = item.media_type === "movie" ? "movie" : "tv" as const;
         const genres = details?.genres?.map((g: any) => g.name) || [];
         
+        // For TV shows, use episode_run_time array (first value), for movies use runtime
+        const runtime = mediaType === "movie" 
+          ? details?.runtime 
+          : (details?.episode_run_time?.[0] || undefined);
+        
         setTmdbDetails({
           tmdb_id: item.id,
           poster_path: item.poster_path,
@@ -76,7 +81,7 @@ export function AddFromDiscoverDialog({ item, open, onOpenChange }: AddFromDisco
           rating: item.vote_average,
           overview: item.overview,
           genres,
-          runtime: details?.runtime,
+          runtime,
           seasons: details?.number_of_seasons,
           episodes: details?.number_of_episodes,
           cast_members: details?.credits?.cast?.slice(0, 10) || [],

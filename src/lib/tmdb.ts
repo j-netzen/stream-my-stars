@@ -45,6 +45,7 @@ export interface TMDBTVDetails {
   vote_average: number;
   number_of_seasons: number;
   number_of_episodes: number;
+  episode_run_time?: number[];
   genres: { id: number; name: string }[];
   credits: {
     cast: { id: number; name: string; character: string; profile_path: string | null }[];
