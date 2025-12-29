@@ -77,6 +77,7 @@ interface HLSPlayerProps {
   isUnstable?: boolean;
   globalProxyEnabled?: boolean;
   proxyModeEnabled?: boolean;
+  controlsVisible?: boolean; // External control for controls visibility
   onProxyModeChange?: (enabled: boolean) => void;
   onProxyRequired?: (channelId: string) => void; // Callback when proxy is needed
   onError?: () => void;
@@ -92,6 +93,7 @@ export function HLSPlayer({
   isUnstable,
   globalProxyEnabled = false,
   proxyModeEnabled = false,
+  controlsVisible: externalControlsVisible,
   onProxyModeChange,
   onProxyRequired,
   onError, 
@@ -110,6 +112,11 @@ export function HLSPlayer({
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Compute effective controls visibility (internal OR external control)
+  const effectiveShowControls = externalControlsVisible !== undefined 
+    ? externalControlsVisible && showControls 
+    : showControls;
   
   // Start with proxy if global proxy is enabled
   const initialProxyIndex = globalProxyEnabled || proxyModeEnabled ? 1 : 0;
@@ -549,8 +556,8 @@ export function HLSPlayer({
 
       {/* Channel Info */}
       <div className={cn(
-        "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent transition-opacity",
-        showControls ? "opacity-100" : "opacity-0"
+        "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent transition-opacity z-10",
+        effectiveShowControls ? "opacity-100" : "opacity-0 pointer-events-none"
       )}>
         <div className="flex items-center gap-3">
           {channelLogo && (
@@ -567,8 +574,8 @@ export function HLSPlayer({
 
       {/* Controls */}
       <div className={cn(
-        "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity",
-        showControls ? "opacity-100" : "opacity-0"
+        "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity z-10",
+        effectiveShowControls ? "opacity-100" : "opacity-0 pointer-events-none"
       )}>
         <div className="flex items-center gap-4">
           <Button
