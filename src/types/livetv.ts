@@ -6,6 +6,7 @@ export interface Channel {
   logo: string;
   isUnstable: boolean;
   isFavorite: boolean;
+  useProxy: boolean; // Smart persistence: if CORS was detected, always use proxy
   epgId: string;
   group: string;
 }
