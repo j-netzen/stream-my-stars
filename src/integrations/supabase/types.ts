@@ -47,6 +47,57 @@ export type Database = {
         }
         Relationships: []
       }
+      livetv_channels: {
+        Row: {
+          channel_group: string | null
+          channel_id: string
+          created_at: string
+          epg_id: string | null
+          id: string
+          is_favorite: boolean | null
+          is_unstable: boolean | null
+          logo: string | null
+          name: string
+          original_url: string | null
+          sort_order: number | null
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          channel_group?: string | null
+          channel_id: string
+          created_at?: string
+          epg_id?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          is_unstable?: boolean | null
+          logo?: string | null
+          name: string
+          original_url?: string | null
+          sort_order?: number | null
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          channel_group?: string | null
+          channel_id?: string
+          created_at?: string
+          epg_id?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          is_unstable?: boolean | null
+          logo?: string | null
+          name?: string
+          original_url?: string | null
+          sort_order?: number | null
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       media: {
         Row: {
           backdrop_path: string | null
