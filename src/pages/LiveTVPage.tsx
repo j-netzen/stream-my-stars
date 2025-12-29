@@ -40,6 +40,7 @@ export default function LiveTVPage() {
     copyShareableData,
     importFromShareableData,
     refreshChannels,
+    isSyncing,
   } = useLiveTV();
 
   // Load persisted view mode
@@ -148,16 +149,23 @@ export default function LiveTVPage() {
   }, [viewMode]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header - hidden in fullscreen mode */}
       {viewMode !== 'fullscreen' && (
-        <div className="flex items-center justify-between p-4 border-b border-border z-30 bg-background">
+        <div className="flex items-center justify-between p-4 border-b border-border z-30 bg-background flex-shrink-0">
           <div className="flex items-center gap-3">
             <Tv className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-semibold">Live TV</h1>
             <span className="text-sm text-muted-foreground">
               {channels.length} channel{channels.length !== 1 ? 's' : ''}
             </span>
+            {/* Sync Status Indicator */}
+            {isSyncing && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full animate-pulse">
+                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                Syncing...
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -210,7 +218,7 @@ export default function LiveTVPage() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex overflow-hidden relative min-h-0">
         {channels.length === 0 ? (
           /* Empty State */
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
@@ -234,6 +242,7 @@ export default function LiveTVPage() {
                 currentPrograms={currentPrograms}
                 selectedChannelId={selectedChannel?.id}
                 sortEnabled={sortEnabled}
+                isSyncing={isSyncing}
                 onSelectChannel={handleSelectChannel}
                 onChannelSettings={handleChannelSettings}
                 onToggleFavorite={toggleFavorite}

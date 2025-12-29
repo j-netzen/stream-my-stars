@@ -14,6 +14,7 @@ interface ChannelListProps {
   currentPrograms: Map<string, Program | undefined>;
   selectedChannelId?: string;
   sortEnabled?: boolean;
+  isSyncing?: boolean;
   onSelectChannel: (channel: Channel) => void;
   onChannelSettings: (channel: Channel) => void;
   onToggleFavorite: (channelId: string) => void;
@@ -32,6 +33,7 @@ export function ChannelList({
   currentPrograms,
   selectedChannelId,
   sortEnabled = false,
+  isSyncing = false,
   onSelectChannel,
   onChannelSettings,
   onToggleFavorite,
@@ -185,9 +187,17 @@ export function ChannelList({
           />
         </div>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-muted-foreground">
-            {filteredChannels.length} channel{filteredChannels.length !== 1 ? 's' : ''}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-muted-foreground">
+              {filteredChannels.length} channel{filteredChannels.length !== 1 ? 's' : ''}
+            </p>
+            {isSyncing && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <span className="animate-pulse">Syncing</span>
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-1">
             {/* Refresh Button */}
             <Button
