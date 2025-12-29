@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { searchTMDB, getTrending, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
+import { searchTMDB, getTrending, getTVAiringToday, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,70 @@ import { Search, Compass, Film, Tv, Loader2, Star, Calendar, Plus } from "lucide
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
+function MediaResultCard({ item, onSelect }: { item: TMDBSearchResult; onSelect: (item: TMDBSearchResult) => void }) {
+  return (
+    <div className="media-card group">
+      <div className="relative aspect-[2/3] bg-secondary">
+        {item.poster_path ? (
+          <img
+            src={getImageUrl(item.poster_path, "w300")!}
+            alt={item.title || item.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            {item.media_type === "movie" ? (
+              <Film className="w-12 h-12" />
+            ) : (
+              <Tv className="w-12 h-12" />
+            )}
+          </div>
+        )}
+
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+          <Button
+            onClick={() => onSelect(item)}
+            className="w-full gap-2"
+            size="sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add to Library
+          </Button>
+        </div>
+
+        {/* Type Badge */}
+        <div
+          className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium uppercase ${
+            item.media_type === "movie"
+              ? "bg-blue-500/80"
+              : "bg-green-500/80"
+          }`}
+        >
+          {item.media_type}
+        </div>
+      </div>
+
+      <div className="p-3">
+        <h3 className="font-medium text-sm line-clamp-1">
+          {item.title || item.name}
+        </h3>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {(item.release_date || item.first_air_date)?.split("-")[0] || "N/A"}
+          </span>
+          <span className="flex items-center gap-1">
+            <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+            {item.vote_average.toFixed(1)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DiscoverPage() {
   const { addMedia } = useMedia();
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,6 +90,11 @@ export default function DiscoverPage() {
   const { data: trending = [], isLoading: trendingLoading } = useQuery({
     queryKey: ["trending"],
     queryFn: () => getTrending("all"),
+  });
+
+  const { data: airingToday = [], isLoading: airingTodayLoading } = useQuery({
+    queryKey: ["tv-airing-today"],
+    queryFn: getTVAiringToday,
   });
 
   const handleSearch = async () => {
@@ -70,9 +139,6 @@ export default function DiscoverPage() {
     setIsAdding(false);
   };
 
-  const displayResults = searchResults.length > 0 ? searchResults : trending;
-  const title = searchResults.length > 0 ? "Search Results" : "Trending This Week";
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -111,83 +177,56 @@ export default function DiscoverPage() {
         </Button>
       </div>
 
-      {/* Results */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">{title}</h2>
-        
-        {trendingLoading && !searchResults.length ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : (
+      {/* Search Results */}
+      {searchResults.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Search Results</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {displayResults.map((item) => (
-              <div
-                key={`${item.media_type}-${item.id}`}
-                className="media-card group"
-              >
-                <div className="relative aspect-[2/3] bg-secondary">
-                  {item.poster_path ? (
-                    <img
-                      src={getImageUrl(item.poster_path, "w300")!}
-                      alt={item.title || item.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                      {item.media_type === "movie" ? (
-                        <Film className="w-12 h-12" />
-                      ) : (
-                        <Tv className="w-12 h-12" />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Hover Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                    <Button
-                      onClick={() => setSelectedItem(item)}
-                      className="w-full gap-2"
-                      size="sm"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add to Library
-                    </Button>
-                  </div>
-
-                  {/* Type Badge */}
-                  <div
-                    className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium uppercase ${
-                      item.media_type === "movie"
-                        ? "bg-blue-500/80"
-                        : "bg-green-500/80"
-                    }`}
-                  >
-                    {item.media_type}
-                  </div>
-                </div>
-
-                <div className="p-3">
-                  <h3 className="font-medium text-sm line-clamp-1">
-                    {item.title || item.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {(item.release_date || item.first_air_date)?.split("-")[0] || "N/A"}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                      {item.vote_average.toFixed(1)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+            {searchResults.map((item) => (
+              <MediaResultCard key={`${item.media_type}-${item.id}`} item={item} onSelect={setSelectedItem} />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* TV Airing Today */}
+      {!searchResults.length && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Tv className="w-5 h-5 text-green-500" />
+            TV - Airing Today
+          </h2>
+          {airingTodayLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {airingToday.map((item) => (
+                <MediaResultCard key={`tv-${item.id}`} item={item} onSelect={setSelectedItem} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Trending This Week */}
+      {!searchResults.length && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Trending This Week</h2>
+          {trendingLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {trending.map((item) => (
+                <MediaResultCard key={`${item.media_type}-${item.id}`} item={item} onSelect={setSelectedItem} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add to Library Dialog */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
