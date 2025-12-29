@@ -53,7 +53,9 @@ export function useLiveTV() {
         setSelectedRegion(storedRegion);
       }
       if (storedSettings) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
+        const parsed = JSON.parse(storedSettings);
+        // Always default globalProxyEnabled to false
+        setSettings({ ...DEFAULT_SETTINGS, ...parsed, globalProxyEnabled: false });
       }
       if (storedSortEnabled) {
         setSortEnabled(storedSortEnabled === 'true');
