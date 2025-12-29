@@ -29,7 +29,7 @@ interface VideoPlayerProps {
 export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoPlayedRef = useRef(false);
   const hasAutoFullscreenedRef = useRef(false);
   const bufferCheckIntervalRef = useRef<NodeJS.Timeout>();
@@ -224,27 +224,40 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     };
   }, []);
 
-  // Hide controls after inactivity
+  // Hide controls after inactivity (works for mouse + touch)
+  const resetControlsHideTimer = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+
+    if (!isPlaying) return;
+
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, [isPlaying]);
+
+  const handleUserActivity = useCallback(() => {
+    setShowControls(true);
+    resetControlsHideTimer();
+  }, [resetControlsHideTimer]);
+
   useEffect(() => {
-    if (showControls && isPlaying) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
+    if (isPlaying) {
+      resetControlsHideTimer();
+    } else if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
     }
 
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
       }
     };
-  }, [showControls, isPlaying]);
-
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-  };
+  }, [isPlaying, resetControlsHideTimer]);
 
   const handlePlayPause = () => {
     const video = videoRef.current;
@@ -521,8 +534,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     <div
       ref={containerRef}
       className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-black flex items-center justify-center overflow-hidden overscroll-none touch-none"
-      onMouseMove={handleMouseMove}
+      onMouseMove={handleUserActivity}
+      onPointerMove={handleUserActivity}
+      onPointerDown={handleUserActivity}
+      onTouchStart={handleUserActivity}
       onMouseLeave={() => isPlaying && setShowControls(false)}
+      onPointerLeave={() => isPlaying && setShowControls(false)}
       onClick={handleContainerClick}
     >
       {/* Video element */}
