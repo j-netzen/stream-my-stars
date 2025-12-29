@@ -1,8 +1,9 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Star, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { discoverByProvider, TMDB_IMAGE_BASE, TMDBSearchResult } from "@/lib/tmdb";
+import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";
 
 // Mock data fallback
 const MOCK_TRENDING: Record<number, { movies: TMDBSearchResult[]; tv: TMDBSearchResult[] }> = {
@@ -71,12 +72,20 @@ interface TrendingNetworkRowProps {
   providerLogo?: string;
 }
 
-function TrendingCard({ item }: { item: TMDBSearchResult }) {
+interface TrendingCardProps {
+  item: TMDBSearchResult;
+  onAdd: (item: TMDBSearchResult) => void;
+}
+
+function TrendingCard({ item, onAdd }: TrendingCardProps) {
   const title = item.title || item.name || "Unknown";
   
   return (
     <div className="flex-shrink-0 w-32 group cursor-pointer">
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted transition-transform duration-300 group-hover:scale-105 group-hover:shadow-star-glow">
+      <div 
+        className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted transition-transform duration-300 group-hover:scale-105 group-hover:shadow-star-glow"
+        onClick={() => onAdd(item)}
+      >
         {item.poster_path ? (
           <img
             src={`${TMDB_IMAGE_BASE}/w300${item.poster_path}`}
@@ -90,6 +99,12 @@ function TrendingCard({ item }: { item: TMDBSearchResult }) {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button size="sm" variant="secondary" className="gap-1 h-7 text-xs">
+            <Plus className="w-3 h-3" />
+            Add
+          </Button>
+        </div>
       </div>
       <div className="mt-2 space-y-1">
         <p className="text-sm font-medium truncate">{title}</p>
@@ -104,6 +119,8 @@ function TrendingCard({ item }: { item: TMDBSearchResult }) {
 
 export function TrendingNetworkRow({ providerId, providerName, providerLogo }: TrendingNetworkRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [selectedItem, setSelectedItem] = useState<TMDBSearchResult | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: movies, isLoading: moviesLoading } = useQuery({
     queryKey: ["trending-network", providerId, "movie"],
@@ -138,55 +155,72 @@ export function TrendingNetworkRow({ providerId, providerName, providerLogo }: T
     }
   };
 
+  const handleAddClick = (item: TMDBSearchResult) => {
+    setSelectedItem(item);
+    setDialogOpen(true);
+  };
+
   if (allContent.length === 0 && !isLoading) return null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        {providerLogo && (
-          <img
-            src={`${TMDB_IMAGE_BASE}/w92${providerLogo}`}
-            alt={providerName}
-            className="w-8 h-8 rounded-lg object-contain bg-white"
-          />
-        )}
-        <h3 className="text-lg font-semibold">Top on {providerName}</h3>
-      </div>
-
-      <div className="relative group">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => scroll("left")}
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </Button>
-
-        <div
-          ref={scrollRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 scroll-smooth"
-        >
-          {isLoading ? (
-            <div className="flex items-center justify-center w-full py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            allContent.map((item) => (
-              <TrendingCard key={`${item.media_type}-${item.id}`} item={item} />
-            ))
+    <>
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          {providerLogo && (
+            <img
+              src={`${TMDB_IMAGE_BASE}/w92${providerLogo}`}
+              alt={providerName}
+              className="w-8 h-8 rounded-lg object-contain bg-white"
+            />
           )}
+          <h3 className="text-lg font-semibold">Top on {providerName}</h3>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => scroll("right")}
-        >
-          <ChevronRight className="w-5 h-5" />
-        </Button>
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => scroll("left")}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+
+          <div
+            ref={scrollRef}
+            className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 scroll-smooth"
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center w-full py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              allContent.map((item) => (
+                <TrendingCard 
+                  key={`${item.media_type}-${item.id}`} 
+                  item={item} 
+                  onAdd={handleAddClick}
+                />
+              ))
+            )}
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => scroll("right")}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </Button>
+        </div>
       </div>
-    </div>
+
+      <AddFromDiscoverDialog
+        item={selectedItem}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+    </>
   );
 }
