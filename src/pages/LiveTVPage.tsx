@@ -22,6 +22,7 @@ export default function LiveTVPage() {
     selectedRegion,
     isLoading,
     settings,
+    sortEnabled,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -34,6 +35,8 @@ export default function LiveTVPage() {
     clearAllData,
     setSelectedRegion,
     setGlobalProxyEnabled,
+    toggleSort,
+    downloadM3U8,
   } = useLiveTV();
 
   // Load persisted view mode
@@ -230,10 +233,13 @@ export default function LiveTVPage() {
                 channels={channels}
                 currentPrograms={currentPrograms}
                 selectedChannelId={selectedChannel?.id}
+                sortEnabled={sortEnabled}
                 onSelectChannel={handleSelectChannel}
                 onChannelSettings={handleChannelSettings}
                 onToggleFavorite={toggleFavorite}
                 onDeleteChannel={removeChannel}
+                onToggleSort={toggleSort}
+                onDownloadM3U8={downloadM3U8}
               />
             </div>
 

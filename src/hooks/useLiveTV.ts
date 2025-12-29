@@ -7,6 +7,7 @@ const CHANNELS_STORAGE_KEY = 'livetv_channels';
 const PROGRAMS_STORAGE_KEY = 'livetv_programs';
 const EPG_REGION_KEY = 'livetv_epg_region';
 const SETTINGS_STORAGE_KEY = 'livetv_settings';
+const SORT_ENABLED_KEY = 'livetv_sort_enabled';
 
 const DEFAULT_SETTINGS: LiveTVSettings = {
   globalProxyEnabled: false,
@@ -19,6 +20,14 @@ export function useLiveTV() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
+  const [sortEnabled, setSortEnabled] = useState(false);
+
+  // Sort channels alphabetically (case-insensitive)
+  const sortChannelsAlphabetically = useCallback((channelList: Channel[]): Channel[] => {
+    return [...channelList].sort((a, b) => 
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
+  }, []);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -27,9 +36,15 @@ export function useLiveTV() {
       const storedPrograms = localStorage.getItem(PROGRAMS_STORAGE_KEY);
       const storedRegion = localStorage.getItem(EPG_REGION_KEY);
       const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      const storedSortEnabled = localStorage.getItem(SORT_ENABLED_KEY);
       
       if (storedChannels) {
-        setChannels(JSON.parse(storedChannels));
+        let parsedChannels = JSON.parse(storedChannels);
+        // Apply sorting if enabled
+        if (storedSortEnabled === 'true') {
+          parsedChannels = sortChannelsAlphabetically(parsedChannels);
+        }
+        setChannels(parsedChannels);
       }
       if (storedPrograms) {
         setPrograms(JSON.parse(storedPrograms));
@@ -40,10 +55,13 @@ export function useLiveTV() {
       if (storedSettings) {
         setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
       }
+      if (storedSortEnabled) {
+        setSortEnabled(storedSortEnabled === 'true');
+      }
     } catch (err) {
       console.error('Error loading from localStorage:', err);
     }
-  }, []);
+  }, [sortChannelsAlphabetically]);
 
   // Save channels to localStorage
   useEffect(() => {
@@ -64,17 +82,65 @@ export function useLiveTV() {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   }, [settings]);
 
+  // Save sort preference to localStorage
+  useEffect(() => {
+    localStorage.setItem(SORT_ENABLED_KEY, String(sortEnabled));
+  }, [sortEnabled]);
+
   // Update global proxy setting
   const setGlobalProxyEnabled = useCallback((enabled: boolean) => {
     setSettings(prev => ({ ...prev, globalProxyEnabled: enabled }));
   }, []);
 
+  // Toggle alphabetical sorting
+  const toggleSort = useCallback(() => {
+    setSortEnabled(prev => {
+      const newValue = !prev;
+      if (newValue) {
+        setChannels(prevChannels => sortChannelsAlphabetically(prevChannels));
+      }
+      return newValue;
+    });
+  }, [sortChannelsAlphabetically]);
+
+  // Export channels to M3U8 format
+  const exportToM3U8 = useCallback((): string => {
+    let m3uContent = '#EXTM3U\n';
+    
+    channels.forEach(channel => {
+      const logoAttr = channel.logo ? ` tvg-logo="${channel.logo}"` : '';
+      const groupAttr = ` group-title="${channel.group || 'My Channels'}"`;
+      m3uContent += `#EXTINF:-1${logoAttr}${groupAttr},${channel.name}\n`;
+      m3uContent += `${channel.url}\n`;
+    });
+    
+    return m3uContent;
+  }, [channels]);
+
+  // Download M3U8 file
+  const downloadM3U8 = useCallback(() => {
+    const m3uContent = exportToM3U8();
+    const blob = new Blob([m3uContent], { type: 'application/x-mpegurl' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'my_playlist.m3u8';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [exportToM3U8]);
+
   // Add channels from M3U content
   const addChannelsFromM3U = useCallback((m3uContent: string) => {
     const newChannels = parseM3U(m3uContent);
-    setChannels(prev => mergeChannels(prev, newChannels));
+    setChannels(prev => {
+      const merged = mergeChannels(prev, newChannels);
+      return sortEnabled ? sortChannelsAlphabetically(merged) : merged;
+    });
     return newChannels.length;
-  }, []);
+  }, [sortEnabled, sortChannelsAlphabetically]);
 
   // Add a single channel by URL
   const addChannelByUrl = useCallback((url: string, name?: string) => {
@@ -95,11 +161,12 @@ export function useLiveTV() {
       if (prev.some(c => c.id === id)) {
         return prev; // Already exists
       }
-      return [...prev, newChannel];
+      const updated = [...prev, newChannel];
+      return sortEnabled ? sortChannelsAlphabetically(updated) : updated;
     });
     
     return newChannel;
-  }, []);
+  }, [sortEnabled, sortChannelsAlphabetically]);
 
   // Set useProxy flag for a channel (smart persistence for CORS bypass)
   const setChannelUseProxy = useCallback((channelId: string, useProxy: boolean) => {
@@ -285,6 +352,7 @@ export function useLiveTV() {
     isLoading,
     error,
     settings,
+    sortEnabled,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -301,5 +369,7 @@ export function useLiveTV() {
     clearAllData,
     setSelectedRegion,
     setGlobalProxyEnabled,
+    toggleSort,
+    downloadM3U8,
   };
 }
