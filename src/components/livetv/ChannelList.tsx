@@ -4,8 +4,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { AlertTriangle, ChevronDown, ChevronRight, Search, Settings, Star } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Search, Settings, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ChannelListProps {
   channels: Channel[];
@@ -14,6 +15,7 @@ interface ChannelListProps {
   onSelectChannel: (channel: Channel) => void;
   onChannelSettings: (channel: Channel) => void;
   onToggleFavorite: (channelId: string) => void;
+  onDeleteChannel: (channelId: string) => void;
 }
 
 export function ChannelList({
@@ -23,9 +25,30 @@ export function ChannelList({
   onSelectChannel,
   onChannelSettings,
   onToggleFavorite,
+  onDeleteChannel,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels']));
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const handleDeleteClick = (e: React.MouseEvent, channel: Channel) => {
+    e.stopPropagation();
+    
+    if (pendingDeleteId === channel.id) {
+      // Second click - confirm delete
+      onDeleteChannel(channel.id);
+      setPendingDeleteId(null);
+      toast.success(`"${channel.name}" removed from channels`);
+    } else {
+      // First click - show confirmation
+      setPendingDeleteId(channel.id);
+      toast.info(`Click again to confirm deleting "${channel.name}"`, {
+        duration: 3000,
+      });
+      // Auto-reset after 3 seconds
+      setTimeout(() => setPendingDeleteId(null), 3000);
+    }
+  };
 
   // Filter and group channels with favorites at the top
   const { filteredChannels, groups } = useMemo(() => {
@@ -178,6 +201,21 @@ export function ChannelList({
                             "h-4 w-4",
                             channel.isFavorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
                           )} />
+                        </Button>
+
+                        {/* Delete Button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-7 w-7 opacity-0 group-hover:opacity-100 transition-all",
+                            pendingDeleteId === channel.id 
+                              ? "opacity-100 text-destructive bg-destructive/10" 
+                              : "text-muted-foreground hover:text-destructive"
+                          )}
+                          onClick={(e) => handleDeleteClick(e, channel)}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
 
                         {/* Settings Button */}
