@@ -150,7 +150,7 @@ export function useLiveTV() {
       name: name || `Channel ${id.slice(0, 6)}`,
       url,
       logo: '',
-      group: 'Custom',
+      group: 'My Channels',
       epgId: '',
       isUnstable: false,
       isFavorite: false,
