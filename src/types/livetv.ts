@@ -2,17 +2,16 @@ export interface Channel {
   id: string;
   name: string;
   url: string;
-  originalUrl?: string; // Preserved for EPG matching when using proxy
+  originalUrl?: string;
   logo: string;
   isUnstable: boolean;
   isFavorite: boolean;
-  useProxy: boolean; // Smart persistence: if CORS was detected, always use proxy
   epgId: string;
   group: string;
 }
 
 export interface LiveTVSettings {
-  globalProxyEnabled: boolean;
+  // Reserved for future settings
 }
 
 export interface Program {

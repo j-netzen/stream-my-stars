@@ -73,7 +73,6 @@ export function parseM3U(content: string): Channel[] {
           epgId: currentInfo.epgId || '',
           isUnstable: false,
           isFavorite: false,
-          useProxy: false,
         });
       }
       

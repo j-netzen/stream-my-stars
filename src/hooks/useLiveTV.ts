@@ -9,9 +9,7 @@ const EPG_REGION_KEY = 'livetv_epg_region';
 const SETTINGS_STORAGE_KEY = 'livetv_settings';
 const SORT_ENABLED_KEY = 'livetv_sort_enabled';
 
-const DEFAULT_SETTINGS: LiveTVSettings = {
-  globalProxyEnabled: false,
-};
+const DEFAULT_SETTINGS: LiveTVSettings = {};
 
 export function useLiveTV() {
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -53,9 +51,7 @@ export function useLiveTV() {
         setSelectedRegion(storedRegion);
       }
       if (storedSettings) {
-        const parsed = JSON.parse(storedSettings);
-        // Always default globalProxyEnabled to false
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed, globalProxyEnabled: false });
+        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) });
       }
       if (storedSortEnabled) {
         setSortEnabled(storedSortEnabled === 'true');
@@ -88,11 +84,6 @@ export function useLiveTV() {
   useEffect(() => {
     localStorage.setItem(SORT_ENABLED_KEY, String(sortEnabled));
   }, [sortEnabled]);
-
-  // Update global proxy setting
-  const setGlobalProxyEnabled = useCallback((enabled: boolean) => {
-    setSettings(prev => ({ ...prev, globalProxyEnabled: enabled }));
-  }, []);
 
   // Toggle alphabetical sorting
   const toggleSort = useCallback(() => {
@@ -156,7 +147,6 @@ export function useLiveTV() {
       epgId: '',
       isUnstable: false,
       isFavorite: false,
-      useProxy: false,
     };
     
     setChannels(prev => {
@@ -169,15 +159,6 @@ export function useLiveTV() {
     
     return newChannel;
   }, [sortEnabled, sortChannelsAlphabetically]);
-
-  // Set useProxy flag for a channel (smart persistence for CORS bypass)
-  const setChannelUseProxy = useCallback((channelId: string, useProxy: boolean) => {
-    setChannels(prev =>
-      prev.map(c =>
-        c.id === channelId ? { ...c, useProxy } : c
-      )
-    );
-  }, []);
 
   // Toggle channel favorite status
   const toggleFavorite = useCallback((channelId: string) => {
@@ -361,7 +342,6 @@ export function useLiveTV() {
     toggleFavorite,
     removeChannel,
     updateChannel,
-    setChannelUseProxy,
     fetchEPG,
     getChannelsByGroup,
     getProgramsForChannel,
@@ -370,7 +350,6 @@ export function useLiveTV() {
     getSortedChannels,
     clearAllData,
     setSelectedRegion,
-    setGlobalProxyEnabled,
     toggleSort,
     downloadM3U8,
   };
