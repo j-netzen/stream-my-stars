@@ -39,6 +39,7 @@ export default function LiveTVPage() {
     importFromJSON,
     copyShareableData,
     importFromShareableData,
+    refreshChannels,
   } = useLiveTV();
 
   // Load persisted view mode
@@ -243,6 +244,7 @@ export default function LiveTVPage() {
                 onImportJSON={importFromJSON}
                 onCopyShareable={copyShareableData}
                 onImportShareable={importFromShareableData}
+                onRefresh={refreshChannels}
               />
             </div>
 

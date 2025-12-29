@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, Search, Settings, Share2, Star, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, RefreshCw, Search, Settings, Share2, Star, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -24,6 +24,7 @@ interface ChannelListProps {
   onImportJSON?: (content: string) => number;
   onCopyShareable?: () => void;
   onImportShareable?: (data: string) => number;
+  onRefresh?: () => Promise<boolean | undefined>;
 }
 
 export function ChannelList({
@@ -41,11 +42,25 @@ export function ChannelList({
   onImportJSON,
   onCopyShareable,
   onImportShareable,
+  onRefresh,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels']));
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await onRefresh?.();
+      toast.success('Channels Reloaded');
+    } catch {
+      toast.error('Failed to refresh channels');
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 600);
+    }
+  };
 
   const handleDownloadM3U = () => {
     onDownloadM3U8?.();
@@ -174,6 +189,21 @@ export function ChannelList({
             {filteredChannels.length} channel{filteredChannels.length !== 1 ? 's' : ''}
           </p>
           <div className="flex items-center gap-1">
+            {/* Refresh Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              title="Refresh channels"
+            >
+              <RefreshCw className={cn(
+                "h-3.5 w-3.5",
+                isRefreshing && "animate-spin"
+              )} />
+            </Button>
+
             <Button
               variant={sortEnabled ? "secondary" : "ghost"}
               size="sm"

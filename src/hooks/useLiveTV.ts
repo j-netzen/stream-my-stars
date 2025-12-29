@@ -107,6 +107,35 @@ export function useLiveTV() {
     return [];
   }, [user]);
 
+  // Manual refresh channels from database
+  const refreshChannels = useCallback(async () => {
+    if (!user) {
+      setChannels([]);
+      return;
+    }
+
+    try {
+      isSyncing.current = true;
+      const dbChannels = await loadChannelsFromDb();
+      let channelList = dbChannels || [];
+      
+      if (sortEnabled && channelList.length > 0) {
+        channelList = sortChannelsAlphabetically(channelList);
+      }
+      
+      setChannels(channelList);
+      return true;
+    } catch (err) {
+      console.error('Error refreshing channels:', err);
+      setChannels([]);
+      return false;
+    } finally {
+      setTimeout(() => {
+        isSyncing.current = false;
+      }, 500);
+    }
+  }, [user, loadChannelsFromDb, sortEnabled, sortChannelsAlphabetically]);
+
   // Load data on mount and when user changes
   useEffect(() => {
     const loadData = async () => {
@@ -578,5 +607,6 @@ export function useLiveTV() {
     importFromJSON,
     copyShareableData,
     importFromShareableData,
+    refreshChannels,
   };
 }
