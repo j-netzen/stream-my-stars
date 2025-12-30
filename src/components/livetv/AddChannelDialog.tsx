@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Link, FileText, Loader2 } from 'lucide-react';
+import { Upload, Link, FileText, Loader2, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AddChannelDialogProps {
@@ -31,6 +31,7 @@ export function AddChannelDialog({
   const [singleUrl, setSingleUrl] = useState('');
   const [singleName, setSingleName] = useState('');
   const [m3uContent, setM3uContent] = useState('');
+  const [m3uUrl, setM3uUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Handle single URL submission
@@ -185,6 +186,36 @@ export function AddChannelDialog({
           </TabsContent>
 
           <TabsContent value="playlist" className="space-y-4 mt-4">
+            {/* Load from URL */}
+            <div className="space-y-2">
+              <Label htmlFor="m3u-url">Load from URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="m3u-url"
+                  placeholder="https://example.com/playlist.m3u"
+                  value={m3uUrl}
+                  onChange={(e) => setM3uUrl(e.target.value)}
+                  disabled={isLoading}
+                />
+                <Button 
+                  variant="secondary" 
+                  onClick={() => handleFetchUrl(m3uUrl)}
+                  disabled={!m3uUrl.trim() || isLoading}
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+
             {/* File Upload */}
             <div className="space-y-2">
               <Label>Upload File</Label>
