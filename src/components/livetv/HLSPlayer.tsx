@@ -115,7 +115,11 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentProxy, setCurrentProxy] = useState(0); // Index into CORS_PROXIES
+  // For HTTP streams on HTTPS sites, default to Cloud Proxy (Spoof) immediately
+  const isHttpStream = url.startsWith('http://');
+  const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const defaultProxyIndex = (isHttpStream && isHttpsSite) ? 2 : 0; // 2 = Cloud Proxy (Spoof)
+  const [currentProxy, setCurrentProxy] = useState(defaultProxyIndex);
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
