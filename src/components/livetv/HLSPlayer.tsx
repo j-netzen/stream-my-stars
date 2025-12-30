@@ -255,7 +255,19 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Try next proxy before giving up
+              // For HTTP streams on HTTPS site, skip retries and go straight to proxy
+              const isHttpStream = url.startsWith('http://');
+              const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
+              const isMixedContent = isHttpStream && isHttpsSite;
+              
+              if (isMixedContent && currentProxy === 0) {
+                console.log('Mixed content detected (HTTP stream on HTTPS site) - switching to Cloud Proxy immediately');
+                if (tryNextProxy()) {
+                  return;
+                }
+              }
+              
+              // Try retries for non-mixed-content issues
               retryCountRef.current++;
               
               if (retryCountRef.current <= maxRetries) {
