@@ -12,8 +12,5 @@ verify_jwt = false
 [functions.torrentio]
 verify_jwt = false
 
-[functions.stream-proxy]
-verify_jwt = false
-
 [functions.stream-check]
 verify_jwt = false
