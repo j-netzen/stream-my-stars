@@ -186,20 +186,33 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Limit to 30 FPS */}
+          {/* 30fps or Best Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label htmlFor="limit-fps" className={cn("font-medium", isTVMode && "text-lg")}>
-                Limit to 30 FPS
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="fps-mode" className={cn("font-medium", isTVMode && "text-lg")}>
+                  30fps or Best
+                </Label>
+                <Badge 
+                  variant={playbackSettings.limitFps30 ? "secondary" : "default"}
+                  className={cn(
+                    "text-xs",
+                    !playbackSettings.limitFps30 && "bg-green-500/20 text-green-500 border-green-500/30"
+                  )}
+                >
+                  {playbackSettings.limitFps30 ? "Optimized" : "High Performance"}
+                </Badge>
+              </div>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                Cap video framerate to reduce CPU usage on slower devices
+                {playbackSettings.limitFps30 
+                  ? "Capped at 30fps to reduce CPU usage on slower devices" 
+                  : "Allows up to 60fps for smoother playback when available"}
               </p>
             </div>
             <Switch
-              id="limit-fps"
-              checked={playbackSettings.limitFps30}
-              onCheckedChange={(checked) => updatePlaybackSetting('limitFps30', checked)}
+              id="fps-mode"
+              checked={!playbackSettings.limitFps30}
+              onCheckedChange={(checked) => updatePlaybackSetting('limitFps30', !checked)}
               className={isTVMode ? "scale-125" : ""}
             />
           </div>
