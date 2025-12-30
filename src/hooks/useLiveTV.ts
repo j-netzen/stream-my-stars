@@ -33,18 +33,35 @@ export function useLiveTV() {
     );
   }, []);
 
-  // Sync channels to database
+  // Sync channels to database using upsert to avoid race conditions
   const syncChannelsToDb = useCallback(async (channelList: Channel[]) => {
     if (!user) return;
+    
+    // Mark as syncing to prevent realtime loops
+    isSyncing.current = true;
+    setIsSyncingState(true);
 
     try {
-      // Delete existing channels for this user
-      await supabase
+      // Get existing channel IDs from database
+      const { data: existingChannels } = await supabase
         .from('livetv_channels')
-        .delete()
+        .select('channel_id')
         .eq('user_id', user.id);
 
-      // Insert all current channels
+      const existingIds = new Set(existingChannels?.map(c => c.channel_id) || []);
+      const currentIds = new Set(channelList.map(c => c.id));
+
+      // Delete channels that are no longer in the list
+      const idsToDelete = [...existingIds].filter(id => !currentIds.has(id));
+      if (idsToDelete.length > 0) {
+        await supabase
+          .from('livetv_channels')
+          .delete()
+          .eq('user_id', user.id)
+          .in('channel_id', idsToDelete);
+      }
+
+      // Upsert all current channels
       if (channelList.length > 0) {
         const dbChannels = channelList.map((channel, index) => ({
           user_id: user.id,
@@ -62,7 +79,10 @@ export function useLiveTV() {
 
         const { error } = await supabase
           .from('livetv_channels')
-          .insert(dbChannels);
+          .upsert(dbChannels, { 
+            onConflict: 'user_id,channel_id',
+            ignoreDuplicates: false 
+          });
 
         if (error) {
           console.error('Error syncing channels to database:', error);
@@ -70,6 +90,11 @@ export function useLiveTV() {
       }
     } catch (err) {
       console.error('Error syncing channels:', err);
+    } finally {
+      setTimeout(() => {
+        isSyncing.current = false;
+        setIsSyncingState(false);
+      }, 500);
     }
   }, [user]);
 
