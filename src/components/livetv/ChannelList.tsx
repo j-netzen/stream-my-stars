@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, RefreshCw, Search, Settings, Share2, Star, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, RefreshCw, Search, Settings, Share2, Trash2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -17,7 +17,7 @@ interface ChannelListProps {
   isSyncing?: boolean;
   onSelectChannel: (channel: Channel) => void;
   onChannelSettings: (channel: Channel) => void;
-  onToggleFavorite: (channelId: string) => void;
+  
   onDeleteChannel: (channelId: string) => void;
   onToggleSort?: () => void;
   onDownloadM3U8?: () => void;
@@ -36,7 +36,7 @@ export function ChannelList({
   isSyncing = false,
   onSelectChannel,
   onChannelSettings,
-  onToggleFavorite,
+  
   onDeleteChannel,
   onToggleSort,
   onDownloadM3U8,
@@ -47,7 +47,7 @@ export function ChannelList({
   onRefresh,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels', 'My Channels']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['All Channels', 'My Channels']));
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,19 +126,10 @@ export function ChannelList({
       c.group.toLowerCase().includes(search.toLowerCase())
     );
 
-    // Separate favorites
-    const favorites = filtered.filter(c => c.isFavorite);
-    const nonFavorites = filtered.filter(c => !c.isFavorite);
-
     const groupMap = new Map<string, Channel[]>();
     
-    // Add favorites group first if there are any
-    if (favorites.length > 0) {
-      groupMap.set('⭐ Favorites', favorites);
-    }
-    
-    // Group the rest by their group
-    nonFavorites.forEach(channel => {
+    // Group channels by their group
+    filtered.forEach(channel => {
       const group = channel.group || 'Uncategorized';
       if (!groupMap.has(group)) {
         groupMap.set(group, []);
@@ -324,9 +315,6 @@ export function ChannelList({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm truncate">{channel.name}</span>
-                            {channel.isFavorite && (
-                              <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 flex-shrink-0" />
-                            )}
                             {channel.isUnstable && (
                               <AlertTriangle className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                             )}
@@ -338,24 +326,6 @@ export function ChannelList({
                           )}
                         </div>
 
-                        {/* Favorite Button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-7 w-7 transition-opacity",
-                            channel.isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                          )}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleFavorite(channel.id);
-                          }}
-                        >
-                          <Star className={cn(
-                            "h-4 w-4",
-                            channel.isFavorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
-                          )} />
-                        </Button>
 
                         {/* Delete Button */}
                         <Button
