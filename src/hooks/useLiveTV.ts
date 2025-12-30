@@ -45,6 +45,10 @@ export function useLiveTV() {
   // Sync channels to database using upsert to avoid race conditions
   const syncChannelsToDb = useCallback(async (channelList: Channel[]) => {
     if (!user) return;
+
+    // Prevent accidental database wipes when local state is temporarily empty.
+    // (Explicit "Clear all" handles true deletion.)
+    if (channelList.length === 0) return;
     
     // Mark as syncing to prevent realtime loops
     isSyncing.current = true;
@@ -346,21 +350,23 @@ export function useLiveTV() {
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key !== CHANNELS_SYNC_KEY || !e.newValue || isSyncing.current) return;
-      
+      if (!user) return;
+
       try {
-        const { timestamp, channels: syncedChannels } = JSON.parse(e.newValue);
+        const { timestamp, channels: syncedChannels, userId } = JSON.parse(e.newValue);
+        if (!userId || userId !== user.id) return;
         if (Date.now() - timestamp > 5000) return;
-        
+
         isSyncing.current = true;
         setIsSyncingState(true);
-        
+
         let channelList = syncedChannels as Channel[];
         if (sortEnabledRef.current && channelList.length > 0) {
           channelList = sortChannelsAlphabetically(channelList);
         }
         setChannels(channelList);
         toast.success('Channels synced from another tab');
-        
+
         setTimeout(() => {
           isSyncing.current = false;
           setIsSyncingState(false);
@@ -372,13 +378,16 @@ export function useLiveTV() {
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, [sortChannelsAlphabetically]);
+  }, [sortChannelsAlphabetically, user]);
 
   // Broadcast channel changes to other tabs
   useEffect(() => {
-    if (!isInitialized || isSyncing.current) return;
-    localStorage.setItem(CHANNELS_SYNC_KEY, JSON.stringify({ timestamp: Date.now(), channels }));
-  }, [channels, isInitialized]);
+    if (!isInitialized || !user || isSyncing.current) return;
+    localStorage.setItem(
+      CHANNELS_SYNC_KEY,
+      JSON.stringify({ timestamp: Date.now(), userId: user.id, channels })
+    );
+  }, [channels, isInitialized, user]);
 
   // Save programs to localStorage
   useEffect(() => {
