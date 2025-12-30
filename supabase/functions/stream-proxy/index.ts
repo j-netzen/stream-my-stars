@@ -56,31 +56,28 @@ serve(async (req) => {
       
       // Get the base URL for relative paths in the playlist
       const baseUrl = decodedUrl.substring(0, decodedUrl.lastIndexOf('/') + 1);
-      const proxyBase = `${url.origin}${url.pathname}?url=`;
+      const proxyBase = `${url.origin}/functions/v1/stream-proxy?url=`;
       
       // Rewrite URLs in the playlist to go through proxy
       const rewrittenText = text.split('\n').map(line => {
         const trimmed = line.trim();
         
-        // Skip empty lines and comments (but not URI in comments)
-        if (!trimmed || (trimmed.startsWith('#') && !trimmed.includes('URI='))) {
-          // Handle URI= in #EXT-X-KEY or other tags
-          if (trimmed.includes('URI="')) {
-            return trimmed.replace(/URI="([^"]+)"/g, (match, uri) => {
-              const absoluteUri = uri.startsWith('http') ? uri : baseUrl + uri;
-              return `URI="${proxyBase}${encodeURIComponent(absoluteUri)}"`;
-            });
-          }
+        // Handle URI= in any tag (like #EXT-X-MEDIA, #EXT-X-KEY, etc.)
+        if (trimmed.includes('URI="')) {
+          return line.replace(/URI="([^"]+)"/g, (match, uri) => {
+            const absoluteUri = uri.startsWith('http') ? uri : baseUrl + uri;
+            return `URI="${proxyBase}${encodeURIComponent(absoluteUri)}"`;
+          });
+        }
+        
+        // Skip empty lines and comment-only lines
+        if (!trimmed || trimmed.startsWith('#')) {
           return line;
         }
         
-        // Handle segment URLs
-        if (!trimmed.startsWith('#')) {
-          const absoluteUrl = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
-          return `${proxyBase}${encodeURIComponent(absoluteUrl)}`;
-        }
-        
-        return line;
+        // Handle segment URLs (non-comment, non-empty lines)
+        const absoluteUrl = trimmed.startsWith('http') ? trimmed : baseUrl + trimmed;
+        return `${proxyBase}${encodeURIComponent(absoluteUrl)}`;
       }).join('\n');
       
       return new Response(rewrittenText, {
