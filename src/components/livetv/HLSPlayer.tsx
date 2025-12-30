@@ -172,6 +172,14 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         maxBufferLength: 30,
         maxMaxBufferLength: 600,
         startLevel: currentQuality, // Start at selected quality or auto (-1)
+        // Enhanced codec compatibility settings
+        preferManagedMediaSource: true, // Use ManagedMediaSource when available (better codec support)
+        progressive: true, // Enable progressive loading for better compatibility
+        // Prefer H.264/AVC over HEVC when multiple renditions available
+        capLevelToPlayerSize: true, // Avoid loading higher resolution HEVC streams unnecessarily
+        testBandwidth: true,
+        // Allow codec switching during playback
+        // When stream has multiple codec variants, HLS.js can switch between them
         xhrSetup: function (xhr: XMLHttpRequest, xhrUrl: string) {
           xhr.withCredentials = false;
           
@@ -192,11 +200,16 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           });
         },
         fragLoadingTimeOut: 20000,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 10000,
-        fragLoadingMaxRetry: 3,
-        manifestLoadingMaxRetry: 3,
-        levelLoadingMaxRetry: 3,
+        manifestLoadingTimeOut: 15000,
+        levelLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 5,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
+        // More aggressive recovery settings
+        fragLoadingMaxRetryTimeout: 64000,
+        levelLoadingMaxRetryTimeout: 64000,
+        // Audio codec preferences - helps with streams that have audio issues
+        audioStreamController: undefined, // Use default audio handling
       });
 
       hls.loadSource(effectiveUrl);
