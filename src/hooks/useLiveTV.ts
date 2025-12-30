@@ -210,19 +210,28 @@ export function useLiveTV() {
   // Sync channels to database when they change (after initialization)
   // Use a debounce to prevent rapid successive syncs
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSyncRef = useRef(false);
   
   useEffect(() => {
-    if (!isInitialized || !user || isSyncing.current) return;
+    if (!isInitialized || !user) return;
     
-    // Clear any pending sync
+    // Mark that we have a pending sync
+    pendingSyncRef.current = true;
+    
+    // Clear any pending sync timeout
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
     
     // Debounce the sync to prevent rapid successive calls
-    syncTimeoutRef.current = setTimeout(() => {
-      syncChannelsToDb(channels);
-    }, 300);
+    syncTimeoutRef.current = setTimeout(async () => {
+      // Only sync if not currently syncing from realtime and we have pending changes
+      if (!isSyncing.current && pendingSyncRef.current) {
+        pendingSyncRef.current = false;
+        await syncChannelsToDb(channels);
+        console.log(`Synced ${channels.length} channels to database`);
+      }
+    }, 500); // Increased debounce to 500ms for better batching
     
     return () => {
       if (syncTimeoutRef.current) {
