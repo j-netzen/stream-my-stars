@@ -280,30 +280,6 @@ export default function LiveTVPage() {
               />
             </div>
 
-          /* List View */
-          <div className="flex-1 flex overflow-hidden">
-            {/* Channel Sidebar */}
-            <div className="w-80 flex-shrink-0 z-10">
-              <ChannelList
-                channels={channels}
-                currentPrograms={currentPrograms}
-                selectedChannelId={selectedChannel?.id}
-                sortEnabled={sortEnabled}
-                isSyncing={isSyncing}
-                onSelectChannel={handleSelectChannel}
-                onChannelSettings={handleChannelSettings}
-                onToggleFavorite={toggleFavorite}
-                onDeleteChannel={removeChannel}
-                onToggleSort={toggleSort}
-                onDownloadM3U8={downloadM3U8}
-                onDownloadJSON={downloadJSON}
-                onImportJSON={importFromJSON}
-                onCopyShareable={copyShareableData}
-                onImportShareable={importFromShareableData}
-                onRefresh={refreshChannels}
-              />
-            </div>
-
             {/* Player Area */}
             <div className="flex-1 p-4 flex flex-col z-10">
               {selectedChannel ? (
