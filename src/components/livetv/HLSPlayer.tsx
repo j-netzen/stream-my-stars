@@ -5,6 +5,7 @@ import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, S
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +18,7 @@ import {
 // CORS proxy options - these are public proxies, users can configure their own
 const CORS_PROXIES = [
   { name: 'Direct', url: '' },
+  { name: 'Cloud Proxy', url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?url=` },
   { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=' },
   { name: 'corsproxy.io', url: 'https://corsproxy.io/?' },
 ];
@@ -148,6 +150,20 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     const video = videoRef.current;
     if (!video || !url) return;
 
+    const systemCheck = async (reason: string) => {
+      const target = (originalUrl || url || '').trim();
+      if (!target) return;
+
+      try {
+        const { data, error } = await supabase.functions.invoke('stream-check', {
+          body: { url: target },
+        });
+        console.log('[SystemCheck]', { reason, target, data, error });
+      } catch (err) {
+        console.log('[SystemCheck]', { reason, target, error: err });
+      }
+    };
+
     setStreamError(null);
     setIsLoading(true);
     setConnectionStatus('connecting');
@@ -254,6 +270,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
               }
               
               // All proxies exhausted
+              void systemCheck('network_error_exhausted');
               if (!hasShownProxyToast.current) {
                 hasShownProxyToast.current = true;
                 toast.error('Stream unavailable - all connection methods failed', {
@@ -272,6 +289,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
               hls.recoverMediaError();
               break;
             default:
+              void systemCheck('fatal_error');
               setStreamError(errorInfo);
               setIsLoading(false);
               onError?.();
@@ -295,6 +313,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           return;
         }
         
+        void systemCheck('safari_error');
         if (!hasShownProxyToast.current) {
           hasShownProxyToast.current = true;
           toast.error('Stream unavailable', {
@@ -325,7 +344,8 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         hlsRef.current = null;
       }
     };
-  }, [url, currentProxy, getProxiedUrl, tryNextProxy, onError, currentQuality]);
+  }, [url, originalUrl, currentProxy, getProxiedUrl, tryNextProxy, onError, currentQuality]);
+
 
   // Handle quality change
   const handleQualityChange = useCallback((levelIndex: number) => {
