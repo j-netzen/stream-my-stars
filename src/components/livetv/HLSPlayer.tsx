@@ -15,12 +15,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// CORS proxy options - these are public proxies, users can configure their own
+// CORS proxy options
 const CORS_PROXIES = [
   { name: 'Direct', url: '' },
-  { name: 'Cloud Proxy', url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?url=` },
-  { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=' },
-  { name: 'corsproxy.io', url: 'https://corsproxy.io/?' },
+  { name: 'Cloud Proxy', url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?mode=passthrough&url=` },
+  { name: 'Cloud Proxy (Spoof)', url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?mode=spoof&url=` },
 ];
 
 // Error type detection
@@ -254,33 +253,40 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           );
           
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              // For HTTP streams on HTTPS site, skip retries and go straight to proxy
+            case Hls.ErrorTypes.NETWORK_ERROR: {
               const isHttpStream = url.startsWith('http://');
               const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
               const isMixedContent = isHttpStream && isHttpsSite;
-              
+
+              // Mixed content will never work direct on browsers; fail over immediately.
               if (isMixedContent && currentProxy === 0) {
-                console.log('Mixed content detected (HTTP stream on HTTPS site) - switching to Cloud Proxy immediately');
-                if (tryNextProxy()) {
-                  return;
-                }
+                console.log('Mixed content detected (HTTP stream on HTTPS site) - switching proxy immediately');
+                if (tryNextProxy()) return;
               }
-              
-              // Try retries for non-mixed-content issues
+
+              // Proxy failover policy:
+              // - Direct: no retries (switch immediately)
+              // - Cloud Proxy: 1 retry
+              // - Cloud Proxy (Spoof): maxRetries
+              const retryLimit = currentProxy === 0 ? 0 : currentProxy === 1 ? 1 : maxRetries;
+
+              if (retryLimit === 0) {
+                console.log('Direct connection failed - switching proxy immediately');
+                if (tryNextProxy()) return;
+              }
+
               retryCountRef.current++;
-              
-              if (retryCountRef.current <= maxRetries) {
-                console.log(`Retry attempt ${retryCountRef.current}/${maxRetries}`);
+
+              if (retryCountRef.current <= retryLimit) {
+                console.log(`Retry attempt ${retryCountRef.current}/${retryLimit}`);
                 hls.startLoad();
                 return;
               }
-              
-              // Try next proxy
+
               if (tryNextProxy()) {
                 return;
               }
-              
+
               // All proxies exhausted
               void systemCheck('network_error_exhausted');
               if (!hasShownProxyToast.current) {
@@ -296,6 +302,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
               });
               setIsLoading(false);
               break;
+            }
             case Hls.ErrorTypes.MEDIA_ERROR:
               console.log('Media error, attempting recovery...');
               hls.recoverMediaError();

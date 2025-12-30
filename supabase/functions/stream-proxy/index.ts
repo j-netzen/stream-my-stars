@@ -126,6 +126,7 @@ serve(async (req) => {
 
   const requestUrl = new URL(req.url);
   const raw = requestUrl.searchParams.get("url");
+  const mode = (requestUrl.searchParams.get("mode") || "passthrough").toLowerCase();
 
   if (!raw || raw.length > 4096) {
     return new Response(JSON.stringify({ error: "Validation error", message: "Missing url" }), {
@@ -158,17 +159,50 @@ serve(async (req) => {
     });
   }
 
+  console.log("[stream-proxy]", {
+    mode,
+    method: req.method,
+    requestedUrl: targetUrl.toString(),
+  });
+
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const upstreamHeaders: Record<string, string> = {};
 
+    // Forward range/accept for segments + playlists
     const range = req.headers.get("range");
     if (range) upstreamHeaders["range"] = range;
 
     const accept = req.headers.get("accept");
     if (accept) upstreamHeaders["accept"] = accept;
+
+    // Spoof / forward headers commonly required by IPTV/CDN origins
+    const uaFromClient = req.headers.get("user-agent");
+    const acceptLanguage = req.headers.get("accept-language");
+
+    const DEFAULT_UA =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
+    upstreamHeaders["user-agent"] = uaFromClient || DEFAULT_UA;
+
+    const targetOrigin = `${targetUrl.protocol}//${targetUrl.host}`;
+
+    if (mode === "spoof") {
+      upstreamHeaders["referer"] = `${targetOrigin}/`;
+      upstreamHeaders["origin"] = targetOrigin;
+    } else {
+      // Pass through where possible, but default to target origin (many IPTV servers require this)
+      const referer = req.headers.get("referer");
+      const origin = req.headers.get("origin");
+      upstreamHeaders["referer"] = referer || `${targetOrigin}/`;
+      upstreamHeaders["origin"] = origin || targetOrigin;
+    }
+
+    if (acceptLanguage) upstreamHeaders["accept-language"] = acceptLanguage;
+    upstreamHeaders["cache-control"] = "no-cache";
+    upstreamHeaders["pragma"] = "no-cache";
 
     const response = await fetch(targetUrl.toString(), {
       method: req.method === "HEAD" ? "HEAD" : "GET",
@@ -179,12 +213,21 @@ serve(async (req) => {
 
     const contentType = response.headers.get("content-type");
 
+    console.log("[stream-proxy] upstream", {
+      status: response.status,
+      ok: response.ok,
+      contentType,
+      finalUrl: response.url,
+    });
+
     const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
     const forwardedHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || requestUrl.host;
     const publicPath = requestUrl.pathname.includes("/functions/v1/")
       ? requestUrl.pathname
       : `/functions/v1${requestUrl.pathname}`;
-    const selfPrefix = `${forwardedProto}://${forwardedHost}${publicPath}?url=`;
+
+    const modePrefix = mode ? `mode=${encodeURIComponent(mode)}&` : "";
+    const selfPrefix = `${forwardedProto}://${forwardedHost}${publicPath}?${modePrefix}url=`;
 
     if (req.method !== "HEAD" && isProbablyPlaylist(contentType, new URL(response.url))) {
       const text = await response.text();
