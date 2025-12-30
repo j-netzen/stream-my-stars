@@ -298,7 +298,6 @@ export default function LiveTVPage() {
                 isSyncing={isSyncing}
                 onSelectChannel={handleSelectChannel}
                 onChannelSettings={handleChannelSettings}
-                onToggleFavorite={toggleFavorite}
                 onDeleteChannel={removeChannel}
                 onToggleSort={toggleSort}
                 onDownloadM3U8={downloadM3U8}
