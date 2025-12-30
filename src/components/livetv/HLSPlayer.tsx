@@ -510,6 +510,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
+        crossOrigin={currentProxy > 0 ? 'anonymous' : undefined}
         onClick={togglePlay}
       />
 
@@ -641,52 +642,55 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
           <div className="flex-1" />
 
-          {/* Quality Selector */}
-          {qualityLevels.length > 1 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-white hover:bg-white/20"
-                >
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Quality</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => handleQualityChange(-1)}
-                  className={cn(currentQuality === -1 && "bg-accent")}
-                >
-                  Auto
-                </DropdownMenuItem>
-                {qualityLevels
-                  .sort((a, b) => b.height - a.height)
-                  .map((level) => (
-                    <DropdownMenuItem 
-                      key={level.index}
-                      onClick={() => handleQualityChange(level.index)}
-                      className={cn(currentQuality === level.index && "bg-accent")}
-                    >
-                      {level.height}p ({formatBitrate(level.bitrate)})
-                    </DropdownMenuItem>
-                  ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Connection</DropdownMenuLabel>
-                {CORS_PROXIES.map((proxy, index) => (
+          {/* Settings (Quality + Connection) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {qualityLevels.length > 1 && (
+                <>
+                  <DropdownMenuLabel>Quality</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    key={proxy.name}
-                    onClick={() => forceProxy(index)}
-                    className={cn(currentProxy === index && "bg-accent")}
+                    onClick={() => handleQualityChange(-1)}
+                    className={cn(currentQuality === -1 && "bg-accent")}
                   >
-                    {proxy.name}
+                    Auto
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                  {qualityLevels
+                    .sort((a, b) => b.height - a.height)
+                    .map((level) => (
+                      <DropdownMenuItem 
+                        key={level.index}
+                        onClick={() => handleQualityChange(level.index)}
+                        className={cn(currentQuality === level.index && "bg-accent")}
+                      >
+                        {level.height}p ({formatBitrate(level.bitrate)})
+                      </DropdownMenuItem>
+                    ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+
+              <DropdownMenuLabel>Connection</DropdownMenuLabel>
+              {CORS_PROXIES.map((proxy, index) => (
+                <DropdownMenuItem 
+                  key={proxy.name}
+                  onClick={() => forceProxy(index)}
+                  className={cn(currentProxy === index && "bg-accent")}
+                >
+                  {proxy.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="ghost"

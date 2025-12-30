@@ -179,7 +179,12 @@ serve(async (req) => {
 
     const contentType = response.headers.get("content-type");
 
-    const selfPrefix = `${requestUrl.origin}${requestUrl.pathname}?url=`;
+    const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
+    const forwardedHost = req.headers.get("x-forwarded-host") || req.headers.get("host") || requestUrl.host;
+    const publicPath = requestUrl.pathname.includes("/functions/v1/")
+      ? requestUrl.pathname
+      : `/functions/v1${requestUrl.pathname}`;
+    const selfPrefix = `${forwardedProto}://${forwardedHost}${publicPath}?url=`;
 
     if (req.method !== "HEAD" && isProbablyPlaylist(contentType, new URL(response.url))) {
       const text = await response.text();
