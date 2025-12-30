@@ -16,9 +16,49 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 
+// HEVC/H.265 codec detection
+interface HEVCSupport {
+  supported: boolean;
+  hardwareAccelerated: boolean;
+}
+
+const checkHEVCSupport = (): HEVCSupport => {
+  const video = document.createElement('video');
+  
+  // Check various HEVC codec strings
+  const hevcCodecs = [
+    'video/mp4; codecs="hvc1"',
+    'video/mp4; codecs="hev1"',
+    'video/mp4; codecs="hvc1.1.6.L93.B0"',
+    'video/mp4; codecs="hev1.1.6.L93.B0"',
+    'video/quicktime; codecs="hvc1"',
+  ];
+  
+  let supported = false;
+  let probablySupported = false;
+  
+  for (const codec of hevcCodecs) {
+    const result = video.canPlayType(codec);
+    if (result === 'probably') {
+      probablySupported = true;
+      supported = true;
+      break;
+    } else if (result === 'maybe') {
+      supported = true;
+    }
+  }
+  
+  // Hardware acceleration is likely if we get "probably" on Safari/Edge
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isEdge = /edg/i.test(navigator.userAgent);
+  const hardwareAccelerated = probablySupported && (isSafari || isEdge);
+  
+  return { supported, hardwareAccelerated };
+};
+
 // Error type detection
 interface StreamError {
-  type: 'cors' | 'forbidden' | 'network' | 'media' | 'unknown';
+  type: 'cors' | 'forbidden' | 'network' | 'media' | 'codec' | 'unknown';
   message: string;
   suggestion: string;
 }
@@ -58,12 +98,17 @@ const detectErrorType = (error: any, response?: any): StreamError => {
 
   
   if (error?.type === 'mediaError' || error?.type === Hls?.ErrorTypes?.MEDIA_ERROR) {
-    // Check for specific codec incompatibility
-    if (error?.message?.includes('IncompatibleCodecs') || error?.details?.includes('IncompatibleCodecs')) {
+    // Check for specific codec incompatibility (HEVC/H.265)
+    if (error?.message?.includes('IncompatibleCodecs') || 
+        error?.details?.includes('IncompatibleCodecs') ||
+        error?.message?.includes('manifestIncompatibleCodecsError')) {
+      const hevcSupport = checkHEVCSupport();
       return {
-        type: 'media',
+        type: 'codec',
         message: 'Unsupported video codec (HEVC/H.265)',
-        suggestion: 'This stream uses a codec your browser cannot play'
+        suggestion: hevcSupport.supported 
+          ? 'Try enabling hardware acceleration in your browser settings'
+          : 'Use Safari, Edge, or a browser with HEVC support'
       };
     }
     return {
@@ -293,17 +338,31 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
             }
 
             case Hls.ErrorTypes.MEDIA_ERROR:
-              // Check if this is an unrecoverable codec error
+              // Check if this is an unrecoverable codec error (HEVC/H.265)
               if (data.details === 'manifestIncompatibleCodecsError') {
                 console.error('Unrecoverable codec error - stream uses unsupported codec');
+                const hevcSupport = checkHEVCSupport();
+                
                 if (!hasShownErrorToast.current) {
                   hasShownErrorToast.current = true;
-                  toast.error('This stream uses an unsupported codec (likely HEVC/H.265)', { duration: 5000 });
+                  if (hevcSupport.supported) {
+                    toast.error('HEVC stream detected. Try enabling hardware acceleration.', { 
+                      duration: 6000,
+                      description: 'Your browser may support HEVC with hardware acceleration enabled.'
+                    });
+                  } else {
+                    toast.error('Your browser does not support HEVC. Please use Safari/Edge or enable hardware acceleration.', { 
+                      duration: 6000 
+                    });
+                  }
                 }
+                
                 setStreamError({
-                  type: 'media',
+                  type: 'codec',
                   message: 'Unsupported codec (HEVC/H.265)',
-                  suggestion: 'Your browser cannot decode this stream format. Try a different source.'
+                  suggestion: hevcSupport.supported 
+                    ? 'Try enabling hardware acceleration in your browser settings'
+                    : 'Use Safari, Edge, or a browser with HEVC codec support'
                 });
                 setIsLoading(false);
                 onError?.();
@@ -312,6 +371,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
                 hls.recoverMediaError();
               }
               break;
+
             default:
               void systemCheck('fatal_error');
               setStreamError(errorInfo);
@@ -521,6 +581,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
+        crossOrigin="anonymous"
         onClick={togglePlay}
       />
 
@@ -540,11 +601,18 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
             "h-12 w-12",
             streamError.type === 'cors' || streamError.type === 'forbidden' 
               ? "text-orange-500" 
+              : streamError.type === 'codec'
+              ? "text-purple-500"
               : "text-yellow-500"
           )} />
           <div className="text-center max-w-md">
             <p className="text-white font-medium mb-2">{streamError.message}</p>
             <p className="text-white/70 text-sm">{streamError.suggestion}</p>
+            {streamError.type === 'codec' && (
+              <p className="text-white/50 text-xs mt-2">
+                HEVC/H.265 requires Safari, Edge, or hardware acceleration support.
+              </p>
+            )}
           </div>
           
           <div className="flex flex-wrap gap-2 justify-center">
