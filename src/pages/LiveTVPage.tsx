@@ -8,9 +8,10 @@ import { AddChannelDialog } from '@/components/livetv/AddChannelDialog';
 import { ChannelSettingsDialog } from '@/components/livetv/ChannelSettingsDialog';
 import { EPGSettingsDialog } from '@/components/livetv/EPGSettingsDialog';
 import { Button } from '@/components/ui/button';
-import { Plus, Globe, Trash2, Tv, List, Grid3X3, X, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, Globe, Trash2, Tv, List, Grid3X3, X, Maximize2, Minimize2, Shield, ShieldOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 type ViewMode = 'list' | 'guide' | 'fullscreen';
 
@@ -24,6 +25,7 @@ export default function LiveTVPage() {
     isLoading,
     settings,
     sortEnabled,
+    proxyEnabled,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -35,6 +37,8 @@ export default function LiveTVPage() {
     clearAllData,
     setSelectedRegion,
     toggleSort,
+    toggleProxy,
+    getProxiedUrl,
     downloadM3U8,
     downloadJSON,
     importFromJSON,
@@ -171,6 +175,32 @@ export default function LiveTVPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Proxy Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={proxyEnabled ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      "h-8 px-3 transition-colors",
+                      proxyEnabled 
+                        ? "bg-green-600 hover:bg-green-700 text-white" 
+                        : "text-muted-foreground"
+                    )}
+                    onClick={toggleProxy}
+                  >
+                    {proxyEnabled ? (
+                      <Shield className="h-4 w-4" />
+                    ) : (
+                      <ShieldOff className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>{proxyEnabled ? 'Proxy ON - Bypassing regional blocks' : 'Proxy OFF - Direct connection'}</p>
+                </TooltipContent>
+              </Tooltip>
+
               {/* View Mode Toggle */}
               <div className="flex items-center bg-muted rounded-lg p-1">
                 <Button
@@ -284,7 +314,7 @@ export default function LiveTVPage() {
             <div className="flex-1 p-4 flex flex-col z-10">
               {selectedChannel ? (
                 <HLSPlayer
-                  url={selectedChannel.url}
+                  url={getProxiedUrl(selectedChannel.url)}
                   originalUrl={selectedChannel.originalUrl}
                   channelId={selectedChannel.id}
                   channelName={selectedChannel.name}
@@ -318,7 +348,7 @@ export default function LiveTVPage() {
                   !playerControlsVisible && "opacity-90"
                 )}>
                   <HLSPlayer
-                    url={selectedChannel.url}
+                    url={getProxiedUrl(selectedChannel.url)}
                     originalUrl={selectedChannel.originalUrl}
                     channelId={selectedChannel.id}
                     channelName={selectedChannel.name}

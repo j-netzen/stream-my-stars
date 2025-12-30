@@ -11,8 +11,12 @@ const EPG_REGION_KEY = 'livetv_epg_region';
 const SETTINGS_STORAGE_KEY = 'livetv_settings';
 const SORT_ENABLED_KEY = 'livetv_sort_enabled';
 const CHANNELS_SYNC_KEY = 'livetv_channels_sync';
+const PROXY_ENABLED_KEY = 'livetv_proxy_enabled';
 
 const DEFAULT_SETTINGS: LiveTVSettings = {};
+
+// Proxy URL prefix for bypassing regional blocks
+const PROXY_URL_PREFIX = 'https://api.codetabs.com/v1/proxy?quest=';
 
 export function useLiveTV() {
   const { user } = useAuth();
@@ -23,6 +27,7 @@ export function useLiveTV() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
   const [sortEnabled, setSortEnabled] = useState(false);
+  const [proxyEnabled, setProxyEnabled] = useState(true); // Default ON for regional bypass
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSyncingState, setIsSyncingState] = useState(false); // Exposed sync status
   const isSyncing = useRef(false); // Prevent sync loops from realtime updates
@@ -173,6 +178,7 @@ export function useLiveTV() {
         const storedRegion = localStorage.getItem(EPG_REGION_KEY);
         const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
         const storedSortEnabled = localStorage.getItem(SORT_ENABLED_KEY);
+        const storedProxyEnabled = localStorage.getItem(PROXY_ENABLED_KEY);
         
         // Load channels from database if user is logged in
         if (user) {
@@ -199,6 +205,10 @@ export function useLiveTV() {
         }
         if (storedSortEnabled) {
           setSortEnabled(storedSortEnabled === 'true');
+        }
+        // Load proxy setting - defaults to true if not set
+        if (storedProxyEnabled !== null) {
+          setProxyEnabled(storedProxyEnabled !== 'false');
         }
       } catch (err) {
         console.error('Error loading data:', err);
@@ -363,6 +373,11 @@ export function useLiveTV() {
     localStorage.setItem(SORT_ENABLED_KEY, String(sortEnabled));
   }, [sortEnabled]);
 
+  // Save proxy preference to localStorage
+  useEffect(() => {
+    localStorage.setItem(PROXY_ENABLED_KEY, String(proxyEnabled));
+  }, [proxyEnabled]);
+
   // Toggle alphabetical sorting
   const toggleSort = useCallback(() => {
     setSortEnabled(prev => {
@@ -373,6 +388,17 @@ export function useLiveTV() {
       return newValue;
     });
   }, [sortChannelsAlphabetically]);
+
+  // Toggle proxy for regional bypass
+  const toggleProxy = useCallback(() => {
+    setProxyEnabled(prev => !prev);
+  }, []);
+
+  // Get proxied URL if proxy is enabled
+  const getProxiedUrl = useCallback((url: string): string => {
+    if (!proxyEnabled) return url;
+    return `${PROXY_URL_PREFIX}${encodeURIComponent(url)}`;
+  }, [proxyEnabled]);
 
   // Export channels to M3U8 format
   const exportToM3U8 = useCallback((): string => {
@@ -708,6 +734,7 @@ export function useLiveTV() {
     error,
     settings,
     sortEnabled,
+    proxyEnabled,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -723,6 +750,8 @@ export function useLiveTV() {
     clearAllData,
     setSelectedRegion,
     toggleSort,
+    toggleProxy,
+    getProxiedUrl,
     downloadM3U8,
     downloadJSON,
     importFromJSON,
