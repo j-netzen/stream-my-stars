@@ -47,7 +47,7 @@ export function ChannelList({
   onRefresh,
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['⭐ Favorites', 'All Channels', 'My Channels']));
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
