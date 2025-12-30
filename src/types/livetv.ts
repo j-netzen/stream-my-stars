@@ -1,3 +1,5 @@
+export type ProxyMode = 'auto' | 'direct' | 'proxy' | 'spoof';
+
 export interface Channel {
   id: string;
   name: string;
@@ -8,6 +10,7 @@ export interface Channel {
   isFavorite: boolean;
   epgId: string;
   group: string;
+  proxyMode?: ProxyMode;
 }
 
 export interface LiveTVSettings {

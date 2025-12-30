@@ -59,6 +59,7 @@ export type Database = {
           logo: string | null
           name: string
           original_url: string | null
+          proxy_mode: string | null
           sort_order: number | null
           updated_at: string
           url: string
@@ -75,6 +76,7 @@ export type Database = {
           logo?: string | null
           name: string
           original_url?: string | null
+          proxy_mode?: string | null
           sort_order?: number | null
           updated_at?: string
           url: string
@@ -91,6 +93,7 @@ export type Database = {
           logo?: string | null
           name?: string
           original_url?: string | null
+          proxy_mode?: string | null
           sort_order?: number | null
           updated_at?: string
           url?: string
