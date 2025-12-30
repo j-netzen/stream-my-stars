@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { ProxyMode } from '@/types/livetv';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,6 +85,7 @@ interface HLSPlayerProps {
   channelName: string;
   channelLogo?: string;
   isUnstable?: boolean;
+  proxyMode?: ProxyMode;
   controlsVisible?: boolean;
   onError?: () => void;
   onClose?: () => void;
@@ -96,6 +98,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   channelName, 
   channelLogo,
   isUnstable,
+  proxyMode = 'auto',
   controlsVisible: externalControlsVisible,
   onError, 
   onClose 
@@ -115,11 +118,18 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // For HTTP streams on HTTPS sites, default to Cloud Proxy (Spoof) immediately
-  const isHttpStream = url.startsWith('http://');
-  const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
-  const defaultProxyIndex = (isHttpStream && isHttpsSite) ? 2 : 0; // 2 = Cloud Proxy (Spoof)
-  const [currentProxy, setCurrentProxy] = useState(defaultProxyIndex);
+  // Determine initial proxy index based on proxyMode setting
+  const getInitialProxyIndex = useCallback(() => {
+    if (proxyMode === 'direct') return 0;
+    if (proxyMode === 'proxy') return 1;
+    if (proxyMode === 'spoof') return 2;
+    // Auto mode: HTTP streams on HTTPS sites default to spoof
+    const isHttpStream = url.startsWith('http://');
+    const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    return (isHttpStream && isHttpsSite) ? 2 : 0;
+  }, [proxyMode, url]);
+  
+  const [currentProxy, setCurrentProxy] = useState(getInitialProxyIndex);
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
