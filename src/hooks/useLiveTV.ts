@@ -70,32 +70,53 @@ export function useLiveTV() {
           .in('channel_id', idsToDelete);
       }
 
-      // Upsert all current channels
+      // Upsert all current channels - use individual upserts for better conflict handling
       if (channelList.length > 0) {
-        const dbChannels = channelList.map((channel, index) => ({
-          user_id: user.id,
-          channel_id: channel.id,
-          name: channel.name,
-          url: channel.url,
-          original_url: channel.originalUrl || null,
-          logo: channel.logo || '',
-          channel_group: channel.group || 'My Channels',
-          epg_id: channel.epgId || '',
-          is_unstable: channel.isUnstable,
-          is_favorite: channel.isFavorite,
-          sort_order: index,
-        }));
+        for (let i = 0; i < channelList.length; i++) {
+          const channel = channelList[i];
+          const dbChannel = {
+            user_id: user.id,
+            channel_id: channel.id,
+            name: channel.name,
+            url: channel.url,
+            original_url: channel.originalUrl || null,
+            logo: channel.logo || '',
+            channel_group: channel.group || 'My Channels',
+            epg_id: channel.epgId || '',
+            is_unstable: channel.isUnstable,
+            is_favorite: channel.isFavorite,
+            sort_order: i,
+          };
 
+          // First try to update existing
+          const { data: existing } = await supabase
+            .from('livetv_channels')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('channel_id', channel.id)
+            .maybeSingle();
 
-        const { error } = await supabase
-          .from('livetv_channels')
-          .upsert(dbChannels, { 
-            onConflict: 'user_id,channel_id',
-            ignoreDuplicates: false 
-          });
+          if (existing) {
+            // Update existing channel
+            const { error } = await supabase
+              .from('livetv_channels')
+              .update(dbChannel)
+              .eq('user_id', user.id)
+              .eq('channel_id', channel.id);
 
-        if (error) {
-          console.error('Error syncing channels to database:', error);
+            if (error) {
+              console.error('Error updating channel:', error);
+            }
+          } else {
+            // Insert new channel
+            const { error } = await supabase
+              .from('livetv_channels')
+              .insert(dbChannel);
+
+            if (error) {
+              console.error('Error inserting channel:', error);
+            }
+          }
         }
       }
     } catch (err) {
