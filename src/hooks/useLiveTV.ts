@@ -10,6 +10,7 @@ const PROGRAMS_STORAGE_KEY = 'livetv_programs';
 const EPG_REGION_KEY = 'livetv_epg_region';
 const SETTINGS_STORAGE_KEY = 'livetv_settings';
 const SORT_ENABLED_KEY = 'livetv_sort_enabled';
+const CHANNELS_SYNC_KEY = 'livetv_channels_sync';
 
 const DEFAULT_SETTINGS: LiveTVSettings = {};
 
@@ -304,6 +305,44 @@ export function useLiveTV() {
       supabase.removeChannel(channel);
     };
   }, [user, loadChannelsFromDb, sortChannelsAlphabetically]);
+
+  // Cross-tab sync via localStorage storage event
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key !== CHANNELS_SYNC_KEY || !e.newValue || isSyncing.current) return;
+      
+      try {
+        const { timestamp, channels: syncedChannels } = JSON.parse(e.newValue);
+        if (Date.now() - timestamp > 5000) return;
+        
+        isSyncing.current = true;
+        setIsSyncingState(true);
+        
+        let channelList = syncedChannels as Channel[];
+        if (sortEnabledRef.current && channelList.length > 0) {
+          channelList = sortChannelsAlphabetically(channelList);
+        }
+        setChannels(channelList);
+        toast.success('Channels synced from another tab');
+        
+        setTimeout(() => {
+          isSyncing.current = false;
+          setIsSyncingState(false);
+        }, 500);
+      } catch (err) {
+        console.error('Cross-tab sync error:', err);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [sortChannelsAlphabetically]);
+
+  // Broadcast channel changes to other tabs
+  useEffect(() => {
+    if (!isInitialized || isSyncing.current) return;
+    localStorage.setItem(CHANNELS_SYNC_KEY, JSON.stringify({ timestamp: Date.now(), channels }));
+  }, [channels, isInitialized]);
 
   // Save programs to localStorage
   useEffect(() => {
