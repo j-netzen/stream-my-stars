@@ -290,7 +290,6 @@ export default function LiveTVPage() {
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
-                  proxyMode={selectedChannel.proxyMode}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />
@@ -325,7 +324,6 @@ export default function LiveTVPage() {
                     channelName={selectedChannel.name}
                     channelLogo={selectedChannel.logo}
                     isUnstable={selectedChannel.isUnstable}
-                    proxyMode={selectedChannel.proxyMode}
                     onError={handleStreamError}
                     onClose={() => setSelectedChannel(null)}
                     controlsVisible={playerControlsVisible}

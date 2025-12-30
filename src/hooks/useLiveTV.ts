@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Channel, Program, EPG_SOURCES, LiveTVSettings, ProxyMode } from '@/types/livetv';
+import { Channel, Program, EPG_SOURCES, LiveTVSettings } from '@/types/livetv';
 import { parseM3U, mergeChannels, hashUrl } from '@/lib/m3uParser';
 import { parseEPGXML, matchEPGToChannels, generateMockEPG } from '@/lib/epgParser';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,8 +76,8 @@ export function useLiveTV() {
           is_unstable: channel.isUnstable,
           is_favorite: channel.isFavorite,
           sort_order: index,
-          proxy_mode: channel.proxyMode === 'auto' ? null : (channel.proxyMode || null),
         }));
+
 
         const { error } = await supabase
           .from('livetv_channels')
@@ -127,8 +127,8 @@ export function useLiveTV() {
           epgId: row.epg_id || '',
           isUnstable: row.is_unstable || false,
           isFavorite: row.is_favorite || false,
-          proxyMode: (row.proxy_mode as ProxyMode) || 'auto',
         })) as Channel[];
+
       }
     } catch (err) {
       console.error('Error loading channels:', err);
