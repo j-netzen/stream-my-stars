@@ -6,7 +6,6 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { ProxyMode } from '@/types/livetv';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,12 +15,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// CORS proxy options
-const CORS_PROXIES = [
-  { name: 'Direct', url: '' },
-  { name: 'Cloud Proxy', url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?mode=passthrough&url=` },
-  { name: 'Cloud Proxy (Spoof)', url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stream-proxy?mode=spoof&url=` },
-];
 
 // Error type detection
 interface StreamError {
@@ -58,10 +51,11 @@ const detectErrorType = (error: any, response?: any): StreamError => {
   if (!status && (error?.message?.includes('network') || error?.type === Hls?.ErrorTypes?.NETWORK_ERROR)) {
     return {
       type: 'cors',
-      message: 'CORS blocked - trying proxy...',
-      suggestion: 'Attempting to connect via proxy'
+      message: 'Request blocked by browser (CORS)',
+      suggestion: 'Try a different stream URL'
     };
   }
+
   
   if (error?.type === 'mediaError' || error?.type === Hls?.ErrorTypes?.MEDIA_ERROR) {
     return {
@@ -85,7 +79,6 @@ interface HLSPlayerProps {
   channelName: string;
   channelLogo?: string;
   isUnstable?: boolean;
-  proxyMode?: ProxyMode;
   controlsVisible?: boolean;
   onError?: () => void;
   onClose?: () => void;
@@ -98,7 +91,6 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   channelName, 
   channelLogo,
   isUnstable,
-  proxyMode = 'auto',
   controlsVisible: externalControlsVisible,
   onError, 
   onClose 
@@ -107,7 +99,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasShownProxyToast = useRef(false);
+  const hasShownErrorToast = useRef(false);
   const retryCountRef = useRef(0);
   const maxRetries = 3;
   
@@ -118,45 +110,17 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  // Determine initial proxy index based on proxyMode setting
-  const getInitialProxyIndex = useCallback(() => {
-    if (proxyMode === 'direct') return 0;
-    if (proxyMode === 'proxy') return 1;
-    if (proxyMode === 'spoof') return 2;
-    // Auto mode: HTTP streams on HTTPS sites default to spoof
-    const isHttpStream = url.startsWith('http://');
-    const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    return (isHttpStream && isHttpsSite) ? 2 : 0;
-  }, [proxyMode, url]);
-  
-  const [currentProxy, setCurrentProxy] = useState(getInitialProxyIndex);
+  const [reloadKey, setReloadKey] = useState(0);
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
+
   
   // Compute effective controls visibility (internal OR external control)
   const effectiveShowControls = externalControlsVisible !== undefined 
     ? externalControlsVisible && showControls 
     : showControls;
 
-  // Get proxied URL
-  const getProxiedUrl = useCallback((baseUrl: string, proxyIndex: number) => {
-    const proxy = CORS_PROXIES[proxyIndex];
-    if (!proxy || !proxy.url) return baseUrl;
-    return `${proxy.url}${encodeURIComponent(baseUrl)}`;
-  }, []);
-
-  // Try next proxy
-  const tryNextProxy = useCallback(() => {
-    const nextProxy = currentProxy + 1;
-    if (nextProxy < CORS_PROXIES.length) {
-      console.log(`Trying proxy: ${CORS_PROXIES[nextProxy].name}`);
-      setCurrentProxy(nextProxy);
-      retryCountRef.current = 0;
-      return true;
-    }
-    return false;
-  }, [currentProxy]);
 
   // Initialize HLS
   useEffect(() => {
@@ -180,7 +144,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     setStreamError(null);
     setIsLoading(true);
     setConnectionStatus('connecting');
-    hasShownProxyToast.current = false;
+    hasShownErrorToast.current = false;
 
     // Cleanup previous instance
     if (hlsRef.current) {
@@ -188,8 +152,9 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
       hlsRef.current = null;
     }
 
-    const effectiveUrl = getProxiedUrl(url, currentProxy);
-    console.log(`Loading stream: ${effectiveUrl} (proxy: ${CORS_PROXIES[currentProxy].name})`);
+    const effectiveUrl = url;
+    console.log(`Loading stream: ${effectiveUrl}`);
+
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -243,10 +208,6 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         }));
         setQualityLevels(levels);
         
-        if (currentProxy > 0) {
-          toast.success(`Connected via ${CORS_PROXIES[currentProxy].name}`, { duration: 3000 });
-        }
-        
         video.play().catch(() => {
           setIsPlaying(false);
         });
@@ -272,51 +233,44 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
               const isHttpsSite = typeof window !== 'undefined' && window.location.protocol === 'https:';
               const isMixedContent = isHttpStream && isHttpsSite;
 
-              // Mixed content will never work direct on browsers; fail over immediately.
-              if (isMixedContent && currentProxy === 0) {
-                console.log('Mixed content detected (HTTP stream on HTTPS site) - switching proxy immediately');
-                if (tryNextProxy()) return;
-              }
-
-              // Proxy failover policy:
-              // - Direct: no retries (switch immediately)
-              // - Cloud Proxy: 1 retry
-              // - Cloud Proxy (Spoof): maxRetries
-              const retryLimit = currentProxy === 0 ? 0 : currentProxy === 1 ? 1 : maxRetries;
-
-              if (retryLimit === 0) {
-                console.log('Direct connection failed - switching proxy immediately');
-                if (tryNextProxy()) return;
+              // Direct-only: mixed content will never work on HTTPS pages.
+              if (isMixedContent) {
+                void systemCheck('mixed_content_blocked');
+                if (!hasShownErrorToast.current) {
+                  hasShownErrorToast.current = true;
+                  toast.error('Stream blocked by browser (mixed content)', { duration: 5000 });
+                }
+                setStreamError({
+                  type: 'network',
+                  message: 'Mixed content blocked',
+                  suggestion: 'This HTTP stream cannot play on an HTTPS site.'
+                });
+                setIsLoading(false);
+                break;
               }
 
               retryCountRef.current++;
 
-              if (retryCountRef.current <= retryLimit) {
-                console.log(`Retry attempt ${retryCountRef.current}/${retryLimit}`);
+              if (retryCountRef.current <= maxRetries) {
+                console.log(`Retry attempt ${retryCountRef.current}/${maxRetries}`);
                 hls.startLoad();
                 return;
               }
 
-              if (tryNextProxy()) {
-                return;
-              }
-
-              // All proxies exhausted
               void systemCheck('network_error_exhausted');
-              if (!hasShownProxyToast.current) {
-                hasShownProxyToast.current = true;
-                toast.error('Stream unavailable - all connection methods failed', {
-                  duration: 5000,
-                });
+              if (!hasShownErrorToast.current) {
+                hasShownErrorToast.current = true;
+                toast.error('Stream unavailable', { duration: 5000 });
               }
               setStreamError({
-                type: 'cors',
+                type: 'network',
                 message: 'Connection failed',
-                suggestion: 'This stream may be geo-restricted or offline'
+                suggestion: 'The stream may be geo-restricted or offline'
               });
               setIsLoading(false);
               break;
             }
+
             case Hls.ErrorTypes.MEDIA_ERROR:
               console.log('Media error, attempting recovery...');
               hls.recoverMediaError();
@@ -341,26 +295,22 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
       });
       
       video.addEventListener('error', () => {
-        // Try next proxy for Safari
-        if (tryNextProxy()) {
-          return;
-        }
-        
         void systemCheck('safari_error');
-        if (!hasShownProxyToast.current) {
-          hasShownProxyToast.current = true;
+        if (!hasShownErrorToast.current) {
+          hasShownErrorToast.current = true;
           toast.error('Stream unavailable', {
             duration: 5000,
           });
         }
         setStreamError({
-          type: 'cors',
+          type: 'network',
           message: 'Connection failed',
           suggestion: 'This stream may be geo-restricted or offline'
         });
         setIsLoading(false);
         setConnectionStatus('failed');
       });
+
     } else {
       setStreamError({
         type: 'unknown',
@@ -377,7 +327,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         hlsRef.current = null;
       }
     };
-  }, [url, originalUrl, currentProxy, getProxiedUrl, tryNextProxy, onError, currentQuality]);
+  }, [url, originalUrl, onError, currentQuality, reloadKey]);
 
 
   // Handle quality change
@@ -486,25 +436,16 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     }
   }, [isPlaying]);
 
-  // Retry loading (reset to direct connection)
+  // Retry loading
   const retry = useCallback(() => {
-    hasShownProxyToast.current = false;
+    hasShownErrorToast.current = false;
     retryCountRef.current = 0;
-    setCurrentProxy(0); // Reset to direct connection
     setStreamError(null);
     setIsLoading(true);
     setConnectionStatus('connecting');
+    setReloadKey((k) => k + 1);
   }, []);
 
-  // Force proxy
-  const forceProxy = useCallback((proxyIndex: number) => {
-    hasShownProxyToast.current = false;
-    retryCountRef.current = 0;
-    setCurrentProxy(proxyIndex);
-    setStreamError(null);
-    setIsLoading(true);
-    setConnectionStatus('connecting');
-  }, []);
 
   // Handle player area interaction
   const handlePlayerInteraction = useCallback(() => {
@@ -543,21 +484,17 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
-        crossOrigin={currentProxy > 0 ? 'anonymous' : undefined}
         onClick={togglePlay}
       />
+
 
       {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 gap-2">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
-          {currentProxy > 0 && (
-            <span className="text-white/70 text-sm">
-              Connecting via {CORS_PROXIES[currentProxy].name}...
-            </span>
-          )}
         </div>
       )}
+
 
       {/* Error Overlay */}
       {streamError && (
@@ -576,24 +513,15 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           <div className="flex flex-wrap gap-2 justify-center">
             <Button variant="outline" onClick={retry} size="sm">
               <RefreshCw className="mr-2 h-4 w-4" />
-              Retry Direct
+              Retry
             </Button>
-            {CORS_PROXIES.slice(1).map((proxy, index) => (
-              <Button 
-                key={proxy.name}
-                variant="secondary" 
-                onClick={() => forceProxy(index + 1)} 
-                size="sm"
-              >
-                Try {proxy.name}
-              </Button>
-            ))}
             {onError && (
               <Button variant="destructive" onClick={onError} size="sm">
                 Mark Unstable
               </Button>
             )}
           </div>
+
         </div>
       )}
 
@@ -606,12 +534,13 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         effectiveShowControls ? "opacity-100" : "opacity-0"
       )}>
         {connectionStatus === 'connected' ? (
-          <><Wifi className="h-3 w-3" /> {currentProxy > 0 ? CORS_PROXIES[currentProxy].name : 'Direct'}</>
+          <><Wifi className="h-3 w-3" /> Direct</>
         ) : connectionStatus === 'connecting' ? (
           <><RefreshCw className="h-3 w-3 animate-spin" /> Connecting...</>
         ) : (
           <><WifiOff className="h-3 w-3" /> Failed</>
         )}
+
       </div>
 
       {/* Unstable Warning */}
@@ -675,7 +604,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
           <div className="flex-1" />
 
-          {/* Settings (Quality + Connection) */}
+          {/* Settings (Quality) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -712,16 +641,6 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
                 </>
               )}
 
-              <DropdownMenuLabel>Connection</DropdownMenuLabel>
-              {CORS_PROXIES.map((proxy, index) => (
-                <DropdownMenuItem 
-                  key={proxy.name}
-                  onClick={() => forceProxy(index)}
-                  className={cn(currentProxy === index && "bg-accent")}
-                >
-                  {proxy.name}
-                </DropdownMenuItem>
-              ))}
             </DropdownMenuContent>
           </DropdownMenu>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Channel, ProxyMode } from '@/types/livetv';
+import { Channel } from '@/types/livetv';
 import {
   Dialog,
   DialogContent,
@@ -13,14 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { AlertTriangle, Star, Trash2, Wifi } from 'lucide-react';
+import { AlertTriangle, Star, Trash2 } from 'lucide-react';
+
 
 interface ChannelSettingsDialogProps {
   channel: Channel | null;
@@ -45,7 +39,7 @@ export function ChannelSettingsDialog({
   const [group, setGroup] = useState('');
   const [logo, setLogo] = useState('');
   const [epgId, setEpgId] = useState('');
-  const [proxyMode, setProxyMode] = useState<ProxyMode>('auto');
+
 
   // Sync state when channel changes
   useEffect(() => {
@@ -54,9 +48,9 @@ export function ChannelSettingsDialog({
       setGroup(channel.group);
       setLogo(channel.logo);
       setEpgId(channel.epgId);
-      setProxyMode(channel.proxyMode || 'auto');
     }
   }, [channel]);
+
 
   if (!channel) return null;
 
@@ -66,10 +60,10 @@ export function ChannelSettingsDialog({
       group,
       logo,
       epgId,
-      proxyMode,
     });
     onOpenChange(false);
   };
+
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to remove this channel?')) {
@@ -131,31 +125,6 @@ export function ChannelSettingsDialog({
               onChange={(e) => setEpgId(e.target.value)}
               placeholder="channel.epg.id"
             />
-          </div>
-
-          {/* Proxy Mode */}
-          <div className="space-y-2">
-            <Label htmlFor="ch-proxy">Connection Mode</Label>
-            <Select value={proxyMode} onValueChange={(v) => setProxyMode(v as ProxyMode)}>
-              <SelectTrigger id="ch-proxy" className="w-full">
-                <div className="flex items-center gap-2">
-                  <Wifi className="h-4 w-4" />
-                  <SelectValue placeholder="Select connection mode" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Auto (recommended)</SelectItem>
-                <SelectItem value="direct">Direct (no proxy)</SelectItem>
-                <SelectItem value="proxy">Cloud Proxy</SelectItem>
-                <SelectItem value="spoof">Cloud Proxy (Spoof)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {proxyMode === 'auto' && 'Automatically selects the best connection method based on stream type.'}
-              {proxyMode === 'direct' && 'Connect directly without proxy. May fail for HTTP streams on HTTPS sites.'}
-              {proxyMode === 'proxy' && 'Route through cloud proxy to bypass CORS restrictions.'}
-              {proxyMode === 'spoof' && 'Cloud proxy with header spoofing for streams that block external requests.'}
-            </p>
           </div>
 
           {/* Stream URL (read-only) */}
