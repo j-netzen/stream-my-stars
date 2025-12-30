@@ -10,6 +10,7 @@ import { EPGSettingsDialog } from '@/components/livetv/EPGSettingsDialog';
 import { Button } from '@/components/ui/button';
 import { Plus, Globe, Trash2, Tv, List, Grid3X3, X, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 type ViewMode = 'list' | 'guide' | 'fullscreen';
 
@@ -232,12 +233,53 @@ export default function LiveTVPage() {
             <p className="text-muted-foreground text-center max-w-md">
               Add channels by pasting a stream URL or importing an M3U playlist to get started with Live TV.
             </p>
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Your First Channel
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Your First Channel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const result = await refreshChannels();
+                  if (result === undefined) {
+                    toast.message('Sign in to sync My Channels');
+                  } else if (result) {
+                    toast.success('Synced My Channels');
+                  } else {
+                    toast.message('No channels found in cloud');
+                  }
+                }}
+              >
+                Sync My Channels
+              </Button>
+            </div>
           </div>
         ) : viewMode === 'list' ? (
+          /* List View */
+          <div className="flex-1 flex overflow-hidden">
+            {/* Channel Sidebar */}
+            <div className="w-80 flex-shrink-0 z-10">
+              <ChannelList
+                channels={channels}
+                currentPrograms={currentPrograms}
+                selectedChannelId={selectedChannel?.id}
+                sortEnabled={sortEnabled}
+                isSyncing={isSyncing}
+                onSelectChannel={handleSelectChannel}
+                onChannelSettings={handleChannelSettings}
+                onToggleFavorite={toggleFavorite}
+                onDeleteChannel={removeChannel}
+                onToggleSort={toggleSort}
+                onDownloadM3U8={downloadM3U8}
+                onDownloadJSON={downloadJSON}
+                onImportJSON={importFromJSON}
+                onCopyShareable={copyShareableData}
+                onImportShareable={importFromShareableData}
+                onRefresh={refreshChannels}
+              />
+            </div>
+
           /* List View */
           <div className="flex-1 flex overflow-hidden">
             {/* Channel Sidebar */}
