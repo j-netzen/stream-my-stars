@@ -58,6 +58,14 @@ const detectErrorType = (error: any, response?: any): StreamError => {
 
   
   if (error?.type === 'mediaError' || error?.type === Hls?.ErrorTypes?.MEDIA_ERROR) {
+    // Check for specific codec incompatibility
+    if (error?.message?.includes('IncompatibleCodecs') || error?.details?.includes('IncompatibleCodecs')) {
+      return {
+        type: 'media',
+        message: 'Unsupported video codec (HEVC/H.265)',
+        suggestion: 'This stream uses a codec your browser cannot play'
+      };
+    }
     return {
       type: 'media',
       message: 'Media format error',
@@ -272,8 +280,24 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
             }
 
             case Hls.ErrorTypes.MEDIA_ERROR:
-              console.log('Media error, attempting recovery...');
-              hls.recoverMediaError();
+              // Check if this is an unrecoverable codec error
+              if (data.details === 'manifestIncompatibleCodecsError') {
+                console.error('Unrecoverable codec error - stream uses unsupported codec');
+                if (!hasShownErrorToast.current) {
+                  hasShownErrorToast.current = true;
+                  toast.error('This stream uses an unsupported codec (likely HEVC/H.265)', { duration: 5000 });
+                }
+                setStreamError({
+                  type: 'media',
+                  message: 'Unsupported codec (HEVC/H.265)',
+                  suggestion: 'Your browser cannot decode this stream format. Try a different source.'
+                });
+                setIsLoading(false);
+                onError?.();
+              } else {
+                console.log('Media error, attempting recovery...');
+                hls.recoverMediaError();
+              }
               break;
             default:
               void systemCheck('fatal_error');
