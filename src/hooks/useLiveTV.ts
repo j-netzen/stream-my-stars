@@ -15,8 +15,11 @@ const PROXY_ENABLED_KEY = 'livetv_proxy_enabled';
 
 const DEFAULT_SETTINGS: LiveTVSettings = {};
 
-// Proxy URL prefix for bypassing regional blocks
-const PROXY_URL_PREFIX = 'https://api.codetabs.com/v1/proxy?quest=';
+// Get proxy URL from Supabase edge function
+const getProxyUrlPrefix = () => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  return `${supabaseUrl}/functions/v1/stream-proxy?url=`;
+};
 
 export function useLiveTV() {
   const { user } = useAuth();
@@ -397,7 +400,7 @@ export function useLiveTV() {
   // Get proxied URL if proxy is enabled
   const getProxiedUrl = useCallback((url: string): string => {
     if (!proxyEnabled) return url;
-    return `${PROXY_URL_PREFIX}${encodeURIComponent(url)}`;
+    return `${getProxyUrlPrefix()}${encodeURIComponent(url)}`;
   }, [proxyEnabled]);
 
   // Export channels to M3U8 format
