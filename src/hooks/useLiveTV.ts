@@ -208,13 +208,42 @@ export function useLiveTV() {
   }, [user, loadChannelsFromDb, sortChannelsAlphabetically]);
 
   // Sync channels to database when they change (after initialization)
+  // Use a debounce to prevent rapid successive syncs
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   useEffect(() => {
-    if (isInitialized && user && !isSyncing.current) {
-      syncChannelsToDb(channels);
+    if (!isInitialized || !user || isSyncing.current) return;
+    
+    // Clear any pending sync
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
     }
+    
+    // Debounce the sync to prevent rapid successive calls
+    syncTimeoutRef.current = setTimeout(() => {
+      syncChannelsToDb(channels);
+    }, 300);
+    
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
   }, [channels, isInitialized, user, syncChannelsToDb]);
 
-  // Real-time subscription for channel changes
+  // Real-time subscription for channel changes from other devices
+  // Using a ref to avoid re-subscribing when channels change
+  const channelsRef = useRef(channels);
+  const sortEnabledRef = useRef(sortEnabled);
+  
+  useEffect(() => {
+    channelsRef.current = channels;
+  }, [channels]);
+  
+  useEffect(() => {
+    sortEnabledRef.current = sortEnabled;
+  }, [sortEnabled]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -229,23 +258,35 @@ export function useLiveTV() {
           filter: `user_id=eq.${user.id}`,
         },
         async () => {
+          // Skip if we're already syncing (we initiated the change)
+          if (isSyncing.current) {
+            console.log('Skipping realtime update - local sync in progress');
+            return;
+          }
+          
           // Show syncing indicator
           setIsSyncingState(true);
           isSyncing.current = true;
           
-          const dbChannels = await loadChannelsFromDb();
-          if (dbChannels.length > 0 || channels.length === 0) {
-            let channelList = dbChannels;
-            if (sortEnabled && channelList.length > 0) {
-              channelList = sortChannelsAlphabetically(channelList);
+          try {
+            const dbChannels = await loadChannelsFromDb();
+            // Only update if we got data or we have no local channels
+            if (dbChannels.length > 0 || channelsRef.current.length === 0) {
+              let channelList = dbChannels;
+              if (sortEnabledRef.current && channelList.length > 0) {
+                channelList = sortChannelsAlphabetically(channelList);
+              }
+              setChannels(channelList);
+              console.log(`Synced ${channelList.length} channels from another device`);
             }
-            setChannels(channelList);
+          } catch (err) {
+            console.error('Error during realtime sync:', err);
+          } finally {
+            setTimeout(() => {
+              isSyncing.current = false;
+              setIsSyncingState(false);
+            }, 1000);
           }
-          
-          setTimeout(() => {
-            isSyncing.current = false;
-            setIsSyncingState(false);
-          }, 1000);
         }
       )
       .subscribe();
@@ -253,7 +294,7 @@ export function useLiveTV() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, loadChannelsFromDb, sortEnabled, sortChannelsAlphabetically, channels.length]);
+  }, [user, loadChannelsFromDb, sortChannelsAlphabetically]);
 
   // Save programs to localStorage
   useEffect(() => {
