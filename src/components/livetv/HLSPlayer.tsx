@@ -133,6 +133,7 @@ interface HLSPlayerProps {
   channelName: string;
   channelLogo?: string;
   isUnstable?: boolean;
+  hwAccelEnabled?: boolean;
   controlsVisible?: boolean;
   onError?: () => void;
   onClose?: () => void;
@@ -145,6 +146,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   channelName, 
   channelLogo,
   isUnstable,
+  hwAccelEnabled = true,
   controlsVisible: externalControlsVisible,
   onError, 
   onClose 
@@ -212,25 +214,25 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
 
     if (Hls.isSupported()) {
-      const hls = new Hls({
+      // Configure HLS.js based on hardware acceleration setting
+      const hlsConfig: Partial<Hls['config']> = {
         enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 600,
+        lowLatencyMode: hwAccelEnabled, // Disable low latency in software mode for stability
+        backBufferLength: hwAccelEnabled ? 90 : 30, // Smaller buffer for software decoding
+        maxBufferLength: hwAccelEnabled ? 30 : 15,
+        maxMaxBufferLength: hwAccelEnabled ? 600 : 120,
         startLevel: currentQuality, // Start at selected quality or auto (-1)
         // Enhanced codec compatibility settings
-        preferManagedMediaSource: true, // Use ManagedMediaSource when available (better codec support)
+        preferManagedMediaSource: hwAccelEnabled, // Use ManagedMediaSource when HW accel enabled
         progressive: true, // Enable progressive loading for better compatibility
         // Prefer H.264/AVC over HEVC when multiple renditions available
-        capLevelToPlayerSize: true, // Avoid loading higher resolution HEVC streams unnecessarily
+        capLevelToPlayerSize: !hwAccelEnabled, // Force cap to player size when software decoding
         testBandwidth: true,
         // Hardware acceleration optimizations
-        // Use native video decoder when available for better performance
         renderTextTracksNatively: true,
-        // Allow hardware decoder to handle more codecs
+        // Allow hardware decoder to handle more codecs when enabled
         videoPreference: {
-          preferHDR: true, // Allow HDR content which often requires hardware decoding
+          preferHDR: hwAccelEnabled, // Only allow HDR when hardware acceleration is on
         },
         // Allow codec switching during playback
         // When stream has multiple codec variants, HLS.js can switch between them
@@ -264,7 +266,9 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         levelLoadingMaxRetryTimeout: 64000,
         // Audio codec preferences - helps with streams that have audio issues
         audioStreamController: undefined, // Use default audio handling
-      });
+      };
+
+      const hls = new Hls(hlsConfig);
 
       hls.loadSource(effectiveUrl);
       hls.attachMedia(video);
@@ -481,7 +485,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         hlsRef.current = null;
       }
     };
-  }, [url, originalUrl, onError, currentQuality, reloadKey]);
+  }, [url, originalUrl, onError, currentQuality, reloadKey, hwAccelEnabled]);
 
 
   // Handle quality change
