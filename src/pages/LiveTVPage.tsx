@@ -8,7 +8,7 @@ import { AddChannelDialog } from '@/components/livetv/AddChannelDialog';
 import { ChannelSettingsDialog } from '@/components/livetv/ChannelSettingsDialog';
 import { EPGSettingsDialog } from '@/components/livetv/EPGSettingsDialog';
 import { Button } from '@/components/ui/button';
-import { Plus, Globe, Trash2, Tv, List, Grid3X3, X, Maximize2, Minimize2, Shield, ShieldOff } from 'lucide-react';
+import { Plus, Globe, Trash2, Tv, List, Grid3X3, X, Maximize2, Minimize2, Shield, ShieldOff, Zap, Cpu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,6 +26,7 @@ export default function LiveTVPage() {
     settings,
     sortEnabled,
     proxyEnabled,
+    hwAccelEnabled,
     addChannelsFromM3U,
     addChannelByUrl,
     toggleUnstable,
@@ -38,6 +39,7 @@ export default function LiveTVPage() {
     setSelectedRegion,
     toggleSort,
     toggleProxy,
+    toggleHwAccel,
     getProxiedUrl,
     downloadM3U8,
     downloadJSON,
@@ -175,6 +177,32 @@ export default function LiveTVPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Hardware Acceleration Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={hwAccelEnabled ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      "h-8 px-3 transition-colors",
+                      hwAccelEnabled 
+                        ? "bg-purple-600 hover:bg-purple-700 text-white" 
+                        : "text-muted-foreground"
+                    )}
+                    onClick={toggleHwAccel}
+                  >
+                    {hwAccelEnabled ? (
+                      <Zap className="h-4 w-4" />
+                    ) : (
+                      <Cpu className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>{hwAccelEnabled ? 'Hardware Acceleration ON' : 'Hardware Acceleration OFF - Software decoding'}</p>
+                </TooltipContent>
+              </Tooltip>
+
               {/* Proxy Toggle */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -312,13 +340,14 @@ export default function LiveTVPage() {
             {/* Player Area */}
             <div className="flex-1 p-4 flex flex-col z-10">
               {selectedChannel ? (
-                <HLSPlayer
+              <HLSPlayer
                   url={getProxiedUrl(selectedChannel.url)}
                   originalUrl={selectedChannel.originalUrl}
                   channelId={selectedChannel.id}
                   channelName={selectedChannel.name}
                   channelLogo={selectedChannel.logo}
                   isUnstable={selectedChannel.isUnstable}
+                  hwAccelEnabled={hwAccelEnabled}
                   onError={handleStreamError}
                   onClose={() => setSelectedChannel(null)}
                 />
@@ -346,13 +375,14 @@ export default function LiveTVPage() {
                   "h-48 md:h-64 transition-opacity duration-300",
                   !playerControlsVisible && "opacity-90"
                 )}>
-                  <HLSPlayer
+                <HLSPlayer
                     url={getProxiedUrl(selectedChannel.url)}
                     originalUrl={selectedChannel.originalUrl}
                     channelId={selectedChannel.id}
                     channelName={selectedChannel.name}
                     channelLogo={selectedChannel.logo}
                     isUnstable={selectedChannel.isUnstable}
+                    hwAccelEnabled={hwAccelEnabled}
                     onError={handleStreamError}
                     onClose={() => setSelectedChannel(null)}
                     controlsVisible={playerControlsVisible}
