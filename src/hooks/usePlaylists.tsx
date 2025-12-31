@@ -40,7 +40,7 @@ export function usePlaylists() {
   });
 
   const addPlaylist = useMutation({
-    mutationFn: async (input: { name: string; description?: string; cover_image?: string }) => {
+    mutationFn: async (input: { name: string; description?: string; cover_image?: string; is_public?: boolean }) => {
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("playlists")
@@ -57,6 +57,29 @@ export function usePlaylists() {
     },
     onError: (error) => {
       toast.error("Failed to create playlist: " + error.message);
+    },
+  });
+
+  const updatePlaylist = useMutation({
+    mutationFn: async ({ id, ...input }: { id: string; name?: string; description?: string; cover_image?: string; is_public?: boolean }) => {
+      if (!user) throw new Error("Not authenticated");
+      const { data, error } = await supabase
+        .from("playlists")
+        .update(input)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["playlists"] });
+      toast.success("Playlist updated");
+    },
+    onError: (error) => {
+      toast.error("Failed to update playlist: " + error.message);
     },
   });
 
@@ -110,5 +133,5 @@ export function usePlaylists() {
     },
   });
 
-  return { playlists, isLoading, addPlaylist, deletePlaylist, addToPlaylist, removeFromPlaylist };
+  return { playlists, isLoading, addPlaylist, updatePlaylist, deletePlaylist, addToPlaylist, removeFromPlaylist };
 }
