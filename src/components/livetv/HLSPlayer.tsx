@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useVideoPlayerOrientation } from '@/hooks/useScreenOrientation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -172,6 +173,8 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
   const [hwAccelStatus, setHwAccelStatus] = useState<'unknown' | 'active' | 'unavailable'>('unknown');
 
+  // Lock to landscape orientation on native apps when fullscreen
+  useVideoPlayerOrientation(isFullscreen);
   
   // Compute effective controls visibility (internal OR external control)
   const effectiveShowControls = externalControlsVisible !== undefined 
