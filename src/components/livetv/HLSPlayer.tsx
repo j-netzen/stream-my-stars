@@ -223,6 +223,13 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         // Prefer H.264/AVC over HEVC when multiple renditions available
         capLevelToPlayerSize: true, // Avoid loading higher resolution HEVC streams unnecessarily
         testBandwidth: true,
+        // Hardware acceleration optimizations
+        // Use native video decoder when available for better performance
+        renderTextTracksNatively: true,
+        // Allow hardware decoder to handle more codecs
+        videoPreference: {
+          preferHDR: true, // Allow HDR content which often requires hardware decoding
+        },
         // Allow codec switching during playback
         // When stream has multiple codec variants, HLS.js can switch between them
         xhrSetup: function (xhr: XMLHttpRequest, xhrUrl: string) {
@@ -577,12 +584,19 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
       onClick={handlePlayerInteraction}
     >
       {/* Video Element */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
         crossOrigin="anonymous"
         onClick={togglePlay}
+        style={{ 
+          transform: 'translateZ(0)', // Force GPU layer
+          backfaceVisibility: 'hidden',
+          willChange: 'transform',
+        }}
+        {...{ 'x-webkit-airplay': 'allow' } as any}
       />
 
 
