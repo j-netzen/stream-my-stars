@@ -590,12 +590,11 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     }
     setShowControls(true);
     
-    if (isPlaying) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
-    }
-  }, [isPlaying]);
+    // Always hide controls after timeout, regardless of play state
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, []);
 
   // Retry loading
   const retry = useCallback(() => {
