@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, range",
-  "Access-Control-Allow-Methods": "GET,HEAD,OPTIONS",
-  "Access-Control-Expose-Headers": "content-length, content-range, accept-ranges, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept, origin',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, HEAD, OPTIONS',
+  'Access-Control-Expose-Headers': 'content-length, content-range, accept-ranges, content-type',
+  'Access-Control-Max-Age': '86400',
 };
 
 const REQUEST_TIMEOUT_MS = 15000;
