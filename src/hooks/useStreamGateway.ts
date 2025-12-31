@@ -8,6 +8,8 @@ import {
   rewriteM3U8Content,
   buildCdnHeaders,
   createGatewayFetch,
+  createXhrSetup,
+  getAuthToken,
   AVAILABLE_REGIONS,
 } from '@/lib/streamGateway';
 
@@ -16,6 +18,7 @@ export interface UseStreamGatewayReturn {
   config: GatewayConfig;
   mode: StreamMode;
   isEdgeOptimized: boolean;
+  authToken: string | null;
   
   // Actions
   setMode: (mode: StreamMode) => void;
@@ -28,6 +31,7 @@ export interface UseStreamGatewayReturn {
   rewriteManifest: (content: string, baseUrl: string) => string;
   getCdnHeaders: () => Record<string, string>;
   gatewayFetch: typeof fetch;
+  xhrSetup: (xhr: XMLHttpRequest, url: string) => void;
   
   // Available options
   availableRegions: typeof AVAILABLE_REGIONS;
@@ -41,6 +45,22 @@ export function useStreamGateway(initialGatewayUrl?: string): UseStreamGatewayRe
       gatewayUrl: initialGatewayUrl || persisted.gatewayUrl,
     };
   });
+
+  const [authToken, setAuthToken] = useState<string | null>(null);
+
+  // Fetch auth token on mount and refresh periodically
+  useEffect(() => {
+    const fetchToken = async () => {
+      const token = await getAuthToken();
+      setAuthToken(token);
+    };
+    
+    fetchToken();
+    
+    // Refresh token periodically
+    const interval = setInterval(fetchToken, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Persist config changes
   useEffect(() => {
@@ -82,17 +102,22 @@ export function useStreamGateway(initialGatewayUrl?: string): UseStreamGatewayRe
   }, [config]);
 
   const getCdnHeaders = useCallback(() => {
-    return buildCdnHeaders(config);
-  }, [config]);
+    return buildCdnHeaders(config, authToken);
+  }, [config, authToken]);
 
   const gatewayFetch = useMemo(() => {
-    return createGatewayFetch(config);
-  }, [config]);
+    return createGatewayFetch(config, authToken);
+  }, [config, authToken]);
+
+  const xhrSetup = useMemo(() => {
+    return createXhrSetup(config, authToken);
+  }, [config, authToken]);
 
   return {
     config,
     mode: config.mode,
     isEdgeOptimized: config.mode === 'edge-optimized',
+    authToken,
     setMode,
     setGatewayUrl,
     setRegion,
@@ -101,6 +126,7 @@ export function useStreamGateway(initialGatewayUrl?: string): UseStreamGatewayRe
     rewriteManifest,
     getCdnHeaders,
     gatewayFetch,
+    xhrSetup,
     availableRegions: AVAILABLE_REGIONS,
   };
 }
