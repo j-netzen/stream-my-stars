@@ -1,19 +1,19 @@
 project_id = "azrfvjecmcloaqidrspi"
 
 [functions.tmdb]
-verify_jwt = false
+verify_jwt = true
 
 [functions.real-debrid]
-verify_jwt = false
+verify_jwt = true
 
 [functions.categorize-media]
-verify_jwt = false
+verify_jwt = true
 
 [functions.torrentio]
-verify_jwt = false
+verify_jwt = true
 
 [functions.stream-check]
-verify_jwt = false
+verify_jwt = true
 
 [functions.stream-proxy]
 verify_jwt = true
