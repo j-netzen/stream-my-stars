@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { TVModeProvider } from "@/hooks/useTVMode";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import MoviesPage from "./pages/MoviesPage";
@@ -30,6 +31,7 @@ const App = () => (
           <TooltipProvider>
           <Toaster />
           <Sonner />
+          <PWAInstallPrompt />
           <ErrorBoundary>
           <BrowserRouter>
             <Routes>
