@@ -1,7 +1,8 @@
 import { useRef, useEffect, useState, useCallback, forwardRef } from 'react';
 import Hls from 'hls.js';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, Settings, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, Settings, Wifi, WifiOff, Cpu, Zap } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -167,6 +168,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([]);
   const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
+  const [hwAccelStatus, setHwAccelStatus] = useState<'unknown' | 'active' | 'unavailable'>('unknown');
 
   
   // Compute effective controls visibility (internal OR external control)
@@ -280,6 +282,54 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           index,
         }));
         setQualityLevels(levels);
+        
+        // Detect hardware acceleration status based on codec and browser capabilities
+        const detectHwAccel = () => {
+          // Check if stream uses hardware-accelerated codecs
+          const codecInfo = data.levels[0]?.codecSet || '';
+          const isHEVC = codecInfo.toLowerCase().includes('hvc1') || codecInfo.toLowerCase().includes('hev1');
+          const isAV1 = codecInfo.toLowerCase().includes('av01');
+          const isH264 = codecInfo.toLowerCase().includes('avc') || !isHEVC && !isAV1;
+          
+          // Check browser/platform for hardware acceleration likelihood
+          const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+          const isChrome = /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent);
+          const isEdge = /edg/i.test(navigator.userAgent);
+          const isFirefox = /firefox/i.test(navigator.userAgent);
+          
+          // Check for WebGL (good indicator of GPU availability)
+          let hasGPU = false;
+          try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+            hasGPU = !!gl;
+          } catch {
+            hasGPU = false;
+          }
+          
+          // H.264 is hardware accelerated on virtually all modern devices
+          // HEVC is hardware accelerated on Safari/Edge and some Chrome platforms
+          // AV1 hardware support is newer but growing
+          if (hasGPU) {
+            if (isH264) {
+              setHwAccelStatus('active'); // H.264 is almost always HW accelerated
+            } else if (isHEVC && (isSafari || isEdge)) {
+              setHwAccelStatus('active');
+            } else if (isAV1 && (isChrome || isEdge)) {
+              // AV1 HW support on newer GPUs
+              setHwAccelStatus('active');
+            } else if (isHEVC || isAV1) {
+              // These codecs on unsupported browsers likely use software decoding
+              setHwAccelStatus('unavailable');
+            } else {
+              setHwAccelStatus('active');
+            }
+          } else {
+            setHwAccelStatus('unavailable');
+          }
+        };
+        
+        detectHwAccel();
         
         video.play().catch(() => {
           setIsPlaying(false);
@@ -644,22 +694,51 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         </div>
       )}
 
-      {/* Connection Status Indicator */}
+      {/* Connection & Hardware Status Indicators */}
       <div className={cn(
-        "absolute top-4 right-4 flex items-center gap-1.5 px-2 py-1 rounded-full text-xs transition-opacity",
-        connectionStatus === 'connected' ? "bg-green-500/80 text-white" : 
-        connectionStatus === 'connecting' ? "bg-yellow-500/80 text-black" : 
-        "bg-red-500/80 text-white",
+        "absolute top-4 right-4 flex items-center gap-2 transition-opacity",
         effectiveShowControls ? "opacity-100" : "opacity-0"
       )}>
-        {connectionStatus === 'connected' ? (
-          <><Wifi className="h-3 w-3" /> Direct</>
-        ) : connectionStatus === 'connecting' ? (
-          <><RefreshCw className="h-3 w-3 animate-spin" /> Connecting...</>
-        ) : (
-          <><WifiOff className="h-3 w-3" /> Failed</>
+        {/* Hardware Acceleration Badge */}
+        {connectionStatus === 'connected' && hwAccelStatus !== 'unknown' && (
+          <Badge 
+            variant={hwAccelStatus === 'active' ? 'default' : 'secondary'}
+            className={cn(
+              "flex items-center gap-1 text-xs",
+              hwAccelStatus === 'active' 
+                ? "bg-purple-600/90 hover:bg-purple-600/90 text-white border-purple-500/50" 
+                : "bg-muted/80 text-muted-foreground"
+            )}
+          >
+            {hwAccelStatus === 'active' ? (
+              <>
+                <Zap className="h-3 w-3" />
+                <span>HW Accel</span>
+              </>
+            ) : (
+              <>
+                <Cpu className="h-3 w-3" />
+                <span>Software</span>
+              </>
+            )}
+          </Badge>
         )}
-
+        
+        {/* Connection Status */}
+        <div className={cn(
+          "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs",
+          connectionStatus === 'connected' ? "bg-green-500/80 text-white" : 
+          connectionStatus === 'connecting' ? "bg-yellow-500/80 text-black" : 
+          "bg-red-500/80 text-white"
+        )}>
+          {connectionStatus === 'connected' ? (
+            <><Wifi className="h-3 w-3" /> Direct</>
+          ) : connectionStatus === 'connecting' ? (
+            <><RefreshCw className="h-3 w-3 animate-spin" /> Connecting...</>
+          ) : (
+            <><WifiOff className="h-3 w-3" /> Failed</>
+          )}
+        </div>
       </div>
 
       {/* Unstable Warning */}
