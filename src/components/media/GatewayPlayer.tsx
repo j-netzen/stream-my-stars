@@ -67,10 +67,11 @@ export function GatewayPlayer({
     config,
     mode,
     isEdgeOptimized,
+    authToken,
     toggleMode,
     setRegion,
     rewriteUrl,
-    getCdnHeaders,
+    xhrSetup,
     availableRegions,
   } = useStreamGateway(gatewayUrl);
 
@@ -90,19 +91,7 @@ export function GatewayPlayer({
       }
 
       const hls = new Hls({
-        xhrSetup: (xhr, url) => {
-          // Apply gateway headers to all requests
-          const headers = getCdnHeaders();
-          Object.entries(headers).forEach(([key, value]) => {
-            xhr.setRequestHeader(key, value);
-          });
-          
-          // Rewrite URL if edge-optimized
-          if (isEdgeOptimized && gatewayUrl) {
-            // Note: xhrSetup doesn't allow URL modification directly,
-            // but the URL rewriting happens at loadSource level
-          }
-        },
+        xhrSetup: xhrSetup,
       });
 
       hls.loadSource(streamUrl);
@@ -135,7 +124,7 @@ export function GatewayPlayer({
         hlsRef.current = null;
       }
     };
-  }, [src, mode, config.gatewayUrl, config.region]);
+  }, [src, mode, config.gatewayUrl, config.region, authToken, xhrSetup, rewriteUrl]);
 
   // Handle fullscreen changes
   useEffect(() => {

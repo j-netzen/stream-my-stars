@@ -3,6 +3,8 @@
  * Provides dynamic gateway routing, request interception, and M3U8 link rewriting
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 export type StreamMode = 'direct' | 'edge-optimized';
 
 export interface GatewayConfig {
@@ -13,6 +15,14 @@ export interface GatewayConfig {
 }
 
 const STORAGE_KEY = 'stream_gateway_config';
+
+/**
+ * Get the current auth token for authenticated requests
+ */
+export async function getAuthToken(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
 
 /**
  * Get persisted gateway configuration from localStorage
@@ -102,7 +112,7 @@ export function rewriteM3U8Content(
 /**
  * Build CDN headers for gateway requests
  */
-export function buildCdnHeaders(config: GatewayConfig): Record<string, string> {
+export function buildCdnHeaders(config: GatewayConfig, authToken?: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     'X-Stream-Mode': config.mode,
   };
@@ -110,6 +120,11 @@ export function buildCdnHeaders(config: GatewayConfig): Record<string, string> {
   if (config.region) {
     headers['X-Forwarded-For'] = getRegionIp(config.region);
     headers['X-Edge-Region'] = config.region;
+  }
+
+  // Add auth token for authenticated proxy requests
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   // Add custom headers if provided
@@ -154,12 +169,12 @@ export const AVAILABLE_REGIONS = [
 /**
  * Create a fetch wrapper that adds gateway headers
  */
-export function createGatewayFetch(config: GatewayConfig): typeof fetch {
+export function createGatewayFetch(config: GatewayConfig, authToken?: string | null): typeof fetch {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const headers = new Headers(init?.headers);
     
-    // Add CDN headers
-    const cdnHeaders = buildCdnHeaders(config);
+    // Add CDN headers with auth token
+    const cdnHeaders = buildCdnHeaders(config, authToken);
     Object.entries(cdnHeaders).forEach(([key, value]) => {
       headers.set(key, value);
     });
@@ -174,6 +189,18 @@ export function createGatewayFetch(config: GatewayConfig): typeof fetch {
     return fetch(url, {
       ...init,
       headers,
+    });
+  };
+}
+
+/**
+ * Create XHR setup function for HLS.js with auth token
+ */
+export function createXhrSetup(config: GatewayConfig, authToken: string | null) {
+  return (xhr: XMLHttpRequest, url: string) => {
+    const headers = buildCdnHeaders(config, authToken);
+    Object.entries(headers).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value);
     });
   };
 }
