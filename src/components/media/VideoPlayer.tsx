@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
+import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 
 interface Media {
   id: string;
@@ -37,6 +38,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const bufferStallCountRef = useRef<number>(0);
 
   const { settings } = usePlaybackSettings();
+  
+  // Lock to landscape orientation on native apps
+  useVideoPlayerOrientation(true);
 
   // Load persisted volume from localStorage
   const getPersistedVolume = () => {
