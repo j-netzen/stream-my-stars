@@ -9,13 +9,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -23,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ListVideo, Plus, Trash2, Loader2, Shuffle, ArrowUpDown } from "lucide-react";
+import { ListVideo, Plus, Trash2, Loader2, Shuffle, ArrowUpDown, Globe, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +43,7 @@ import { useQuery } from "@tanstack/react-query";
 type SortOption = "date_added" | "alphabetical" | "release_date";
 
 export default function PlaylistsPage() {
-  const { playlists, isLoading, addPlaylist, deletePlaylist, removeFromPlaylist } = usePlaylists();
+  const { playlists, isLoading, addPlaylist, updatePlaylist, deletePlaylist, removeFromPlaylist } = usePlaylists();
   const { media, deleteMedia } = useMedia();
   const { progress } = useWatchProgress();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
@@ -40,9 +52,12 @@ export default function PlaylistsPage() {
   const [activeTryNextStream, setActiveTryNextStream] = useState<(() => void) | undefined>();
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
+  const [newPlaylistPublic, setNewPlaylistPublic] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPlaylist, setSelectedPlaylist] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("date_added");
+  const [publicConfirmPlaylistId, setPublicConfirmPlaylistId] = useState<string | null>(null);
+  const [pendingPublicState, setPendingPublicState] = useState<boolean>(false);
 
   // Fetch playlist items
   const { data: playlistItems = [] } = useQuery({
@@ -70,11 +85,32 @@ export default function PlaylistsPage() {
     await addPlaylist.mutateAsync({
       name: newPlaylistName,
       description: newPlaylistDesc || undefined,
+      is_public: newPlaylistPublic,
     });
 
     setNewPlaylistName("");
     setNewPlaylistDesc("");
+    setNewPlaylistPublic(false);
     setIsDialogOpen(false);
+  };
+
+  const handleTogglePublic = (playlistId: string, currentPublic: boolean) => {
+    if (!currentPublic) {
+      // Making public - show confirmation
+      setPublicConfirmPlaylistId(playlistId);
+      setPendingPublicState(true);
+    } else {
+      // Making private - no confirmation needed
+      updatePlaylist.mutate({ id: playlistId, is_public: false });
+    }
+  };
+
+  const confirmMakePublic = () => {
+    if (publicConfirmPlaylistId) {
+      updatePlaylist.mutate({ id: publicConfirmPlaylistId, is_public: true });
+    }
+    setPublicConfirmPlaylistId(null);
+    setPendingPublicState(false);
   };
 
   const selectedPlaylistData = playlists.find((p) => p.id === selectedPlaylist);
@@ -166,6 +202,9 @@ export default function PlaylistsPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Playlist</DialogTitle>
+              <DialogDescription>
+                Create a new playlist to organize your media
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -182,6 +221,27 @@ export default function PlaylistsPage() {
                   placeholder="Enter a description"
                   value={newPlaylistDesc}
                   onChange={(e) => setNewPlaylistDesc(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                <div className="flex items-center gap-2">
+                  {newPlaylistPublic ? (
+                    <Globe className="w-4 h-4 text-primary" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <div>
+                    <Label className="cursor-pointer">Make Public</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {newPlaylistPublic 
+                        ? "All authenticated users can view this playlist" 
+                        : "Only you can see this playlist"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={newPlaylistPublic}
+                  onCheckedChange={setNewPlaylistPublic}
                 />
               </div>
               <Button onClick={handleCreatePlaylist} className="w-full">
@@ -218,7 +278,12 @@ export default function PlaylistsPage() {
                       <ListVideo className="w-4 h-4 text-purple-500" />
                     </div>
                     <div>
-                      <p className="font-medium">{playlist.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium">{playlist.name}</p>
+                        {playlist.is_public && (
+                          <Globe className="w-3 h-3 text-primary" />
+                        )}
+                      </div>
                       {playlist.description && (
                         <p className="text-xs text-muted-foreground line-clamp-1">
                           {playlist.description}
@@ -226,20 +291,34 @@ export default function PlaylistsPage() {
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deletePlaylist.mutate(playlist.id);
-                      if (selectedPlaylist === playlist.id) {
-                        setSelectedPlaylist(null);
-                      }
-                    }}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTogglePublic(playlist.id, playlist.is_public);
+                      }}
+                      className={`h-8 w-8 ${playlist.is_public ? 'text-primary' : 'text-muted-foreground'}`}
+                      title={playlist.is_public ? "Make private" : "Make public"}
+                    >
+                      {playlist.is_public ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deletePlaylist.mutate(playlist.id);
+                        if (selectedPlaylist === playlist.id) {
+                          setSelectedPlaylist(null);
+                        }
+                      }}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))
@@ -336,6 +415,32 @@ export default function PlaylistsPage() {
           onPlaybackError={activeTryNextStream}
         />
       )}
+
+      {/* Public Confirmation Dialog */}
+      <AlertDialog open={!!publicConfirmPlaylistId} onOpenChange={(open) => !open && setPublicConfirmPlaylistId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-primary" />
+              Make Playlist Public?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Making this playlist public means <strong>all authenticated users</strong> will be able to view it and its contents.
+              </p>
+              <p className="text-amber-500">
+                ⚠️ Any media in this playlist will be visible to others.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmMakePublic}>
+              Yes, Make Public
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
