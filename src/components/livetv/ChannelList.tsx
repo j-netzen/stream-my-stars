@@ -1,13 +1,23 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Channel, Program } from '@/types/livetv';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, RefreshCw, Search, Settings, Share2, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowDownAZ, ChevronDown, ChevronRight, Copy, Download, FileDown, FileUp, RefreshCw, Search, Settings, Share2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ChannelListProps {
   channels: Channel[];
@@ -48,9 +58,18 @@ export function ChannelList({
 }: ChannelListProps) {
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['All Channels', 'My Channels']));
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Long-press deletion state
+  const [longPressChannel, setLongPressChannel] = useState<Channel | null>(null);
+  const [longPressProgress, setLongPressProgress] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const LONG_PRESS_DURATION = 5000; // 5 seconds
+  const PROGRESS_INTERVAL = 50; // Update progress every 50ms
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -100,24 +119,71 @@ export function ChannelList({
     }
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, channel: Channel) => {
-    e.stopPropagation();
-    
-    if (pendingDeleteId === channel.id) {
-      // Second click - confirm delete
-      onDeleteChannel(channel.id);
-      setPendingDeleteId(null);
-      toast.success(`"${channel.name}" removed from channels`);
-    } else {
-      // First click - show confirmation
-      setPendingDeleteId(channel.id);
-      toast.info(`Click again to confirm deleting "${channel.name}"`, {
-        duration: 3000,
-      });
-      // Auto-reset after 3 seconds
-      setTimeout(() => setPendingDeleteId(null), 3000);
+  // Cleanup long press on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      if (longPressIntervalRef.current) clearInterval(longPressIntervalRef.current);
+    };
+  }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
-  };
+    if (longPressIntervalRef.current) {
+      clearInterval(longPressIntervalRef.current);
+      longPressIntervalRef.current = null;
+    }
+    setLongPressChannel(null);
+    setLongPressProgress(0);
+  }, []);
+
+  const startLongPress = useCallback((channel: Channel) => {
+    cancelLongPress();
+    setLongPressChannel(channel);
+    setLongPressProgress(0);
+    
+    const startTime = Date.now();
+    
+    // Update progress bar
+    longPressIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / LONG_PRESS_DURATION) * 100, 100);
+      setLongPressProgress(progress);
+    }, PROGRESS_INTERVAL);
+    
+    // Trigger delete dialog after 5 seconds
+    longPressTimerRef.current = setTimeout(() => {
+      cancelLongPress();
+      setChannelToDelete(channel);
+      setDeleteDialogOpen(true);
+    }, LONG_PRESS_DURATION);
+  }, [cancelLongPress]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent, channel: Channel) => {
+    // Only start long press for primary button (left click / touch)
+    if (e.button !== 0) return;
+    startLongPress(channel);
+  }, [startLongPress]);
+
+  const handlePointerUp = useCallback(() => {
+    cancelLongPress();
+  }, [cancelLongPress]);
+
+  const handlePointerLeave = useCallback(() => {
+    cancelLongPress();
+  }, [cancelLongPress]);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (channelToDelete) {
+      onDeleteChannel(channelToDelete.id);
+      toast.success(`"${channelToDelete.name}" removed from channels`);
+      setChannelToDelete(null);
+      setDeleteDialogOpen(false);
+    }
+  }, [channelToDelete, onDeleteChannel]);
 
   // Filter and group channels with favorites at the top
   const { filteredChannels, groups } = useMemo(() => {
@@ -283,23 +349,39 @@ export function ChannelList({
                     const currentProgram = currentPrograms.get(channel.id);
                     const isSelected = channel.id === selectedChannelId;
 
+                    const isLongPressing = longPressChannel?.id === channel.id;
+
                     return (
                       <div
                         key={channel.id}
                         className={cn(
-                          "group relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors",
+                          "group relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors select-none",
                           isSelected ? "bg-primary/20 border border-primary/50" : "hover:bg-muted",
-                          channel.isUnstable && "opacity-50 grayscale"
+                          channel.isUnstable && "opacity-50 grayscale",
+                          isLongPressing && "bg-destructive/10 border border-destructive/50"
                         )}
-                        onClick={() => onSelectChannel(channel)}
+                        onClick={() => !isLongPressing && onSelectChannel(channel)}
+                        onPointerDown={(e) => handlePointerDown(e, channel)}
+                        onPointerUp={handlePointerUp}
+                        onPointerLeave={handlePointerLeave}
+                        onPointerCancel={handlePointerUp}
+                        onContextMenu={(e) => e.preventDefault()}
                       >
+                        {/* Long press progress bar */}
+                        {isLongPressing && (
+                          <div 
+                            className="absolute bottom-0 left-0 h-1 bg-destructive transition-all"
+                            style={{ width: `${longPressProgress}%` }}
+                          />
+                        )}
+
                         {/* Channel Logo */}
                         <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
                           {channel.logo ? (
                             <img
                               src={channel.logo}
                               alt={channel.name}
-                              className="w-full h-full object-contain"
+                              className="w-full h-full object-contain pointer-events-none"
                               onError={(e) => {
                                 e.currentTarget.style.display = 'none';
                               }}
@@ -324,23 +406,12 @@ export function ChannelList({
                               {currentProgram.title}
                             </p>
                           )}
-                        </div>
-
-
-                        {/* Delete Button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-7 w-7 opacity-0 group-hover:opacity-100 transition-all",
-                            pendingDeleteId === channel.id 
-                              ? "opacity-100 text-destructive bg-destructive/10" 
-                              : "text-muted-foreground hover:text-destructive"
+                          {isLongPressing && (
+                            <p className="text-xs text-destructive animate-pulse">
+                              Hold to delete...
+                            </p>
                           )}
-                          onClick={(e) => handleDeleteClick(e, channel)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </div>
 
                         {/* Settings Button */}
                         <Button
@@ -351,6 +422,7 @@ export function ChannelList({
                             e.stopPropagation();
                             onChannelSettings(channel);
                           }}
+                          onPointerDown={(e) => e.stopPropagation()}
                         >
                           <Settings className="h-4 w-4" />
                         </Button>
@@ -370,6 +442,30 @@ export function ChannelList({
           )}
         </div>
       </ScrollArea>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Channel</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove "{channelToDelete?.name}" from your channels?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setChannelToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
