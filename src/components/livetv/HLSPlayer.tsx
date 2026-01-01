@@ -524,7 +524,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     const onPause = () => setIsPlaying(false);
     
     // Check if we're behind live edge
-    const onTimeUpdate = () => {
+    const checkBehindLive = () => {
       if (video.duration && isFinite(video.duration)) {
         // Consider "behind live" if more than 10 seconds from the live edge
         const behindBy = video.duration - video.currentTime;
@@ -536,12 +536,16 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
-    video.addEventListener('timeupdate', onTimeUpdate);
+    video.addEventListener('timeupdate', checkBehindLive);
+    
+    // Also check periodically (for when paused, the live edge keeps moving)
+    const intervalId = setInterval(checkBehindLive, 1000);
 
     return () => {
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
-      video.removeEventListener('timeupdate', onTimeUpdate);
+      video.removeEventListener('timeupdate', checkBehindLive);
+      clearInterval(intervalId);
     };
   }, []);
 
@@ -635,7 +639,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
       video.play().catch(() => {});
     }
     
-    setIsBehindLive(false);
+    // Note: isBehindLive will be updated by the interval/timeupdate check
     toast.success('Jumped to live', { duration: 2000 });
   }, []);
 
