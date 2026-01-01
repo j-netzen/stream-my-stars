@@ -314,52 +314,58 @@ export default function LiveTVPage() {
             </div>
           </div>
         ) : viewMode === 'list' ? (
-          /* List View - Scrollable layout with player above channels */
+          /* Split-Screen Layout: Channel list on left (scrollable), Player on right (sticky) */
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-            {/* Mobile/Tablet: Vertical scroll with player then channels */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-auto">
-              {/* Player Area - scrolls with content on mobile, side-by-side on desktop */}
-              <div className="w-full md:flex-1 p-4 flex flex-col md:order-2">
+            {/* Mobile: Stacked layout with sticky mini-player at top */}
+            {/* Desktop: Side-by-side with sticky player sidebar on right */}
+            
+            {/* Channel List - Left side on desktop, scrollable */}
+            <div className="flex-1 overflow-auto order-2 md:order-1">
+              <ChannelList
+                channels={channels}
+                currentPrograms={currentPrograms}
+                selectedChannelId={selectedChannel?.id}
+                sortEnabled={sortEnabled}
+                isSyncing={isSyncing}
+                onSelectChannel={handleSelectChannel}
+                onChannelSettings={handleChannelSettings}
+                onDeleteChannel={removeChannel}
+                onToggleSort={toggleSort}
+                onDownloadM3U8={downloadM3U8}
+                onDownloadJSON={downloadJSON}
+                onImportJSON={importFromJSON}
+                onCopyShareable={copyShareableData}
+                onImportShareable={importFromShareableData}
+                onRefresh={refreshChannels}
+              />
+            </div>
+
+            {/* Player Sidebar - Right side on desktop, sticky mini-player on mobile */}
+            <div className="w-full md:w-[45%] lg:w-[50%] xl:w-[55%] flex-shrink-0 order-1 md:order-2 
+                          sticky top-0 z-20 md:h-full md:overflow-hidden
+                          bg-background border-b md:border-b-0 md:border-l border-border">
+              <div className="md:sticky md:top-0 md:h-full md:flex md:flex-col">
                 {selectedChannel ? (
-                  <div className="aspect-video landscape:sticky landscape:top-0 landscape:z-20 md:sticky md:top-4 md:z-20">
-                    <HLSPlayer
-                      url={getProxiedUrl(selectedChannel.url)}
-                      originalUrl={selectedChannel.originalUrl}
-                      channelId={selectedChannel.id}
-                      channelName={selectedChannel.name}
-                      channelLogo={selectedChannel.logo}
-                      isUnstable={selectedChannel.isUnstable}
-                      hwAccelEnabled={hwAccelEnabled}
-                      onError={handleStreamError}
-                      onClose={() => setSelectedChannel(null)}
-                    />
+                  <div className="aspect-video md:aspect-auto md:flex-1 md:min-h-0">
+                    <div className="h-full">
+                      <HLSPlayer
+                        url={getProxiedUrl(selectedChannel.url)}
+                        originalUrl={selectedChannel.originalUrl}
+                        channelId={selectedChannel.id}
+                        channelName={selectedChannel.name}
+                        channelLogo={selectedChannel.logo}
+                        isUnstable={selectedChannel.isUnstable}
+                        hwAccelEnabled={hwAccelEnabled}
+                        onError={handleStreamError}
+                        onClose={() => setSelectedChannel(null)}
+                      />
+                    </div>
                   </div>
                 ) : (
-                  <div className="aspect-video flex items-center justify-center bg-muted rounded-lg">
-                    <p className="text-muted-foreground">Select a channel to start watching</p>
+                  <div className="aspect-video md:aspect-auto md:flex-1 flex items-center justify-center bg-muted/50">
+                    <p className="text-muted-foreground text-center px-4">Select a channel to start watching</p>
                   </div>
                 )}
-              </div>
-
-              {/* Channel Sidebar */}
-              <div className="w-full md:w-80 flex-shrink-0 z-10 md:order-1">
-                <ChannelList
-                  channels={channels}
-                  currentPrograms={currentPrograms}
-                  selectedChannelId={selectedChannel?.id}
-                  sortEnabled={sortEnabled}
-                  isSyncing={isSyncing}
-                  onSelectChannel={handleSelectChannel}
-                  onChannelSettings={handleChannelSettings}
-                  onDeleteChannel={removeChannel}
-                  onToggleSort={toggleSort}
-                  onDownloadM3U8={downloadM3U8}
-                  onDownloadJSON={downloadJSON}
-                  onImportJSON={importFromJSON}
-                  onCopyShareable={copyShareableData}
-                  onImportShareable={importFromShareableData}
-                  onRefresh={refreshChannels}
-                />
               </div>
             </div>
           </div>
