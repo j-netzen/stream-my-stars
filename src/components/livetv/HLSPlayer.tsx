@@ -821,18 +821,25 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
             {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
           </Button>
 
-          {/* Live Button - shows when behind live edge */}
-          {isBehindLive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-white/20 gap-1.5 px-3"
-              onClick={skipToLive}
-            >
-              <Radio className="h-4 w-4 text-red-500" />
-              <span className="text-sm font-medium">LIVE</span>
-            </Button>
-          )}
+          {/* Live Button - always visible, changes state based on live edge */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "gap-1.5 px-3 transition-all",
+              isBehindLive 
+                ? "text-white/70 hover:bg-white/20 hover:text-white" 
+                : "text-white hover:bg-white/20"
+            )}
+            onClick={isBehindLive ? skipToLive : undefined}
+            disabled={!isBehindLive}
+          >
+            <Radio className={cn(
+              "h-4 w-4 transition-colors",
+              isBehindLive ? "text-white/50" : "text-red-500 animate-pulse"
+            )} />
+            <span className="text-sm font-medium">LIVE</span>
+          </Button>
 
           <div className="flex items-center gap-2 w-32">
             <Button
