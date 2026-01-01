@@ -321,7 +321,7 @@ export default function LiveTVPage() {
               {/* Player Area - scrolls with content on mobile, side-by-side on desktop */}
               <div className="w-full md:flex-1 p-4 flex flex-col md:order-2">
                 {selectedChannel ? (
-                  <div className="aspect-video sticky top-0 z-20 landscape:relative landscape:top-auto md:relative md:top-auto">
+                  <div className="aspect-video landscape:sticky landscape:top-0 landscape:z-20 md:sticky md:top-4 md:z-20">
                     <HLSPlayer
                       url={getProxiedUrl(selectedChannel.url)}
                       originalUrl={selectedChannel.originalUrl}
