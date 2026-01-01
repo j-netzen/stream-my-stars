@@ -367,10 +367,10 @@ export default function LiveTVPage() {
               />
             </div>
 
-            {/* DESKTOP: Two-column flex layout */}
-            <div className="hidden md:flex flex-1 min-h-0">
+            {/* DESKTOP: Two-column flex layout with fixed height */}
+            <div className="hidden md:flex flex-1 h-full">
               {/* Left Column: Channel List (scrollable independently) */}
-              <div className="w-80 lg:w-96 flex-shrink-0 h-full overflow-y-auto border-r border-border">
+              <div className="w-80 lg:w-96 flex-shrink-0 overflow-y-auto border-r border-border">
                 <ChannelList
                   channels={channels}
                   currentPrograms={currentPrograms}
@@ -390,32 +390,30 @@ export default function LiveTVPage() {
                 />
               </div>
 
-              {/* Right Column: Sticky Player Viewport */}
-              <div className="flex-1 h-full relative">
-                <div className="sticky top-0 z-30 h-full flex flex-col">
-                  {selectedChannel ? (
-                    <div className="flex-1 min-h-0">
-                      <HLSPlayer
-                        url={getProxiedUrl(selectedChannel.url)}
-                        originalUrl={selectedChannel.originalUrl}
-                        channelId={selectedChannel.id}
-                        channelName={selectedChannel.name}
-                        channelLogo={selectedChannel.logo}
-                        isUnstable={selectedChannel.isUnstable}
-                        hwAccelEnabled={hwAccelEnabled}
-                        onError={handleStreamError}
-                        onClose={() => setSelectedChannel(null)}
-                      />
+              {/* Right Column: Fixed Player Viewport (doesn't scroll) */}
+              <div className="flex-1 flex flex-col">
+                {selectedChannel ? (
+                  <div className="flex-1 min-h-0">
+                    <HLSPlayer
+                      url={getProxiedUrl(selectedChannel.url)}
+                      originalUrl={selectedChannel.originalUrl}
+                      channelId={selectedChannel.id}
+                      channelName={selectedChannel.name}
+                      channelLogo={selectedChannel.logo}
+                      isUnstable={selectedChannel.isUnstable}
+                      hwAccelEnabled={hwAccelEnabled}
+                      onError={handleStreamError}
+                      onClose={() => setSelectedChannel(null)}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center bg-muted/30">
+                    <div className="text-center">
+                      <Tv className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground">Select a channel to start watching</p>
                     </div>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center bg-muted/30">
-                      <div className="text-center">
-                        <Tv className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                        <p className="text-muted-foreground">Select a channel to start watching</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </>
