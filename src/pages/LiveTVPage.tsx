@@ -155,8 +155,11 @@ export default function LiveTVPage() {
     }
   }, [viewMode]);
 
+  // Calculate mobile player height for padding offset
+  const mobilePlayerHeight = 'calc((100vw) * 9 / 16)'; // 16:9 aspect ratio
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full">
       {/* Header - hidden in fullscreen mode */}
       {viewMode !== 'fullscreen' && (
         <div className="flex flex-col gap-2 p-4 border-b border-border z-30 bg-background flex-shrink-0">
@@ -281,8 +284,8 @@ export default function LiveTVPage() {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden relative min-h-0">
+      {/* Main Content - No overflow:hidden to preserve sticky context */}
+      <div className="flex-1 flex relative min-h-0">
         {channels.length === 0 ? (
           /* Empty State */
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
@@ -314,13 +317,37 @@ export default function LiveTVPage() {
             </div>
           </div>
         ) : viewMode === 'list' ? (
-          /* Split-Screen Layout: Channel list on left (scrollable), Player on right (sticky) */
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-            {/* Mobile: Stacked layout with sticky mini-player at top */}
-            {/* Desktop: Side-by-side with sticky player sidebar on right */}
-            
-            {/* Channel List - Left side on desktop, scrollable */}
-            <div className="flex-1 overflow-auto order-2 md:order-1">
+          /* Master-Detail Layout with Viewport-Locked Player */
+          <>
+            {/* MOBILE: Fixed player at viewport top */}
+            <div 
+              className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background"
+              style={{ height: mobilePlayerHeight }}
+            >
+              {selectedChannel ? (
+                <HLSPlayer
+                  url={getProxiedUrl(selectedChannel.url)}
+                  originalUrl={selectedChannel.originalUrl}
+                  channelId={selectedChannel.id}
+                  channelName={selectedChannel.name}
+                  channelLogo={selectedChannel.logo}
+                  isUnstable={selectedChannel.isUnstable}
+                  hwAccelEnabled={hwAccelEnabled}
+                  onError={handleStreamError}
+                  onClose={() => setSelectedChannel(null)}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center bg-muted/80 backdrop-blur-sm">
+                  <p className="text-muted-foreground text-sm">Select a channel</p>
+                </div>
+              )}
+            </div>
+
+            {/* MOBILE: Channel list with top padding to avoid player occlusion */}
+            <div 
+              className="md:hidden flex-1 overflow-y-auto"
+              style={{ paddingTop: mobilePlayerHeight }}
+            >
               <ChannelList
                 channels={channels}
                 currentPrograms={currentPrograms}
@@ -340,14 +367,34 @@ export default function LiveTVPage() {
               />
             </div>
 
-            {/* Player Sidebar - Right side on desktop, sticky mini-player on mobile */}
-            <div className="w-full md:w-[45%] lg:w-[50%] xl:w-[55%] flex-shrink-0 order-1 md:order-2 
-                          sticky top-0 z-20 md:h-full md:overflow-hidden
-                          bg-background border-b md:border-b-0 md:border-l border-border">
-              <div className="md:sticky md:top-0 md:h-full md:flex md:flex-col">
-                {selectedChannel ? (
-                  <div className="aspect-video md:aspect-auto md:flex-1 md:min-h-0">
-                    <div className="h-full">
+            {/* DESKTOP: Two-column flex layout */}
+            <div className="hidden md:flex flex-1 min-h-0">
+              {/* Left Column: Channel List (scrollable independently) */}
+              <div className="w-80 lg:w-96 flex-shrink-0 h-full overflow-y-auto border-r border-border">
+                <ChannelList
+                  channels={channels}
+                  currentPrograms={currentPrograms}
+                  selectedChannelId={selectedChannel?.id}
+                  sortEnabled={sortEnabled}
+                  isSyncing={isSyncing}
+                  onSelectChannel={handleSelectChannel}
+                  onChannelSettings={handleChannelSettings}
+                  onDeleteChannel={removeChannel}
+                  onToggleSort={toggleSort}
+                  onDownloadM3U8={downloadM3U8}
+                  onDownloadJSON={downloadJSON}
+                  onImportJSON={importFromJSON}
+                  onCopyShareable={copyShareableData}
+                  onImportShareable={importFromShareableData}
+                  onRefresh={refreshChannels}
+                />
+              </div>
+
+              {/* Right Column: Sticky Player Viewport */}
+              <div className="flex-1 h-full relative">
+                <div className="sticky top-0 z-30 h-full flex flex-col">
+                  {selectedChannel ? (
+                    <div className="flex-1 min-h-0">
                       <HLSPlayer
                         url={getProxiedUrl(selectedChannel.url)}
                         originalUrl={selectedChannel.originalUrl}
@@ -360,15 +407,18 @@ export default function LiveTVPage() {
                         onClose={() => setSelectedChannel(null)}
                       />
                     </div>
-                  </div>
-                ) : (
-                  <div className="aspect-video md:aspect-auto md:flex-1 flex items-center justify-center bg-muted/50">
-                    <p className="text-muted-foreground text-center px-4">Select a channel to start watching</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center bg-muted/30">
+                      <div className="text-center">
+                        <Tv className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-muted-foreground">Select a channel to start watching</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          </>
         ) : (
           /* Guide / Fullscreen View */
           <div className="flex-1 flex flex-col overflow-hidden relative">
