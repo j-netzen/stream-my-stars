@@ -661,6 +661,24 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     resetControlsTimer();
   }, [resetControlsTimer]);
 
+  // Keyboard controls for fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      handlePlayerInteraction();
+      if (e.key === ' ' || e.key === 'k') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === 'Escape') {
+        toggleFullscreen();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, handlePlayerInteraction, togglePlay, toggleFullscreen]);
+
   // Format bitrate for display
   const formatBitrate = (bitrate: number) => {
     if (bitrate >= 1000000) {
@@ -682,10 +700,12 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
       }}
       className={cn(
         "relative bg-black group",
-        isFullscreen ? "fixed inset-0 z-50" : "w-full aspect-video rounded-lg overflow-hidden"
+        isFullscreen ? "fixed inset-0 z-[100]" : "w-full aspect-video rounded-lg overflow-hidden"
       )}
+      style={{ touchAction: 'manipulation' }}
       onMouseMove={handlePlayerInteraction}
       onTouchStart={handlePlayerInteraction}
+      onTouchEnd={() => isFullscreen && handlePlayerInteraction()}
       onClick={handlePlayerInteraction}
     >
       {/* Video Element */}
@@ -705,13 +725,14 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
       
       {/* Click overlay for play/pause - separate from video to not block controls */}
       <div 
-        className="absolute inset-0 z-0" 
+        className="absolute inset-0 z-10" 
         onClick={(e) => {
-          // Only toggle play if clicking on the overlay, not on controls
+          handlePlayerInteraction();
           if (e.target === e.currentTarget) {
             togglePlay();
           }
         }}
+        onTouchStart={() => handlePlayerInteraction()}
       />
 
 
