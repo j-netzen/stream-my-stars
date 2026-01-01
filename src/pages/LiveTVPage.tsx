@@ -314,48 +314,53 @@ export default function LiveTVPage() {
             </div>
           </div>
         ) : viewMode === 'list' ? (
-          /* List View */
-          <div className="flex-1 flex overflow-hidden">
-            {/* Channel Sidebar */}
-            <div className="w-80 flex-shrink-0 z-10">
-              <ChannelList
-                channels={channels}
-                currentPrograms={currentPrograms}
-                selectedChannelId={selectedChannel?.id}
-                sortEnabled={sortEnabled}
-                isSyncing={isSyncing}
-                onSelectChannel={handleSelectChannel}
-                onChannelSettings={handleChannelSettings}
-                onDeleteChannel={removeChannel}
-                onToggleSort={toggleSort}
-                onDownloadM3U8={downloadM3U8}
-                onDownloadJSON={downloadJSON}
-                onImportJSON={importFromJSON}
-                onCopyShareable={copyShareableData}
-                onImportShareable={importFromShareableData}
-                onRefresh={refreshChannels}
-              />
-            </div>
+          /* List View - Scrollable layout with player above channels */
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* Mobile/Tablet: Vertical scroll with player then channels */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-auto">
+              {/* Player Area - scrolls with content on mobile, side-by-side on desktop */}
+              <div className="w-full md:flex-1 p-4 flex flex-col md:order-2">
+                {selectedChannel ? (
+                  <div className="aspect-video md:sticky md:top-4">
+                    <HLSPlayer
+                      url={getProxiedUrl(selectedChannel.url)}
+                      originalUrl={selectedChannel.originalUrl}
+                      channelId={selectedChannel.id}
+                      channelName={selectedChannel.name}
+                      channelLogo={selectedChannel.logo}
+                      isUnstable={selectedChannel.isUnstable}
+                      hwAccelEnabled={hwAccelEnabled}
+                      onError={handleStreamError}
+                      onClose={() => setSelectedChannel(null)}
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video flex items-center justify-center bg-muted rounded-lg">
+                    <p className="text-muted-foreground">Select a channel to start watching</p>
+                  </div>
+                )}
+              </div>
 
-            {/* Player Area */}
-            <div className="flex-1 p-4 flex flex-col z-10">
-              {selectedChannel ? (
-              <HLSPlayer
-                  url={getProxiedUrl(selectedChannel.url)}
-                  originalUrl={selectedChannel.originalUrl}
-                  channelId={selectedChannel.id}
-                  channelName={selectedChannel.name}
-                  channelLogo={selectedChannel.logo}
-                  isUnstable={selectedChannel.isUnstable}
-                  hwAccelEnabled={hwAccelEnabled}
-                  onError={handleStreamError}
-                  onClose={() => setSelectedChannel(null)}
+              {/* Channel Sidebar */}
+              <div className="w-full md:w-80 flex-shrink-0 z-10 md:order-1">
+                <ChannelList
+                  channels={channels}
+                  currentPrograms={currentPrograms}
+                  selectedChannelId={selectedChannel?.id}
+                  sortEnabled={sortEnabled}
+                  isSyncing={isSyncing}
+                  onSelectChannel={handleSelectChannel}
+                  onChannelSettings={handleChannelSettings}
+                  onDeleteChannel={removeChannel}
+                  onToggleSort={toggleSort}
+                  onDownloadM3U8={downloadM3U8}
+                  onDownloadJSON={downloadJSON}
+                  onImportJSON={importFromJSON}
+                  onCopyShareable={copyShareableData}
+                  onImportShareable={importFromShareableData}
+                  onRefresh={refreshChannels}
                 />
-              ) : (
-                <div className="flex-1 flex items-center justify-center bg-muted rounded-lg">
-                  <p className="text-muted-foreground">Select a channel to start watching</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         ) : (
