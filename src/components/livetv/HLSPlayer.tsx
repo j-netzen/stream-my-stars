@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback, forwardRef } from 'react';
 import Hls from 'hls.js';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, Settings, Wifi, WifiOff, Cpu, Zap } from 'lucide-react';
+import { AlertTriangle, Play, Pause, Volume2, VolumeX, Maximize, X, RefreshCw, Settings, Wifi, WifiOff, Cpu, Zap, Radio } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -172,6 +172,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
   const [hwAccelStatus, setHwAccelStatus] = useState<'unknown' | 'active' | 'unavailable'>('unknown');
+  const [isBehindLive, setIsBehindLive] = useState(false);
 
   // Lock to landscape orientation on native apps when fullscreen
   useVideoPlayerOrientation(isFullscreen);
@@ -521,13 +522,26 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    
+    // Check if we're behind live edge
+    const onTimeUpdate = () => {
+      if (video.duration && isFinite(video.duration)) {
+        // Consider "behind live" if more than 10 seconds from the live edge
+        const behindBy = video.duration - video.currentTime;
+        setIsBehindLive(behindBy > 10);
+      } else {
+        setIsBehindLive(false);
+      }
+    };
 
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
+    video.addEventListener('timeupdate', onTimeUpdate);
 
     return () => {
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
+      video.removeEventListener('timeupdate', onTimeUpdate);
     };
   }, []);
 
@@ -604,6 +618,25 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     setIsLoading(true);
     setConnectionStatus('connecting');
     setReloadKey((k) => k + 1);
+  }, []);
+
+  // Skip to live edge
+  const skipToLive = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    // Seek to the live edge (end of the stream)
+    if (video.duration && isFinite(video.duration)) {
+      video.currentTime = video.duration;
+    }
+    
+    // If paused, also start playing
+    if (video.paused) {
+      video.play().catch(() => {});
+    }
+    
+    setIsBehindLive(false);
+    toast.success('Jumped to live', { duration: 2000 });
   }, []);
 
 
@@ -787,6 +820,19 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           >
             {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
           </Button>
+
+          {/* Live Button - shows when behind live edge */}
+          {isBehindLive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20 gap-1.5 px-3"
+              onClick={skipToLive}
+            >
+              <Radio className="h-4 w-4 text-red-500" />
+              <span className="text-sm font-medium">LIVE</span>
+            </Button>
+          )}
 
           <div className="flex items-center gap-2 w-32">
             <Button
