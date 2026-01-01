@@ -62,6 +62,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [volume, setVolume] = useState(getPersistedVolume);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isCustomFullscreen, setIsCustomFullscreen] = useState(false); // Custom fullscreen state
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [showPlayScreen, setShowPlayScreen] = useState(true);
@@ -78,7 +79,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       ? `https://image.tmdb.org/t/p/w780${media.poster_path}`
       : null;
 
-  // Try to enter fullscreen
+  // Try to enter fullscreen - using custom implementation for better control
   const enterFullscreen = useCallback(async () => {
     if (hasAutoFullscreenedRef.current) return;
     
@@ -86,17 +87,28 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     if (!element) return;
     
     try {
+      // Try native fullscreen first on the container
       if (element.requestFullscreen) {
         await element.requestFullscreen();
+        setIsFullscreen(true);
       } else if ((element as any).webkitRequestFullscreen) {
         await (element as any).webkitRequestFullscreen();
+        setIsFullscreen(true);
       } else if ((element as any).msRequestFullscreen) {
         await (element as any).msRequestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        // Fallback to custom fullscreen
+        setIsCustomFullscreen(true);
+        setIsFullscreen(true);
       }
-      setIsFullscreen(true);
       hasAutoFullscreenedRef.current = true;
     } catch (err) {
-      console.warn("Fullscreen request failed (requires user gesture):", err);
+      console.warn("Native fullscreen failed, using custom fullscreen:", err);
+      // Use custom fullscreen as fallback
+      setIsCustomFullscreen(true);
+      setIsFullscreen(true);
+      hasAutoFullscreenedRef.current = true;
     }
   }, []);
 
@@ -213,10 +225,16 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     hasAutoFullscreenedRef.current = false;
   }, [media.id, src]);
 
-  // Handle fullscreen changes
+  // Handle fullscreen changes - sync custom state with native
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isNativeFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isNativeFullscreen || isCustomFullscreen);
+      
+      // If exiting native fullscreen via system command, also exit custom
+      if (!isNativeFullscreen && !isCustomFullscreen) {
+        setIsFullscreen(false);
+      }
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -226,7 +244,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
     };
-  }, []);
+  }, [isCustomFullscreen]);
 
   // Hide controls after inactivity (works for mouse + touch)
   const resetControlsHideTimer = useCallback(() => {
@@ -327,19 +345,31 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
   };
 
-  const toggleFullscreen = async () => {
+  const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
 
     try {
-      if (!document.fullscreenElement) {
-        await containerRef.current.requestFullscreen();
-      } else {
+      if (!document.fullscreenElement && !isCustomFullscreen) {
+        // Try native fullscreen first
+        try {
+          await containerRef.current.requestFullscreen();
+          setIsFullscreen(true);
+        } catch {
+          // Fallback to custom fullscreen
+          setIsCustomFullscreen(true);
+          setIsFullscreen(true);
+        }
+      } else if (document.fullscreenElement) {
         await document.exitFullscreen();
+        setIsFullscreen(false);
+      } else if (isCustomFullscreen) {
+        setIsCustomFullscreen(false);
+        setIsFullscreen(false);
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
     }
-  };
+  }, [isCustomFullscreen]);
 
   const skipTime = (seconds: number) => {
     if (videoRef.current) {
@@ -354,14 +384,18 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     // Exit fullscreen before closing
     if (document.fullscreenElement) {
       document.exitFullscreen().then(onClose).catch(onClose);
+    } else if (isCustomFullscreen) {
+      setIsCustomFullscreen(false);
+      setIsFullscreen(false);
+      onClose();
     } else {
       onClose();
     }
-  };
+  }, [isCustomFullscreen, onClose]);
 
   // Handle click on the "Click to Play" screen
   const handlePlayScreenClick = async () => {
@@ -406,11 +440,23 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Keyboard controls
+  // Global keyboard controls - handles Escape for exiting fullscreen and other shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.fullscreenElement) {
-        handleClose();
+      // Always show controls on any key press
+      handleUserActivity();
+      
+      // Handle Escape - exit fullscreen or close player
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else if (isCustomFullscreen) {
+          setIsCustomFullscreen(false);
+          setIsFullscreen(false);
+        } else {
+          handleClose();
+        }
         return;
       }
 
@@ -447,9 +493,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPlaying, volume]);
+    // Use document-level listener for global key handling including in fullscreen
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isPlaying, volume, isCustomFullscreen, handleUserActivity, handleClose, toggleFullscreen]);
 
   // Scroll to top and reset viewport when video player mounts/unmounts
   useEffect(() => {
@@ -534,23 +581,34 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     );
   }
 
+  // Determine if we're in any form of fullscreen
+  const isInFullscreen = isFullscreen || isCustomFullscreen || !!document.fullscreenElement;
+
   return (
     <div
       ref={containerRef}
-      className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-black flex items-center justify-center overflow-hidden overscroll-none touch-none"
+      className={cn(
+        "bg-black flex items-center justify-center overflow-hidden overscroll-none",
+        // Custom fullscreen uses fixed positioning
+        isCustomFullscreen || !document.fullscreenElement
+          ? "fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh]"
+          : "w-full h-full"
+      )}
+      style={{ touchAction: 'manipulation' }}
       onMouseMove={handleUserActivity}
       onPointerMove={handleUserActivity}
       onPointerDown={handleUserActivity}
       onTouchStart={handleUserActivity}
+      onTouchEnd={() => isInFullscreen && handleUserActivity()}
       onMouseLeave={() => isPlaying && setShowControls(false)}
       onPointerLeave={() => isPlaying && setShowControls(false)}
       onClick={handleContainerClick}
     >
-      {/* Video element */}
+      {/* Video element - z-index 0 to stay below controls */}
       <video
         key={src || media.id}
         ref={videoRef}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain relative z-0"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onCanPlay={handleCanPlay}
@@ -559,21 +617,31 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         onPause={() => setIsPlaying(false)}
         onWaiting={() => setIsBuffering(true)}
         onPlaying={() => setIsBuffering(false)}
-        onClick={(e) => {
-          e.stopPropagation();
-          handlePlayPause();
-          if (!hasAutoFullscreenedRef.current) {
-            enterFullscreen();
-          }
-        }}
         poster={backdropUrl || undefined}
         preload="auto"
         playsInline
         muted={isMuted}
         controls={false}
+        style={{ pointerEvents: 'none' }} // Let overlay handle clicks
       >
         {src && <source src={src} />}
       </video>
+
+      {/* Click overlay for play/pause - separate from video with pointer-events control */}
+      <div 
+        className="absolute inset-0 z-10"
+        style={{ pointerEvents: 'auto' }}
+        onClick={(e) => {
+          handleUserActivity();
+          if (e.target === e.currentTarget) {
+            handlePlayPause();
+            if (!hasAutoFullscreenedRef.current) {
+              enterFullscreen();
+            }
+          }
+        }}
+        onTouchStart={() => handleUserActivity()}
+      />
 
       {/* Buffering indicator with health status */}
       {isBuffering && (
@@ -644,17 +712,23 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
       )}
 
-      {/* Controls overlay */}
+      {/* Controls overlay - z-20 to stay above video and click overlay */}
       <div
         className={cn(
-          "absolute inset-0 flex flex-col justify-between transition-opacity duration-300",
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+          "absolute z-20 flex flex-col justify-between transition-opacity duration-300",
+          // Use fixed inset-0 during fullscreen for UI persistence
+          isInFullscreen ? "fixed inset-0" : "absolute inset-0",
+          showControls ? "opacity-100" : "opacity-0"
         )}
+        style={{ pointerEvents: showControls ? 'none' : 'none' }} // Background doesn't capture clicks
       >
         {/* Top bar */}
-        <div className="bg-gradient-to-b from-black/80 to-transparent p-4">
+        <div 
+          className="bg-gradient-to-b from-black/80 to-transparent p-4"
+          style={{ pointerEvents: showControls ? 'auto' : 'none' }}
+        >
           <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0" style={{ pointerEvents: 'none' }}>
               <h2 className="text-white text-lg font-medium truncate">{media.title}</h2>
               {streamQuality && (
                 <p className="text-white/60 text-sm">{streamQuality.quality} • {streamQuality.size}</p>
@@ -665,6 +739,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
               size="icon"
               className="text-white hover:bg-white/20 ml-4"
               onClick={handleClose}
+              style={{ pointerEvents: 'auto' }}
             >
               <X className="h-6 w-6" />
             </Button>
@@ -672,9 +747,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
 
         {/* Bottom controls */}
-        <div className="bg-gradient-to-t from-black/80 to-transparent p-4">
+        <div 
+          className="bg-gradient-to-t from-black/80 to-transparent p-4"
+          style={{ pointerEvents: showControls ? 'auto' : 'none' }}
+        >
           {/* Progress bar */}
-          <div className="mb-4">
+          <div className="mb-4" style={{ pointerEvents: 'auto' }}>
             <Slider
               value={[currentTime]}
               min={0}
@@ -693,6 +771,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 size="icon"
                 className="text-white hover:bg-white/20"
                 onClick={() => skipTime(-10)}
+                style={{ pointerEvents: 'auto' }}
               >
                 <SkipBack className="h-5 w-5" />
               </Button>
@@ -702,6 +781,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 size="icon"
                 className="text-white hover:bg-white/20"
                 onClick={handlePlayPause}
+                style={{ pointerEvents: 'auto' }}
               >
                 {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
               </Button>
@@ -711,11 +791,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 size="icon"
                 className="text-white hover:bg-white/20"
                 onClick={() => skipTime(10)}
+                style={{ pointerEvents: 'auto' }}
               >
                 <SkipForward className="h-5 w-5" />
               </Button>
 
-              <span className="text-white text-sm ml-2">
+              <span className="text-white text-sm ml-2" style={{ pointerEvents: 'none' }}>
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
@@ -726,11 +807,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 size="icon"
                 className="text-white hover:bg-white/20"
                 onClick={toggleMute}
+                style={{ pointerEvents: 'auto' }}
               >
                 {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </Button>
 
-              <div className="w-24 hidden sm:block">
+              <div className="w-24 hidden sm:block" style={{ pointerEvents: 'auto' }}>
                 <Slider
                   value={[isMuted ? 0 : volume]}
                   min={0}
@@ -745,8 +827,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 size="icon"
                 className="text-white hover:bg-white/20"
                 onClick={toggleFullscreen}
+                style={{ pointerEvents: 'auto' }}
               >
-                {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                {isInFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
               </Button>
             </div>
           </div>
