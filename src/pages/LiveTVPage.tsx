@@ -155,15 +155,12 @@ export default function LiveTVPage() {
     }
   }, [viewMode]);
 
-  // Calculate mobile player height for padding offset
-  const mobilePlayerHeight = 'calc((100vw) * 9 / 16)'; // 16:9 aspect ratio
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header - hidden in fullscreen mode */}
       {viewMode !== 'fullscreen' && (
         <div className="flex flex-col gap-2 p-4 border-b border-border z-30 bg-background flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-3">
               <Tv className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-semibold">Live TV</h1>
@@ -179,7 +176,7 @@ export default function LiveTVPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {/* Hardware Acceleration Toggle */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -199,6 +196,9 @@ export default function LiveTVPage() {
                     ) : (
                       <Cpu className="h-4 w-4" />
                     )}
+                    <span className="ml-1.5 hidden sm:inline text-xs">
+                      {hwAccelEnabled ? 'HW' : 'SW'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -225,6 +225,9 @@ export default function LiveTVPage() {
                     ) : (
                       <ShieldOff className="h-4 w-4" />
                     )}
+                    <span className="ml-1.5 hidden sm:inline text-xs">
+                      {proxyEnabled ? 'Proxy' : 'Direct'}
+                    </span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
@@ -284,8 +287,8 @@ export default function LiveTVPage() {
         </div>
       )}
 
-      {/* Main Content - No overflow:hidden to preserve sticky context */}
-      <div className="flex-1 flex relative min-h-0">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
         {channels.length === 0 ? (
           /* Empty State */
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
@@ -319,10 +322,10 @@ export default function LiveTVPage() {
         ) : viewMode === 'list' ? (
           /* Master-Detail Layout with Viewport-Locked Player */
           <>
-            {/* MOBILE: Fixed player at viewport top */}
+            {/* MOBILE: Sticky player at top */}
             <div 
-              className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background"
-              style={{ height: mobilePlayerHeight }}
+              className="md:hidden sticky top-0 z-40 bg-background flex-shrink-0"
+              style={{ aspectRatio: '16/9', width: '100%' }}
             >
               {selectedChannel ? (
                 <HLSPlayer
@@ -337,17 +340,17 @@ export default function LiveTVPage() {
                   onClose={() => setSelectedChannel(null)}
                 />
               ) : (
-                <div className="h-full flex items-center justify-center bg-muted/80 backdrop-blur-sm">
-                  <p className="text-muted-foreground text-sm">Select a channel</p>
+                <div className="h-full w-full flex items-center justify-center bg-muted/80">
+                  <div className="text-center">
+                    <Tv className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground text-sm">Select a channel</p>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* MOBILE: Channel list with top padding to avoid player occlusion */}
-            <div 
-              className="md:hidden flex-1 overflow-y-auto"
-              style={{ paddingTop: mobilePlayerHeight }}
-            >
+            {/* MOBILE: Channel list below player */}
+            <div className="md:hidden flex-1 overflow-y-auto">
               <ChannelList
                 channels={channels}
                 currentPrograms={currentPrograms}
@@ -367,8 +370,8 @@ export default function LiveTVPage() {
               />
             </div>
 
-            {/* DESKTOP: Two-column flex layout with fixed height */}
-            <div className="hidden md:flex flex-1 h-full">
+            {/* DESKTOP: Two-column layout */}
+            <div className="hidden md:flex flex-1 overflow-hidden">
               {/* Left Column: Channel List (scrollable independently) */}
               <div className="w-80 lg:w-96 flex-shrink-0 overflow-y-auto border-r border-border">
                 <ChannelList
@@ -390,8 +393,8 @@ export default function LiveTVPage() {
                 />
               </div>
 
-              {/* Right Column: Fixed Player Viewport (doesn't scroll) */}
-              <div className="flex-1 flex flex-col">
+              {/* Right Column: Player (fixed, doesn't scroll) */}
+              <div className="flex-1 flex flex-col overflow-hidden">
                 {selectedChannel ? (
                   <div className="flex-1 min-h-0">
                     <HLSPlayer
