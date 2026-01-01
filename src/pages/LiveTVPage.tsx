@@ -113,6 +113,8 @@ export default function LiveTVPage() {
     setSelectedChannel(channel);
     // Reset controls visibility timer when channel changes
     setPlayerControlsVisible(true);
+    // Scroll to top on desktop/landscape so player is visible
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const handleChannelSettings = useCallback((channel: Channel) => {
