@@ -608,11 +608,23 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
     }
     setShowControls(true);
     
-    // Always hide controls after timeout, regardless of play state
+    // Hide controls after 5 seconds
     controlsTimeoutRef.current = setTimeout(() => {
       setShowControls(false);
-    }, 10000);
+    }, 5000);
   }, []);
+
+  // Start the controls timer when video starts playing
+  useEffect(() => {
+    if (isPlaying) {
+      resetControlsTimer();
+    }
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isPlaying, resetControlsTimer]);
 
   // Retry loading
   const retry = useCallback(() => {
@@ -683,13 +695,23 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         className="w-full h-full object-contain"
         playsInline
         crossOrigin="anonymous"
-        onClick={togglePlay}
         style={{ 
           transform: 'translateZ(0)', // Force GPU layer
           backfaceVisibility: 'hidden',
           willChange: 'transform',
         }}
         {...{ 'x-webkit-airplay': 'allow' } as any}
+      />
+      
+      {/* Click overlay for play/pause - separate from video to not block controls */}
+      <div 
+        className="absolute inset-0 z-0" 
+        onClick={(e) => {
+          // Only toggle play if clicking on the overlay, not on controls
+          if (e.target === e.currentTarget) {
+            togglePlay();
+          }
+        }}
       />
 
 
@@ -794,9 +816,9 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
       {/* Channel Info */}
       <div className={cn(
-        "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent transition-opacity z-10",
+        "absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent transition-opacity z-20",
         effectiveShowControls ? "opacity-100" : "opacity-0 pointer-events-none"
-      )}>
+      )} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           {channelLogo && (
             <img 
@@ -812,10 +834,10 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
 
       {/* Controls */}
       <div className={cn(
-        "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity z-10",
+        "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity z-20",
         effectiveShowControls ? "opacity-100" : "opacity-0 pointer-events-none"
       )}>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="icon"
