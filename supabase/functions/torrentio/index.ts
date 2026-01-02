@@ -1,27 +1,29 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// Enhanced CORS headers for web and mobile apps (Android/iOS)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept, origin',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Expose-Headers': 'content-length, content-range, accept-ranges, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept, origin, x-requested-with, cache-control',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
+  'Access-Control-Expose-Headers': 'content-length, content-range, accept-ranges, content-type, x-ratelimit-remaining',
   'Access-Control-Max-Age': '86400',
+  'Access-Control-Allow-Credentials': 'true',
 };
 
-// Torrentio base URL - using realdebrid provider
+// Torrentio base URL
 const TORRENTIO_BASE = "https://torrentio.strem.fun";
 
 // Rate limiting configuration
 const RATE_LIMIT = {
-  maxRequests: 30,      // 30 requests
-  windowMs: 60 * 1000,  // per minute
+  maxRequests: 30,
+  windowMs: 60 * 1000,
 };
 
 // Simple in-memory rate limiter
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const IMDB_ID_REGEX = /^tt\d{7,10}$/;  // IMDB IDs: tt followed by 7-10 digits
+const IMDB_ID_REGEX = /^tt\d{7,10}$/;
 const VALID_TYPES = ["movie", "series"] as const;
 const VALID_ACTIONS = ["search"] as const;
 
@@ -34,15 +36,48 @@ interface ValidationResult {
     type: string;
     season?: number;
     episode?: number;
+    rdApiKey?: string;
   };
+}
+
+interface ErrorResponse {
+  error: string;
+  message: string;
+  code?: string;
+  status?: number;
+  retryable?: boolean;
+  details?: Record<string, unknown>;
+}
+
+function createErrorResponse(
+  error: string,
+  message: string,
+  status: number,
+  options?: { code?: string; retryable?: boolean; details?: Record<string, unknown> }
+): Response {
+  const body: ErrorResponse = {
+    error,
+    message,
+    status,
+    code: options?.code,
+    retryable: options?.retryable ?? false,
+    details: options?.details,
+  };
+
+  console.error(`[ERROR] ${error}: ${message}`, options?.details || '');
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
 function validateTorrentioInput(body: unknown): ValidationResult {
   if (!body || typeof body !== 'object') {
-    return { valid: false, error: "Invalid request body" };
+    return { valid: false, error: "Invalid request body - expected JSON object" };
   }
   
-  const { action, imdbId, type, season, episode } = body as Record<string, unknown>;
+  const { action, imdbId, type, season, episode, rdApiKey } = body as Record<string, unknown>;
   
   // Validate action
   if (typeof action !== 'string' || !VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number])) {
@@ -77,6 +112,15 @@ function validateTorrentioInput(body: unknown): ValidationResult {
         }
       }
     }
+
+    // Optional: client can pass RD API key
+    let validatedRdKey: string | undefined;
+    if (rdApiKey !== undefined) {
+      if (typeof rdApiKey !== 'string' || rdApiKey.length === 0) {
+        return { valid: false, error: "rdApiKey must be a non-empty string if provided" };
+      }
+      validatedRdKey = rdApiKey;
+    }
     
     return { 
       valid: true, 
@@ -85,7 +129,8 @@ function validateTorrentioInput(body: unknown): ValidationResult {
         imdbId, 
         type, 
         season: season as number | undefined, 
-        episode: episode as number | undefined 
+        episode: episode as number | undefined,
+        rdApiKey: validatedRdKey,
       } 
     };
   }
@@ -93,11 +138,47 @@ function validateTorrentioInput(body: unknown): ValidationResult {
   return { valid: false, error: "Unknown action" };
 }
 
+// ========== ENVIRONMENT SECRETS VERIFICATION ==========
+interface SecretsStatus {
+  realDebridConfigured: boolean;
+  supabaseConfigured: boolean;
+  warnings: string[];
+}
+
+function verifySecrets(): SecretsStatus {
+  const warnings: string[] = [];
+  
+  const rdApiKey = Deno.env.get('REAL_DEBRID_API_KEY');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  
+  const realDebridConfigured = !!rdApiKey && rdApiKey.length > 0;
+  const supabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
+  
+  if (!realDebridConfigured) {
+    warnings.push("REAL_DEBRID_API_KEY not configured - Real-Debrid streams unavailable");
+  }
+  
+  if (!supabaseConfigured) {
+    warnings.push("Supabase environment variables not fully configured");
+  }
+  
+  return { realDebridConfigured, supabaseConfigured, warnings };
+}
+
 // ========== RATE LIMITING ==========
 function getClientIp(req: Request): string {
+  // Check various headers used by proxies/load balancers
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
+  
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp;
+  
+  const cfConnectingIp = req.headers.get("cf-connecting-ip");
+  if (cfConnectingIp) return cfConnectingIp;
+  
+  return "unknown";
 }
 
 function checkRateLimit(req: Request): { allowed: boolean; remaining: number; retryAfterMs?: number } {
@@ -114,6 +195,15 @@ function checkRateLimit(req: Request): { allowed: boolean; remaining: number; re
   entry.count++;
   rateLimitStore.set(key, entry);
   
+  // Clean up old entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (v.resetAt <= now) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+  
   const remaining = Math.max(0, RATE_LIMIT.maxRequests - entry.count);
   const allowed = entry.count <= RATE_LIMIT.maxRequests;
   
@@ -127,18 +217,29 @@ function checkRateLimit(req: Request): { allowed: boolean; remaining: number; re
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
+  }
+
+  // Verify secrets on startup (log warnings)
+  const secretsStatus = verifySecrets();
+  if (secretsStatus.warnings.length > 0) {
+    console.warn("[SECRETS]", secretsStatus.warnings.join("; "));
   }
 
   // Check rate limit
   const rateLimit = checkRateLimit(req);
   if (!rateLimit.allowed) {
-    console.warn("Rate limit exceeded for Torrentio function");
+    console.warn(`[RATE_LIMIT] Exceeded for IP: ${getClientIp(req)}`);
     return new Response(
       JSON.stringify({
         error: "Rate limit exceeded",
+        code: "RATE_LIMIT_EXCEEDED",
         retryAfterMs: rateLimit.retryAfterMs,
         message: `Too many requests. Please try again in ${Math.ceil((rateLimit.retryAfterMs || 0) / 1000)} seconds.`,
+        retryable: true,
       }),
       {
         status: 429,
@@ -146,7 +247,7 @@ serve(async (req) => {
           ...corsHeaders,
           "Content-Type": "application/json",
           "Retry-After": String(Math.ceil((rateLimit.retryAfterMs || 0) / 1000)),
-          "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Remaining": "0",
         },
       }
     );
@@ -157,27 +258,33 @@ serve(async (req) => {
     let body: unknown;
     try {
       body = await req.json();
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: "Invalid JSON in request body" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    } catch (parseError) {
+      return createErrorResponse(
+        "PARSE_ERROR",
+        "Invalid JSON in request body",
+        400,
+        { code: "INVALID_JSON", details: { hint: "Ensure request body is valid JSON" } }
       );
     }
 
     const validation = validateTorrentioInput(body);
     if (!validation.valid) {
-      console.warn("Validation failed:", validation.error);
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: validation.error }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return createErrorResponse(
+        "VALIDATION_ERROR",
+        validation.error || "Invalid input",
+        400,
+        { code: "INVALID_INPUT" }
       );
     }
 
-    const { action, imdbId, type, season, episode } = validation.data!;
+    const { action, imdbId, type, season, episode, rdApiKey: clientRdKey } = validation.data!;
 
     if (action === "search") {
-      // Get Real-Debrid API key for authenticated streams
-      const rdApiKey = Deno.env.get('REAL_DEBRID_API_KEY');
+      // Get Real-Debrid API key - prefer client-provided, fall back to env
+      const rdApiKey = clientRdKey || Deno.env.get('REAL_DEBRID_API_KEY');
+      
+      // Log secret status (not the actual values!)
+      console.log(`[SECRETS] Real-Debrid API key: ${rdApiKey ? 'configured (' + rdApiKey.length + ' chars)' : 'NOT configured'}`);
       
       // Build the stream ID - for series, include season:episode
       let streamId = imdbId;
@@ -185,36 +292,55 @@ serve(async (req) => {
         streamId = `${imdbId}:${season}:${episode}`;
       }
       
-      // Build Torrentio URLs (try Real-Debrid provider first, then fallback to standard)
+      console.log(`[SEARCH] Type: ${type}, StreamID: ${streamId}`);
+      
+      // Build Torrentio URLs
+      // IMPORTANT: Torrentio expects the config BEFORE /stream/
+      // Format: /[config]/stream/[type]/[id].json
       const torrentioUrls: Array<{ label: string; url: string }> = [];
+      
+      // Standard public endpoint (no debrid)
       const standardUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
+      
+      // Real-Debrid endpoint with proper config format
       if (rdApiKey) {
-        const rdUrl = `${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`;
+        // Torrentio config format: realdebrid=APIKEY
+        // The config goes in the path segment before /stream/
+        const rdConfig = `realdebrid=${encodeURIComponent(rdApiKey)}`;
+        const rdUrl = `${TORRENTIO_BASE}/${rdConfig}/stream/${type}/${streamId}.json`;
         torrentioUrls.push({ label: "realdebrid", url: rdUrl });
       }
+      
+      // Always add standard as fallback
       torrentioUrls.push({ label: "standard", url: standardUrl });
 
-      // Retry logic with exponential backoff for transient errors
+      // Retry logic with exponential backoff
       const MAX_RETRIES = 3;
-      const RETRY_DELAYS = [1000, 2000, 4000]; // ms
-
+      const RETRY_DELAYS = [1000, 2000, 4000];
+      
       const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       let lastStatus = 0;
+      let lastError: string | null = null;
 
       for (const candidate of torrentioUrls) {
-        console.log(`Torrentio search using: ${candidate.label}`);
+        console.log(`[TORRENTIO] Trying: ${candidate.label}`);
 
         for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
           try {
-            console.log(`Torrentio request attempt ${attempt + 1}/${MAX_RETRIES} (${candidate.label})`);
+            console.log(`[TORRENTIO] Attempt ${attempt + 1}/${MAX_RETRIES} (${candidate.label})`);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
             const response = await fetch(candidate.url, {
               headers: {
                 Accept: "application/json",
-                "User-Agent": "MediaHub/1.0",
+                "User-Agent": "MediaHub/1.0 (Android; iOS; Web)",
               },
+              signal: controller.signal,
             });
 
+            clearTimeout(timeoutId);
             lastStatus = response.status;
 
             // Success
@@ -232,9 +358,49 @@ serve(async (req) => {
                 });
               }
 
-              console.log(`Torrentio returned ${data.streams?.length || 0} streams`);
+              const streamCount = data.streams?.length || 0;
+              console.log(`[SUCCESS] Torrentio returned ${streamCount} streams via ${candidate.label}`);
 
-              return new Response(JSON.stringify(data), {
+              return new Response(JSON.stringify({
+                ...data,
+                _meta: {
+                  provider: candidate.label,
+                  streamCount,
+                  timestamp: new Date().toISOString(),
+                }
+              }), {
+                status: 200,
+                headers: {
+                  ...corsHeaders,
+                  "Content-Type": "application/json",
+                  "X-RateLimit-Remaining": String(rateLimit.remaining),
+                  "Cache-Control": "private, max-age=300", // 5 min cache
+                },
+              });
+            }
+
+            // Handle specific error codes
+            if (response.status === 403) {
+              lastError = "Access denied by Torrentio - API key may be invalid or expired";
+              console.error(`[ERROR] 403 Forbidden from ${candidate.label} - checking next provider`);
+              // Don't retry 403, move to next provider
+              break;
+            }
+
+            if (response.status === 404) {
+              lastError = "Content not found on Torrentio";
+              console.warn(`[WARN] 404 Not Found for ${streamId}`);
+              // Return empty streams for 404
+              return new Response(JSON.stringify({
+                streams: [],
+                _meta: {
+                  provider: candidate.label,
+                  streamCount: 0,
+                  message: "No streams found for this content",
+                  timestamp: new Date().toISOString(),
+                }
+              }), {
+                status: 200,
                 headers: {
                   ...corsHeaders,
                   "Content-Type": "application/json",
@@ -245,43 +411,52 @@ serve(async (req) => {
 
             // Non-retryable client errors (4xx except 429)
             if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-              console.error(`Torrentio client error: ${response.status}`);
-              return new Response(
-                JSON.stringify({ error: "Failed to fetch streams", status: response.status }),
-                { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
+              lastError = `Torrentio returned error ${response.status}`;
+              console.error(`[ERROR] ${response.status} from ${candidate.label}`);
+              break; // Move to next provider
             }
 
             // Retryable errors (5xx, 429)
-            console.warn(`Torrentio returned ${response.status} (${candidate.label}), will retry...`);
+            lastError = `Torrentio temporarily unavailable (${response.status})`;
+            console.warn(`[RETRY] ${response.status} from ${candidate.label}`);
           } catch (err) {
-            console.warn(`Torrentio fetch error on attempt ${attempt + 1} (${candidate.label}):`, err);
+            if (err instanceof Error && err.name === 'AbortError') {
+              lastError = "Request timed out";
+              console.warn(`[TIMEOUT] Request to ${candidate.label} timed out`);
+            } else {
+              lastError = err instanceof Error ? err.message : "Network error";
+              console.error(`[FETCH_ERROR] ${candidate.label}:`, err);
+            }
           }
 
           // Wait before retry (except on last attempt)
           if (attempt < MAX_RETRIES - 1) {
             const delay = RETRY_DELAYS[attempt];
-            console.log(`Waiting ${delay}ms before retry...`);
+            console.log(`[WAIT] ${delay}ms before retry`);
             await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
 
-        console.warn(`Torrentio path failed: ${candidate.label} (last status: ${lastStatus})`);
+        console.warn(`[FAILED] Provider ${candidate.label} exhausted (status: ${lastStatus})`);
       }
 
-      // All attempts exhausted. IMPORTANT:
-      // Return HTTP 200 with an error payload so the client can show a friendly message
-      // without Lovable treating this as a runtime error/blank screen.
+      // All providers failed - return graceful error with empty streams
+      console.error(`[EXHAUSTED] All providers failed. Last status: ${lastStatus}, Last error: ${lastError}`);
+      
       return new Response(
         JSON.stringify({
           streams: [],
-          error: "Failed to fetch streams",
+          error: "STREAM_FETCH_FAILED",
+          message: lastError || "Unable to fetch streams. Please try again later.",
           status: lastStatus || 503,
-          message: "Stream service temporarily unavailable. Please try again in a few moments.",
           retryable: true,
+          _meta: {
+            timestamp: new Date().toISOString(),
+            secretsConfigured: secretsStatus.realDebridConfigured,
+          }
         }),
         {
-          status: 200,
+          status: 200, // Return 200 so client can handle gracefully
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -291,17 +466,31 @@ serve(async (req) => {
       );
     }
 
-    return new Response(
-      JSON.stringify({ error: "Validation error", message: `Unknown action: ${action}` }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    return createErrorResponse(
+      "UNKNOWN_ACTION",
+      `Unknown action: ${action}`,
+      400,
+      { code: "INVALID_ACTION" }
     );
 
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error in torrentio function:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error("[FATAL] Unhandled error:", errorMessage, errorStack);
+    
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred. Please try again.",
+        code: "INTERNAL_SERVER_ERROR",
+        retryable: true,
+        _debug: Deno.env.get('ENVIRONMENT') === 'development' ? { message: errorMessage } : undefined,
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
