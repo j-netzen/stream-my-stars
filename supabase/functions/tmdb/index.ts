@@ -1,11 +1,60 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// Enhanced CORS headers for web and mobile apps (Android/iOS)
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, range, accept, origin, x-requested-with, cache-control',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
+  'Access-Control-Expose-Headers': 'content-length, content-range, accept-ranges, content-type, x-ratelimit-remaining',
+  'Access-Control-Max-Age': '86400',
+  'Access-Control-Allow-Credentials': 'true',
 };
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const REQUEST_TIMEOUT = 15000;
+
+// ========== ERROR RESPONSE HELPER ==========
+interface ErrorResponse {
+  error: string;
+  message: string;
+  code?: string;
+  status?: number;
+  retryable?: boolean;
+}
+
+function createErrorResponse(
+  error: string,
+  message: string,
+  status: number,
+  options?: { code?: string; retryable?: boolean }
+): Response {
+  const body: ErrorResponse = {
+    error,
+    message,
+    status,
+    code: options?.code,
+    retryable: options?.retryable ?? false,
+  };
+
+  console.error(`[ERROR] ${error}: ${message}`);
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+// ========== SECRETS VERIFICATION ==========
+function verifySecrets(): { configured: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  const apiKey = Deno.env.get('TMDB_API_KEY');
+  
+  if (!apiKey || apiKey.length === 0) {
+    warnings.push("TMDB_API_KEY not configured");
+  }
+  
+  return { configured: !!apiKey, warnings };
+}
 
 // Rate limiting configuration
 const RATE_LIMIT = {
@@ -86,7 +135,11 @@ function validateTmdbInput(body: unknown): ValidationResult {
 function getClientIp(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp;
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp;
+  return "unknown";
 }
 
 function checkRateLimit(req: Request): { allowed: boolean; remaining: number; retryAfterMs?: number } {
@@ -114,19 +167,28 @@ function checkRateLimit(req: Request): { allowed: boolean; remaining: number; re
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  // Verify secrets on startup
+  const secretsStatus = verifySecrets();
+  if (secretsStatus.warnings.length > 0) {
+    console.warn("[SECRETS]", secretsStatus.warnings.join("; "));
   }
 
   // Check rate limit
   const rateLimit = checkRateLimit(req);
   if (!rateLimit.allowed) {
-    console.warn("Rate limit exceeded for TMDB function");
+    console.warn(`[RATE_LIMIT] Exceeded for IP: ${getClientIp(req)}`);
     return new Response(
       JSON.stringify({
-        error: "Rate limit exceeded",
+        error: "RATE_LIMIT_EXCEEDED",
+        code: "RATE_LIMIT_EXCEEDED",
         retryAfterMs: rateLimit.retryAfterMs,
-        message: `Too many requests. Please try again in ${Math.ceil((rateLimit.retryAfterMs || 0) / 1000)} seconds.`,
+        message: `Too many requests. Retry in ${Math.ceil((rateLimit.retryAfterMs || 0) / 1000)}s`,
+        retryable: true,
       }),
       {
         status: 429,
@@ -134,7 +196,7 @@ serve(async (req) => {
           ...corsHeaders,
           "Content-Type": "application/json",
           "Retry-After": String(Math.ceil((rateLimit.retryAfterMs || 0) / 1000)),
-          "X-RateLimit-Remaining": String(rateLimit.remaining),
+          "X-RateLimit-Remaining": "0",
         },
       }
     );
@@ -143,10 +205,11 @@ serve(async (req) => {
   try {
     const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
     if (!TMDB_API_KEY) {
-      console.error("TMDB_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "TMDB API key not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return createErrorResponse(
+        "CONFIG_ERROR",
+        "TMDB API key not configured",
+        503,
+        { code: "MISSING_API_KEY", retryable: false }
       );
     }
 
@@ -155,19 +218,12 @@ serve(async (req) => {
     try {
       body = await req.json();
     } catch {
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: "Invalid JSON in request body" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return createErrorResponse("PARSE_ERROR", "Invalid JSON", 400, { code: "INVALID_JSON" });
     }
 
     const validation = validateTmdbInput(body);
     if (!validation.valid) {
-      console.warn("Validation failed:", validation.error);
-      return new Response(
-        JSON.stringify({ error: "Validation error", message: validation.error }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return createErrorResponse("VALIDATION_ERROR", validation.error!, 400, { code: "INVALID_INPUT" });
     }
 
     const { action, query, id, media_type } = validation.data!;
