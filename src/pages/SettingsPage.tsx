@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -25,7 +26,10 @@ export default function SettingsPage() {
   const [rdError, setRdError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isTestingSpeed, setIsTestingSpeed] = useState(false);
-  
+  const [clientRdApiKey, setClientRdApiKey] = useState(() => 
+    localStorage.getItem("realDebridApiKey") || ""
+  );
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -501,6 +505,68 @@ export default function SettingsPage() {
               Real-Debrid API key not configured or invalid.
             </p>
           )}
+
+          {/* Client-side API Key for fallback */}
+          <div className="pt-4 border-t border-border/50 space-y-3">
+            <div className="flex items-start gap-2">
+              <Key className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
+              <div className="space-y-1 flex-1">
+                <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
+                  Client-Side API Key (Fallback)
+                </Label>
+                <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                  Optional: Used when server requests are blocked. Get your key from{" "}
+                  <a 
+                    href="https://real-debrid.com/apitoken" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    real-debrid.com/apitoken
+                  </a>
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  placeholder="Enter Real-Debrid API key..."
+                  value={clientRdApiKey}
+                  onChange={(e) => setClientRdApiKey(e.target.value)}
+                  className={cn("pr-10", isTVMode && "text-base h-12")}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? (
+                    <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size={isTVMode ? "lg" : "default"}
+                onClick={() => {
+                  if (clientRdApiKey.trim()) {
+                    localStorage.setItem("realDebridApiKey", clientRdApiKey.trim());
+                    toast.success("API key saved for client-side fallback");
+                  } else {
+                    localStorage.removeItem("realDebridApiKey");
+                    toast.success("API key removed");
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
