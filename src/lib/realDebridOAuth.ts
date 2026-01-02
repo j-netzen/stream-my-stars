@@ -1,6 +1,7 @@
 // Real-Debrid OAuth2 Device Flow Implementation
+// Uses edge function proxy to avoid CORS issues
 
-const RD_OAUTH_BASE = "https://api.real-debrid.com/oauth/v2";
+import { supabase } from "@/integrations/supabase/client";
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -59,26 +60,23 @@ export interface PairingState {
   interval?: number;
 }
 
-// Real-Debrid uses a fixed client ID for open source applications
-const OPEN_SOURCE_CLIENT_ID = "X245A4XAIBGVM";
-
 /**
  * Phase 1: Request a device code from Real-Debrid
  */
 export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
-  const response = await fetch(`${RD_OAUTH_BASE}/device/code?client_id=${OPEN_SOURCE_CLIENT_ID}&new_credentials=yes`, {
-    method: "GET",
-    headers: {
-      "Accept": "application/json",
-    },
+  const { data, error } = await supabase.functions.invoke("real-debrid-oauth", {
+    body: { action: "device_code" },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to request device code: ${response.status} ${errorText}`);
+  if (error) {
+    throw new Error(`Failed to request device code: ${error.message}`);
   }
 
-  return response.json();
+  if (data.error) {
+    throw new Error(`Failed to request device code: ${data.error}`);
+  }
+
+  return data as DeviceCodeResponse;
 }
 
 /**
@@ -87,38 +85,32 @@ export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
  * Throws specific errors for different states
  */
 export async function pollDeviceCredentials(deviceCode: string): Promise<DeviceCredentialsResponse> {
-  const response = await fetch(
-    `${RD_OAUTH_BASE}/device/credentials?client_id=${OPEN_SOURCE_CLIENT_ID}&code=${deviceCode}`,
-    {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-      },
-    }
-  );
+  const { data, error } = await supabase.functions.invoke("real-debrid-oauth", {
+    body: { action: "credentials", device_code: deviceCode },
+  });
 
-  // Handle specific error codes
-  if (response.status === 403) {
-    // Action pending - user hasn't authorized yet
+  if (error) {
+    throw new Error(`Credentials request failed: ${error.message}`);
+  }
+
+  // Handle specific error codes based on response
+  if (data.error_code === 18 || data.error === "action_pending") {
     throw new PendingAuthorizationError("Authorization pending");
   }
 
-  if (response.status === 404) {
-    // Code expired
+  if (data.error_code === 6 || data.error === "code_expired") {
     throw new ExpiredCodeError("Device code has expired");
   }
 
-  if (response.status === 410) {
-    // Code already used
+  if (data.error_code === 7 || data.error === "code_used") {
     throw new UsedCodeError("Device code has already been used");
   }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Credentials request failed: ${response.status} ${errorText}`);
+  if (data.error) {
+    throw new Error(`Credentials request failed: ${data.error}`);
   }
 
-  return response.json();
+  return data as DeviceCredentialsResponse;
 }
 
 /**
@@ -129,27 +121,24 @@ export async function exchangeForTokens(
   clientSecret: string,
   deviceCode: string
 ): Promise<TokenResponse> {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    code: deviceCode,
-    grant_type: "http://oauth.net/grant_type/device/1.0",
-  });
-
-  const response = await fetch(`${RD_OAUTH_BASE}/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+  const { data, error } = await supabase.functions.invoke("real-debrid-oauth", {
+    body: {
+      action: "token",
+      client_id: clientId,
+      client_secret: clientSecret,
+      device_code: deviceCode,
     },
-    body: params.toString(),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
+  if (error) {
+    throw new Error(`Token exchange failed: ${error.message}`);
   }
 
-  return response.json();
+  if (data.error) {
+    throw new Error(`Token exchange failed: ${data.error}`);
+  }
+
+  return data as TokenResponse;
 }
 
 /**
@@ -160,27 +149,24 @@ export async function refreshAccessToken(
   clientSecret: string,
   refreshToken: string
 ): Promise<TokenResponse> {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    code: refreshToken,
-    grant_type: "http://oauth.net/grant_type/device/1.0",
-  });
-
-  const response = await fetch(`${RD_OAUTH_BASE}/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+  const { data, error } = await supabase.functions.invoke("real-debrid-oauth", {
+    body: {
+      action: "refresh",
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
     },
-    body: params.toString(),
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
+  if (error) {
+    throw new Error(`Token refresh failed: ${error.message}`);
   }
 
-  return response.json();
+  if (data.error) {
+    throw new Error(`Token refresh failed: ${data.error}`);
+  }
+
+  return data as TokenResponse;
 }
 
 // Custom error classes for specific error handling
