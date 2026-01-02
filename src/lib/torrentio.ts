@@ -2,6 +2,21 @@ import { supabase } from "@/integrations/supabase/client";
 
 const TORRENTIO_BASE = "https://torrentio.strem.fun";
 
+// Get custom Torrentio addon URL from localStorage
+function getTorrentioBaseUrl(): string {
+  try {
+    const customUrl = localStorage.getItem("torrentioAddonUrl");
+    if (customUrl) {
+      // Extract base URL from manifest URL (remove /manifest.json if present)
+      const baseUrl = customUrl.replace(/\/manifest\.json$/, "");
+      return baseUrl;
+    }
+  } catch {
+    // localStorage not available
+  }
+  return TORRENTIO_BASE;
+}
+
 export interface TorrentioStream {
   name: string;
   title: string;
@@ -241,10 +256,19 @@ async function searchTorrentioClientSide(
     ? `${imdbId}:${season}:${episode}`
     : imdbId;
 
-  // Try Real-Debrid configured endpoint first if we have an API key
+  // Get custom base URL if configured
+  const customBase = getTorrentioBaseUrl();
+  const hasCustomUrl = customBase !== TORRENTIO_BASE;
+
   const urls: string[] = [];
   
-  if (rdApiKey) {
+  // If custom addon URL is set, use it first (it already has RD key baked in)
+  if (hasCustomUrl) {
+    urls.push(`${customBase}/stream/${type}/${streamId}.json`);
+  }
+  
+  // Then try Real-Debrid configured endpoint if we have an API key
+  if (rdApiKey && !hasCustomUrl) {
     urls.push(`${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`);
   }
   

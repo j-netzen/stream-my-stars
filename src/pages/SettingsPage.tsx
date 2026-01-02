@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2 } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -34,6 +34,9 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showPairingDialog, setShowPairingDialog] = useState(false);
   const [isOAuthConnected, setIsOAuthConnected] = useState(() => hasOAuthTokens());
+  const [torrentioAddonUrl, setTorrentioAddonUrl] = useState(() => 
+    localStorage.getItem("torrentioAddonUrl") || ""
+  );
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -619,6 +622,77 @@ export default function SettingsPage() {
                 Save
               </Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Torrentio Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Globe className={cn("text-blue-500", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            Torrentio
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Configure your personalized Torrentio addon endpoint
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-2">
+            <Info className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
+            <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+              Configure your addon at{" "}
+              <a 
+                href="https://torrentio.strem.fun/configure" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                torrentio.strem.fun/configure
+              </a>
+              {" "}with your Real-Debrid key, then paste the manifest URL here. This creates a personalized endpoint that avoids rate limiting.
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
+              Addon URL
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                type="url"
+                placeholder="https://torrentio.strem.fun/realdebrid=YOUR_KEY/manifest.json"
+                value={torrentioAddonUrl}
+                onChange={(e) => setTorrentioAddonUrl(e.target.value)}
+                className={cn(isTVMode && "text-base h-12")}
+              />
+              <Button
+                variant="outline"
+                size={isTVMode ? "lg" : "default"}
+                onClick={() => {
+                  const url = torrentioAddonUrl.trim();
+                  if (url) {
+                    // Validate URL format
+                    if (!url.includes("torrentio.strem.fun")) {
+                      toast.error("Invalid URL - must be a torrentio.strem.fun URL");
+                      return;
+                    }
+                    localStorage.setItem("torrentioAddonUrl", url);
+                    toast.success("Torrentio addon URL saved");
+                  } else {
+                    localStorage.removeItem("torrentioAddonUrl");
+                    toast.success("Torrentio addon URL removed (using default)");
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </div>
+            {torrentioAddonUrl && (
+              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                ✓ Custom addon configured - stream searches will use your personalized endpoint
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
