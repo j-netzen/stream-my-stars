@@ -9,11 +9,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2 } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { RealDebridPairingDialog } from "@/components/RealDebridPairingDialog";
+import { hasOAuthTokens, clearStoredTokens } from "@/lib/realDebridOAuth";
 
 
 export default function SettingsPage() {
@@ -30,6 +32,8 @@ export default function SettingsPage() {
     localStorage.getItem("realDebridApiKey") || ""
   );
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showPairingDialog, setShowPairingDialog] = useState(false);
+  const [isOAuthConnected, setIsOAuthConnected] = useState(() => hasOAuthTokens());
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -506,16 +510,65 @@ export default function SettingsPage() {
             </p>
           )}
 
+          {/* OAuth Device Pairing */}
+          <div className="pt-4 border-t border-border/50 space-y-3">
+            <div className="flex items-start gap-2">
+              <Link2 className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
+              <div className="space-y-1 flex-1">
+                <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
+                  Device Authorization
+                </Label>
+                <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                  Link your Real-Debrid account using the TV-style device pairing flow. No API key needed.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {isOAuthConnected ? (
+                <>
+                  <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30 gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Device Linked
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size={isTVMode ? "lg" : "sm"}
+                    onClick={() => {
+                      clearStoredTokens();
+                      setIsOAuthConnected(false);
+                      setClientRdApiKey("");
+                      toast.success("Device unlinked");
+                      fetchRealDebridData();
+                    }}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    Unlink Device
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="default"
+                  size={isTVMode ? "lg" : "default"}
+                  onClick={() => setShowPairingDialog(true)}
+                  className="gap-2"
+                >
+                  <Link2 className="w-4 h-4" />
+                  Link Device
+                </Button>
+              )}
+            </div>
+          </div>
+
           {/* Client-side API Key for fallback */}
           <div className="pt-4 border-t border-border/50 space-y-3">
             <div className="flex items-start gap-2">
               <Key className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
               <div className="space-y-1 flex-1">
                 <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
-                  Client-Side API Key (Fallback)
+                  Manual API Key (Alternative)
                 </Label>
                 <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
-                  Optional: Used when server requests are blocked. Get your key from{" "}
+                  Or enter your API key manually from{" "}
                   <a 
                     href="https://real-debrid.com/apitoken" 
                     target="_blank" 
@@ -556,7 +609,7 @@ export default function SettingsPage() {
                 onClick={() => {
                   if (clientRdApiKey.trim()) {
                     localStorage.setItem("realDebridApiKey", clientRdApiKey.trim());
-                    toast.success("API key saved for client-side fallback");
+                    toast.success("API key saved");
                   } else {
                     localStorage.removeItem("realDebridApiKey");
                     toast.success("API key removed");
@@ -569,6 +622,18 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Real-Debrid Pairing Dialog */}
+      <RealDebridPairingDialog
+        open={showPairingDialog}
+        onOpenChange={setShowPairingDialog}
+        onSuccess={() => {
+          setIsOAuthConnected(true);
+          setClientRdApiKey(localStorage.getItem("realDebridApiKey") || "");
+          fetchRealDebridData();
+        }}
+        isTVMode={isTVMode}
+      />
 
       {/* Storage Info */}
       <Card>
