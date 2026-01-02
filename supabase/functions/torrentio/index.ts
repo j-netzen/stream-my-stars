@@ -369,6 +369,10 @@ serve(async (req) => {
         // Use a simple manifest request to check if Torrentio is up
         const torrentioResponse = await fetch(`${TORRENTIO_BASE}/manifest.json`, {
           signal: controller.signal,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json",
+          },
         });
         
         clearTimeout(timeoutId);
@@ -429,20 +433,15 @@ serve(async (req) => {
       // Config format: providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl,horriblesubs,nyaasi,tokyotosho,anidex|sort=qualitysize|qualityfilter=brremux,hdrall,dolbyvision,4k,1080p,720p,480p,scr,cam,unknown
       const torrentioUrls: Array<{ label: string; url: string }> = [];
       
-      // Base configuration for quality and providers
-      const baseConfig = "providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl,horriblesubs,nyaasi,tokyotosho,anidex|sort=qualitysize|qualityfilter=brremux,hdrall,dolbyvision,4k,1080p,720p,480p,other";
-      
-      // Real-Debrid endpoint with full config
+      // Real-Debrid endpoint - Torrentio uses the API key directly in the path (NOT URL encoded)
+      // Format: /realdebrid=APIKEY/stream/type/id.json
       if (rdApiKey) {
-        // Torrentio config format: realdebrid=APIKEY|providers=...|sort=...
-        // All config parts are separated by pipe |
-        const rdConfig = `realdebrid=${rdApiKey}|${baseConfig}`;
-        const rdUrl = `${TORRENTIO_BASE}/${encodeURIComponent(rdConfig)}/stream/${type}/${streamId}.json`;
+        const rdUrl = `${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`;
         torrentioUrls.push({ label: "realdebrid", url: rdUrl });
       }
       
-      // Standard public endpoint with config (no debrid)
-      const standardUrl = `${TORRENTIO_BASE}/${encodeURIComponent(baseConfig)}/stream/${type}/${streamId}.json`;
+      // Standard public endpoint (no config needed for basic search)
+      const standardUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
       torrentioUrls.push({ label: "standard", url: standardUrl });
 
       // Retry logic with exponential backoff
