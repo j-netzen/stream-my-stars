@@ -284,10 +284,20 @@ async function searchTorrentioClientSide(
   throw lastError || new Error("All Torrentio endpoints failed");
 }
 
-// Get Real-Debrid API key from localStorage (set by useRealDebridStatus)
+// Get Real-Debrid API key from localStorage (OAuth tokens or manual key)
 function getRdApiKeyFromStorage(): string | null {
   try {
-    // Check if there's a stored RD API key
+    // First check for OAuth access token
+    const oauthToken = localStorage.getItem("rd_access_token");
+    if (oauthToken) {
+      // Check if token is expired
+      const expiry = localStorage.getItem("rd_token_expiry");
+      if (expiry && Date.now() < parseInt(expiry, 10)) {
+        return oauthToken;
+      }
+    }
+    
+    // Fall back to manual API key
     const stored = localStorage.getItem("realDebridApiKey");
     return stored || null;
   } catch {
