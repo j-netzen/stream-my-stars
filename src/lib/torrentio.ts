@@ -335,7 +335,20 @@ export async function searchTorrentio(
   season?: number,
   episode?: number
 ): Promise<TorrentioStream[]> {
-  // First try edge function
+  // Check if custom Torrentio addon URL is configured
+  const customBase = getTorrentioBaseUrl();
+  const hasCustomUrl = customBase !== TORRENTIO_BASE;
+  
+  // If custom addon URL is configured, use client-side search directly
+  // This bypasses the edge function which often gets blocked by Torrentio
+  if (hasCustomUrl) {
+    console.log("[Torrentio] Using custom addon URL, skipping edge function");
+    const rdApiKey = getRdApiKeyFromStorage();
+    const streams = await searchTorrentioClientSide(imdbId, type, season, episode, rdApiKey || undefined);
+    return sortStreams(streams);
+  }
+  
+  // Otherwise, try edge function first
   try {
     const { data, error } = await supabase.functions.invoke("torrentio", {
       body: { action: "search", imdbId, type, season, episode },
@@ -347,7 +360,11 @@ export async function searchTorrentio(
     if (payload.error) {
       // Check if it's a Torrentio blocking error - if so, try client-side
       const errorMsg = payload.message || payload.error;
-      if (errorMsg.includes("403") || errorMsg.includes("blocked") || errorMsg.includes("Cloudflare")) {
+      if (errorMsg.includes("403") || 
+          errorMsg.includes("blocked") || 
+          errorMsg.includes("Cloudflare") ||
+          errorMsg.includes("Access denied") ||
+          errorMsg.includes("STREAM_FETCH_FAILED")) {
         console.log("[Torrentio] Edge function blocked, falling back to client-side");
         throw new Error("FALLBACK_TO_CLIENT");
       }
@@ -361,7 +378,8 @@ export async function searchTorrentio(
     if (err.message === "FALLBACK_TO_CLIENT" || 
         err.message?.includes("403") || 
         err.message?.includes("blocked") ||
-        err.message?.includes("exhausted")) {
+        err.message?.includes("exhausted") ||
+        err.message?.includes("Access denied")) {
       console.log("[Torrentio] Attempting client-side fallback...");
       
       const rdApiKey = getRdApiKeyFromStorage();
