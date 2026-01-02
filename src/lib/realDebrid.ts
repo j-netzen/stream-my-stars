@@ -3,6 +3,62 @@ import {
   clearRealDebridServiceUnavailable,
   setRealDebridServiceUnavailable,
 } from "@/lib/realDebridStatusStore";
+import {
+  getStoredTokens,
+  refreshAccessToken,
+  storeTokens,
+  clearStoredTokens,
+} from "@/lib/realDebridOAuth";
+
+// Token refresh state to prevent concurrent refresh attempts
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+/**
+ * Get a valid access token, refreshing if necessary
+ * Uses a mutex pattern to prevent concurrent refresh attempts
+ */
+async function getValidAccessTokenWithRefresh(): Promise<string | null> {
+  const tokens = getStoredTokens();
+  if (!tokens) return null;
+
+  // Check if token is still valid (with 5 min buffer)
+  const isExpired = Date.now() > tokens.expiresAt - 5 * 60 * 1000;
+  
+  if (!isExpired) {
+    return tokens.accessToken;
+  }
+
+  // Token is expired, need to refresh
+  // Use mutex to prevent concurrent refresh attempts
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      console.log("Refreshing Real-Debrid access token...");
+      const newTokens = await refreshAccessToken(
+        tokens.clientId,
+        tokens.clientSecret,
+        tokens.refreshToken
+      );
+      storeTokens(newTokens, tokens.clientId, tokens.clientSecret);
+      console.log("Real-Debrid token refreshed successfully");
+      return newTokens.access_token;
+    } catch (error) {
+      console.error("Failed to refresh Real-Debrid token:", error);
+      clearStoredTokens();
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
 
 export interface RealDebridUser {
   id: number;
@@ -53,11 +109,42 @@ export interface RealDebridMagnetResponse {
   uri: string;
 }
 
-async function invokeRealDebrid(body: Record<string, unknown>) {
+/**
+ * Check if an error indicates an expired/invalid token
+ */
+function isTokenError(error: unknown): boolean {
+  if (!error) return false;
+  const message = String(error);
+  return (
+    message.includes("401") ||
+    message.includes("Bad Token") ||
+    message.includes("bad_token") ||
+    message.includes("expired") ||
+    message.includes("invalid_grant") ||
+    message.includes("Unauthorized")
+  );
+}
+
+/**
+ * Main function to invoke Real-Debrid API with automatic token refresh
+ */
+async function invokeRealDebrid(body: Record<string, unknown>, retryCount = 0): Promise<unknown> {
   const { data, error } = await supabase.functions.invoke("real-debrid", { body });
   
   if (error) {
     console.error("Real-Debrid API error:", error);
+    
+    // Check if it's a token error and we haven't retried yet
+    if (isTokenError(error) && retryCount === 0) {
+      console.log("Token error detected, attempting refresh...");
+      const newToken = await getValidAccessTokenWithRefresh();
+      if (newToken) {
+        // Retry the request after token refresh
+        return invokeRealDebrid(body, retryCount + 1);
+      }
+      throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
+    }
+    
     // Check if it's a service unavailable error
     const errorMessage = error.message || "";
     if (errorMessage.includes("503") || errorMessage.includes("service_unavailable")) {
@@ -69,8 +156,19 @@ async function invokeRealDebrid(body: Record<string, unknown>) {
   }
   
   if (data?.error) {
-    // Check for service unavailable in data error
     const errorString = String(data.error || "");
+    
+    // Check for token errors in response
+    if (isTokenError(errorString) && retryCount === 0) {
+      console.log("Token error in response, attempting refresh...");
+      const newToken = await getValidAccessTokenWithRefresh();
+      if (newToken) {
+        return invokeRealDebrid(body, retryCount + 1);
+      }
+      throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
+    }
+    
+    // Check for service unavailable in data error
     if (data.details?.error_code === 25 || String(data.httpStatus || "").includes("503") || errorString.includes("overloaded")) {
       const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
       setRealDebridServiceUnavailable(serviceError);
@@ -85,43 +183,43 @@ async function invokeRealDebrid(body: Record<string, unknown>) {
 }
 
 export async function getRealDebridUser(): Promise<RealDebridUser> {
-  return invokeRealDebrid({ action: "user" });
+  return invokeRealDebrid({ action: "user" }) as Promise<RealDebridUser>;
 }
 
 export async function unrestrictLink(link: string): Promise<RealDebridUnrestrictedLink> {
-  return invokeRealDebrid({ action: "unrestrict", link });
+  return invokeRealDebrid({ action: "unrestrict", link }) as Promise<RealDebridUnrestrictedLink>;
 }
 
 export async function getStreamingLinks(fileId: string): Promise<RealDebridStreamingLinks> {
-  return invokeRealDebrid({ action: "streaming", fileId });
+  return invokeRealDebrid({ action: "streaming", fileId }) as Promise<RealDebridStreamingLinks>;
 }
 
 export async function addMagnet(magnet: string): Promise<RealDebridMagnetResponse> {
-  return invokeRealDebrid({ action: "add_magnet", magnet });
+  return invokeRealDebrid({ action: "add_magnet", magnet }) as Promise<RealDebridMagnetResponse>;
 }
 
 export async function addTorrentFile(torrentFileBase64: string): Promise<RealDebridMagnetResponse> {
-  return invokeRealDebrid({ action: "add_torrent", torrentFile: torrentFileBase64 });
+  return invokeRealDebrid({ action: "add_torrent", torrentFile: torrentFileBase64 }) as Promise<RealDebridMagnetResponse>;
 }
 
 export async function selectTorrentFiles(torrentId: string): Promise<{ success: boolean }> {
-  return invokeRealDebrid({ action: "select_files", torrentId });
+  return invokeRealDebrid({ action: "select_files", torrentId }) as Promise<{ success: boolean }>;
 }
 
 export async function getTorrentInfo(torrentId: string): Promise<RealDebridTorrent> {
-  return invokeRealDebrid({ action: "torrent_info", torrentId });
+  return invokeRealDebrid({ action: "torrent_info", torrentId }) as Promise<RealDebridTorrent>;
 }
 
 export async function listTorrents(): Promise<RealDebridTorrent[]> {
-  return invokeRealDebrid({ action: "torrents" });
+  return invokeRealDebrid({ action: "torrents" }) as Promise<RealDebridTorrent[]>;
 }
 
 export async function listDownloads(): Promise<RealDebridUnrestrictedLink[]> {
-  return invokeRealDebrid({ action: "downloads" });
+  return invokeRealDebrid({ action: "downloads" }) as Promise<RealDebridUnrestrictedLink[]>;
 }
 
 export async function getSupportedHosts(): Promise<Record<string, unknown>> {
-  return invokeRealDebrid({ action: "hosts" });
+  return invokeRealDebrid({ action: "hosts" }) as Promise<Record<string, unknown>>;
 }
 
 // Helper to add a magnet and wait for links to be available (not full download)
