@@ -25,7 +25,7 @@ const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 // ========== INPUT VALIDATION ==========
 const IMDB_ID_REGEX = /^tt\d{7,10}$/;
 const VALID_TYPES = ["movie", "series"] as const;
-const VALID_ACTIONS = ["search"] as const;
+const VALID_ACTIONS = ["search", "health"] as const;
 
 interface ValidationResult {
   valid: boolean;
@@ -82,6 +82,18 @@ function validateTorrentioInput(body: unknown): ValidationResult {
   // Validate action
   if (typeof action !== 'string' || !VALID_ACTIONS.includes(action as typeof VALID_ACTIONS[number])) {
     return { valid: false, error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` };
+  }
+
+  // Health check action - no additional validation needed
+  if (action === "health") {
+    let validatedRdKey: string | undefined;
+    if (rdApiKey !== undefined && typeof rdApiKey === 'string' && rdApiKey.length > 0) {
+      validatedRdKey = rdApiKey;
+    }
+    return { 
+      valid: true, 
+      data: { action, imdbId: '', type: '', rdApiKey: validatedRdKey } 
+    };
   }
   
   // For search action, validate required fields
@@ -278,6 +290,123 @@ serve(async (req) => {
     }
 
     const { action, imdbId, type, season, episode, rdApiKey: clientRdKey } = validation.data!;
+
+    // ========== HEALTH CHECK ACTION ==========
+    if (action === "health") {
+      console.log("[HEALTH] Running health check...");
+      
+      const rdApiKey = clientRdKey || Deno.env.get('REAL_DEBRID_API_KEY');
+      const healthResult: {
+        status: "healthy" | "degraded" | "unhealthy";
+        checks: {
+          realDebrid: { configured: boolean; valid: boolean; error?: string; username?: string; premium?: boolean; expiration?: string };
+          torrentio: { reachable: boolean; error?: string };
+        };
+        timestamp: string;
+      } = {
+        status: "healthy",
+        checks: {
+          realDebrid: { configured: false, valid: false },
+          torrentio: { reachable: false },
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      // Check Real-Debrid API key validity
+      if (rdApiKey && rdApiKey.length > 0) {
+        healthResult.checks.realDebrid.configured = true;
+        
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          
+          const rdResponse = await fetch("https://api.real-debrid.com/rest/1.0/user", {
+            headers: {
+              "Authorization": `Bearer ${rdApiKey}`,
+              "Accept": "application/json",
+            },
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (rdResponse.ok) {
+            const userData = await rdResponse.json();
+            healthResult.checks.realDebrid.valid = true;
+            healthResult.checks.realDebrid.username = userData.username;
+            healthResult.checks.realDebrid.premium = userData.type === "premium";
+            healthResult.checks.realDebrid.expiration = userData.expiration;
+            console.log(`[HEALTH] Real-Debrid: valid (user: ${userData.username}, premium: ${userData.type === "premium"})`);
+          } else if (rdResponse.status === 401) {
+            healthResult.checks.realDebrid.error = "API key is invalid or expired";
+            healthResult.status = "unhealthy";
+            console.error("[HEALTH] Real-Debrid: invalid API key");
+          } else {
+            healthResult.checks.realDebrid.error = `API returned ${rdResponse.status}`;
+            healthResult.status = "degraded";
+            console.warn(`[HEALTH] Real-Debrid: unexpected status ${rdResponse.status}`);
+          }
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            healthResult.checks.realDebrid.error = "Request timed out";
+          } else {
+            healthResult.checks.realDebrid.error = err instanceof Error ? err.message : "Connection failed";
+          }
+          healthResult.status = "degraded";
+          console.error("[HEALTH] Real-Debrid check failed:", err);
+        }
+      } else {
+        healthResult.checks.realDebrid.error = "API key not configured";
+        healthResult.status = "degraded";
+        console.warn("[HEALTH] Real-Debrid: not configured");
+      }
+
+      // Check Torrentio reachability
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        // Use a simple manifest request to check if Torrentio is up
+        const torrentioResponse = await fetch(`${TORRENTIO_BASE}/manifest.json`, {
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (torrentioResponse.ok) {
+          healthResult.checks.torrentio.reachable = true;
+          console.log("[HEALTH] Torrentio: reachable");
+        } else {
+          healthResult.checks.torrentio.error = `Returned ${torrentioResponse.status}`;
+          if (healthResult.status === "healthy") healthResult.status = "degraded";
+          console.warn(`[HEALTH] Torrentio: returned ${torrentioResponse.status}`);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          healthResult.checks.torrentio.error = "Request timed out";
+        } else {
+          healthResult.checks.torrentio.error = err instanceof Error ? err.message : "Connection failed";
+        }
+        if (healthResult.status === "healthy") healthResult.status = "degraded";
+        console.error("[HEALTH] Torrentio check failed:", err);
+      }
+
+      // Determine overall status
+      if (!healthResult.checks.realDebrid.valid && !healthResult.checks.torrentio.reachable) {
+        healthResult.status = "unhealthy";
+      }
+
+      console.log(`[HEALTH] Overall status: ${healthResult.status}`);
+
+      return new Response(JSON.stringify(healthResult), {
+        status: healthResult.status === "unhealthy" ? 503 : 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+      });
+    }
 
     if (action === "search") {
       // Get Real-Debrid API key - prefer client-provided, fall back to env
