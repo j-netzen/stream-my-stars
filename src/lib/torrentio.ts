@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const TORRENTIO_BASE = "https://torrentio.strem.fun";
+
 export interface TorrentioStream {
   name: string;
   title: string;
@@ -226,27 +228,115 @@ export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   });
 }
 
+// Client-side direct Torrentio search (fallback when edge function is blocked)
+async function searchTorrentioClientSide(
+  imdbId: string,
+  type: "movie" | "series",
+  season?: number,
+  episode?: number,
+  rdApiKey?: string
+): Promise<TorrentioStream[]> {
+  // Build the stream ID
+  const streamId = type === "series" && season && episode
+    ? `${imdbId}:${season}:${episode}`
+    : imdbId;
+
+  // Try Real-Debrid configured endpoint first if we have an API key
+  const urls: string[] = [];
+  
+  if (rdApiKey) {
+    urls.push(`${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`);
+  }
+  
+  // Fallback to public endpoint
+  urls.push(`${TORRENTIO_BASE}/stream/${type}/${streamId}.json`);
+
+  let lastError: Error | null = null;
+
+  for (const url of urls) {
+    try {
+      console.log("[Torrentio Client] Trying:", url.replace(rdApiKey || "", "***"));
+      
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          console.warn("[Torrentio Client] 403 Forbidden, trying next URL");
+          continue;
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const streams: TorrentioStream[] = data.streams || [];
+      console.log(`[Torrentio Client] Found ${streams.length} streams`);
+      return streams;
+    } catch (err: any) {
+      console.error("[Torrentio Client] Error:", err.message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("All Torrentio endpoints failed");
+}
+
+// Get Real-Debrid API key from localStorage (set by useRealDebridStatus)
+function getRdApiKeyFromStorage(): string | null {
+  try {
+    // Check if there's a stored RD API key
+    const stored = localStorage.getItem("realDebridApiKey");
+    return stored || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function searchTorrentio(
   imdbId: string,
   type: "movie" | "series",
   season?: number,
   episode?: number
 ): Promise<TorrentioStream[]> {
-  const { data, error } = await supabase.functions.invoke("torrentio", {
-    body: { action: "search", imdbId, type, season, episode },
-  });
+  // First try edge function
+  try {
+    const { data, error } = await supabase.functions.invoke("torrentio", {
+      body: { action: "search", imdbId, type, season, episode },
+    });
 
-  // Always throw a normal Error (not a FunctionsHttpError) so callers can safely catch/display it.
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-  const payload = (data || {}) as any;
-  if (payload.error) {
-    throw new Error(payload.message || payload.error);
+    const payload = (data || {}) as any;
+    if (payload.error) {
+      // Check if it's a Torrentio blocking error - if so, try client-side
+      const errorMsg = payload.message || payload.error;
+      if (errorMsg.includes("403") || errorMsg.includes("blocked") || errorMsg.includes("Cloudflare")) {
+        console.log("[Torrentio] Edge function blocked, falling back to client-side");
+        throw new Error("FALLBACK_TO_CLIENT");
+      }
+      throw new Error(errorMsg);
+    }
+
+    const streams: TorrentioStream[] = payload.streams || [];
+    return sortStreams(streams);
+  } catch (err: any) {
+    // If edge function fails with blocking error, try client-side
+    if (err.message === "FALLBACK_TO_CLIENT" || 
+        err.message?.includes("403") || 
+        err.message?.includes("blocked") ||
+        err.message?.includes("exhausted")) {
+      console.log("[Torrentio] Attempting client-side fallback...");
+      
+      const rdApiKey = getRdApiKeyFromStorage();
+      const streams = await searchTorrentioClientSide(imdbId, type, season, episode, rdApiKey || undefined);
+      return sortStreams(streams);
+    }
+    
+    throw err;
   }
-
-  // Sort streams by quality and seeds
-  const streams: TorrentioStream[] = payload.streams || [];
-  return sortStreams(streams);
 }
 
 // Get IMDB ID from TMDB
@@ -261,3 +351,6 @@ export async function getImdbIdFromTmdb(
   if (error) throw error;
   return data.imdb_id || null;
 }
+
+// Export client-side search for direct use
+export { searchTorrentioClientSide };
