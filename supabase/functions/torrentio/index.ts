@@ -424,23 +424,25 @@ serve(async (req) => {
       console.log(`[SEARCH] Type: ${type}, StreamID: ${streamId}`);
       
       // Build Torrentio URLs
-      // IMPORTANT: Torrentio expects the config BEFORE /stream/
+      // IMPORTANT: Torrentio expects a full config string BEFORE /stream/
       // Format: /[config]/stream/[type]/[id].json
+      // Config format: providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl,horriblesubs,nyaasi,tokyotosho,anidex|sort=qualitysize|qualityfilter=brremux,hdrall,dolbyvision,4k,1080p,720p,480p,scr,cam,unknown
       const torrentioUrls: Array<{ label: string; url: string }> = [];
       
-      // Standard public endpoint (no debrid)
-      const standardUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
+      // Base configuration for quality and providers
+      const baseConfig = "providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl,horriblesubs,nyaasi,tokyotosho,anidex|sort=qualitysize|qualityfilter=brremux,hdrall,dolbyvision,4k,1080p,720p,480p,other";
       
-      // Real-Debrid endpoint with proper config format
+      // Real-Debrid endpoint with full config
       if (rdApiKey) {
-        // Torrentio config format: realdebrid=APIKEY
-        // The config goes in the path segment before /stream/
-        const rdConfig = `realdebrid=${encodeURIComponent(rdApiKey)}`;
-        const rdUrl = `${TORRENTIO_BASE}/${rdConfig}/stream/${type}/${streamId}.json`;
+        // Torrentio config format: realdebrid=APIKEY|providers=...|sort=...
+        // All config parts are separated by pipe |
+        const rdConfig = `realdebrid=${rdApiKey}|${baseConfig}`;
+        const rdUrl = `${TORRENTIO_BASE}/${encodeURIComponent(rdConfig)}/stream/${type}/${streamId}.json`;
         torrentioUrls.push({ label: "realdebrid", url: rdUrl });
       }
       
-      // Always add standard as fallback
+      // Standard public endpoint with config (no debrid)
+      const standardUrl = `${TORRENTIO_BASE}/${encodeURIComponent(baseConfig)}/stream/${type}/${streamId}.json`;
       torrentioUrls.push({ label: "standard", url: standardUrl });
 
       // Retry logic with exponential backoff
