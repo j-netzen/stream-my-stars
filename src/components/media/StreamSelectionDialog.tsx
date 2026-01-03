@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Media, useMedia } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
+import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
@@ -52,6 +53,7 @@ export function StreamSelectionDialog({
   const { updateMedia } = useMedia();
   const { isTVMode } = useTVMode();
   const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
+  const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
   const [activeTab, setActiveTab] = useState<string>("downloads");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
@@ -422,7 +424,7 @@ export function StreamSelectionDialog({
     }
   };
 
-  const resolveStream = async (stream: TorrentioStream): Promise<string> => {
+  const resolveStream = async (stream: TorrentioStream, skipConfirmation = false): Promise<string> => {
     let streamUrl: string;
     
     if (!stream.url) {
@@ -430,6 +432,17 @@ export function StreamSelectionDialog({
     }
     
     const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
+    const needsRdDownload = isMagnetLink(stream.url) || isTorrentioResolveUrl;
+    
+    // Ask for confirmation before adding to Real-Debrid
+    if (needsRdDownload && !skipConfirmation) {
+      const streamInfo = parseStreamInfo(stream);
+      const streamName = streamInfo.quality ? `${streamInfo.quality} (${streamInfo.size || 'Unknown size'})` : stream.title;
+      const confirmed = await confirmAddToRealDebrid(streamName);
+      if (!confirmed) {
+        throw new Error("Download cancelled by user");
+      }
+    }
     
     const handleProgress = (progress: number) => {
       setResolveProgress(progress);
@@ -674,6 +687,7 @@ export function StreamSelectionDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none border-none overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
@@ -1336,5 +1350,7 @@ export function StreamSelectionDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+    <ConfirmationDialog />
+    </>
   );
 }

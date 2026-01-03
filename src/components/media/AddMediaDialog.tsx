@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
+import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { unrestrictLink, addMagnetAndWait, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
@@ -47,6 +48,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
   const { isTVMode } = useTVMode();
   const { status: rdServiceStatus, isServiceAvailable: isRdAvailable, refresh: refreshRdStatus } = useRealDebridStatus();
+  const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -325,6 +327,21 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     if (readyItems.length === 0) {
       toast.error("No episodes ready to add");
       return;
+    }
+
+    // Check if any items need RD download (magnet or extractable magnet)
+    const needsRdDownload = readyItems.some(item => {
+      const streamUrl = item.stream!.url;
+      return isMagnetLink(streamUrl) || 
+             (!isDirectRdLink(streamUrl) && extractMagnetFromTorrentioUrl(streamUrl));
+    });
+
+    if (needsRdDownload) {
+      const confirmed = await confirmAddToRealDebrid(`${readyItems.length} episodes`);
+      if (!confirmed) {
+        toast.info("Batch add cancelled");
+        return;
+      }
     }
 
     setIsAdding(true);
@@ -651,6 +668,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
       // Check if it's a magnet link
       if (isMagnetLink(rdLink)) {
+        // Confirm before adding to Real-Debrid
+        const confirmed = await confirmAddToRealDebrid(manualTitle || "this content");
+        if (!confirmed) {
+          setIsUnrestricting(false);
+          return;
+        }
+        
         setRdStatus("Adding magnet to Real-Debrid...");
         const torrent = await addMagnetAndWait(rdLink, (progress) => {
           setRdProgress(progress);
@@ -681,6 +705,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
             console.log("Unrestrict failed, attempting magnet extraction fallback...");
             const magnetLink = extractMagnetFromTorrentioUrl(rdLink);
             if (magnetLink) {
+              // Confirm before adding to Real-Debrid
+              const confirmed = await confirmAddToRealDebrid(manualTitle || "this content");
+              if (!confirmed) {
+                setIsUnrestricting(false);
+                return;
+              }
+              
               setRdStatus("Falling back to magnet link...");
               const torrent = await addMagnetAndWait(magnetLink, (progress) => {
                 setRdProgress(progress);
@@ -835,6 +866,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0">
@@ -1513,5 +1545,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
+    <ConfirmationDialog />
+    </>
   );
 }
