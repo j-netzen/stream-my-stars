@@ -20,11 +20,31 @@ function getTorrentioBaseUrl(): string {
 export interface TorrentioStream {
   name: string;
   title: string;
-  url: string;
+  url?: string;
+  infoHash?: string;
+  fileIdx?: number;
   behaviorHints?: {
     bingeGroup?: string;
     filename?: string;
   };
+}
+
+// Normalize stream to ensure it has a usable URL
+export function normalizeStream(stream: TorrentioStream): TorrentioStream {
+  // If stream already has a valid URL, return as-is
+  if (stream.url && stream.url.trim() && !stream.url.includes('[REDACTED]')) {
+    return stream;
+  }
+  
+  // If stream has infoHash but no URL, create a magnet link
+  if (stream.infoHash) {
+    const filename = stream.behaviorHints?.filename || stream.title || 'Unknown';
+    const magnetUrl = `magnet:?xt=urn:btih:${stream.infoHash}&dn=${encodeURIComponent(filename)}`;
+    return { ...stream, url: magnetUrl };
+  }
+  
+  // Return stream as-is if we can't fix it
+  return stream;
 }
 
 export interface TorrentioResult {
@@ -296,8 +316,10 @@ async function searchTorrentioClientSide(
       }
 
       const data = await response.json();
-      const streams: TorrentioStream[] = data.streams || [];
-      console.log(`[Torrentio Client] Found ${streams.length} streams`);
+      const rawStreams: TorrentioStream[] = data.streams || [];
+      // Normalize streams to ensure they have usable URLs
+      const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
+      console.log(`[Torrentio Client] Found ${rawStreams.length} streams, ${streams.length} with valid URLs`);
       return streams;
     } catch (err: any) {
       console.error("[Torrentio Client] Error:", err.message);
@@ -371,7 +393,9 @@ export async function searchTorrentio(
       throw new Error(errorMsg);
     }
 
-    const streams: TorrentioStream[] = payload.streams || [];
+    const rawStreams: TorrentioStream[] = payload.streams || [];
+    // Normalize streams to ensure they have usable URLs
+    const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
     return sortStreams(streams);
   } catch (err: any) {
     // If edge function fails with blocking error, try client-side
