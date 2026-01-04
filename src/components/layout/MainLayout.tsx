@@ -85,16 +85,16 @@ export function MainLayout({ children }: MainLayoutProps) {
           "min-h-screen transition-all duration-300 safe-bottom",
           // Desktop: offset by sidebar width
           sidebarCollapsed ? "md:ml-16" : "md:ml-64",
-          // TV Mode: wider sidebar offset
-          isTVMode && (sidebarCollapsed ? "md:ml-20" : "md:ml-72"),
+          // TV Mode: reduced sidebar offset (~240px expanded, ~56px collapsed)
+          isTVMode && (sidebarCollapsed ? "md:ml-14" : "md:ml-60"),
           // Mobile: no offset, add top padding for menu button + safe area
           "ml-0 pt-16 md:pt-0",
-          // TV Mode: extra padding for overscan
-          isTVMode && "pt-24 md:pt-0"
+          // TV Mode: moderate padding for overscan
+          isTVMode && "pt-16 md:pt-0"
         )}
         style={{ 
           paddingTop: isTVMode 
-            ? 'calc(6rem + var(--safe-area-inset-top, 0px))'
+            ? 'calc(4rem + var(--safe-area-inset-top, 0px))'
             : 'calc(4rem + var(--safe-area-inset-top, 0px))',
         }}
       >
