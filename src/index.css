@@ -133,16 +133,19 @@
   }
 
   /* TV Mode - Leanback 10-foot UI for Android TV
-     Base font: 22px, min touch targets: 80x80px, 5% overscan margins */
+     Normalized sizing for landscape 1280px+ screens */
   .tv-mode {
-    --tv-card-width: 18rem;
-    --tv-focus-ring-width: 4px;
+    --tv-card-width: 12rem;
+    --tv-focus-ring-width: 3px;
     --tv-overscan: 5%;
-    --tv-min-target: 80px;
-    font-size: 22px;
-    --card-width-lg: 14rem;
-    --card-width-xl: 16rem;
-    --card-width-2xl: 18rem;
+    --tv-min-target: 48px;
+    font-size: 18px;
+    --card-width-lg: 11rem;
+    --card-width-xl: 13rem;
+    --card-width-2xl: 15rem;
+    /* Sidebar width variable */
+    --tv-sidebar-width: 240px;
+    --tv-sidebar-collapsed: 56px;
   }
 
   /* TV Mode overscan safe zone - 5% margin for TV bezels */
@@ -151,7 +154,7 @@
     box-sizing: border-box;
   }
 
-  /* Ensure all interactive elements meet minimum 80x80px target */
+  /* Normalized touch targets for dense layout (48px min instead of 80px) */
   .tv-mode button,
   .tv-mode a,
   .tv-mode [role="button"],
@@ -166,33 +169,51 @@
     min-width: auto;
   }
 
-  /* Landscape mode optimizations */
-  @media (min-aspect-ratio: 4/3) {
-    :root {
-      --card-width-lg: 13rem;
-      --card-width-xl: 15rem;
-      --card-width-2xl: 17rem;
+  /* Landscape TV-specific overrides: orientation landscape + min-width 1280px */
+  @media (orientation: landscape) and (min-width: 1280px) {
+    .tv-mode {
+      --tv-card-width: 11rem;
+      --tv-focus-ring-width: 3px;
+      --tv-min-target: 44px;
+      font-size: 16px;
+      --card-width-lg: 10rem;
+      --card-width-xl: 12rem;
+      --card-width-2xl: 14rem;
+      --tv-sidebar-width: 240px;
+      --tv-sidebar-collapsed: 52px;
+    }
+
+    /* Increased grid columns for efficient space usage */
+    .tv-mode .tv-grid {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
   }
 
-  @media (min-aspect-ratio: 16/9) {
-    :root {
-      --card-width-lg: 14rem;
-      --card-width-xl: 16rem;
-      --card-width-2xl: 18rem;
-    }
+  /* Ultra-wide landscape */
+  @media (orientation: landscape) and (min-width: 1920px) {
     .tv-mode {
-      --tv-card-width: 20rem;
+      --tv-card-width: 12rem;
+      font-size: 17px;
+      --card-width-lg: 11rem;
+      --card-width-xl: 13rem;
+      --card-width-2xl: 15rem;
+      --tv-sidebar-width: 260px;
+    }
+
+    .tv-mode .tv-grid {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     }
   }
 
-  @media (min-aspect-ratio: 21/9) {
-    :root {
-      --card-width-xl: 18rem;
-      --card-width-2xl: 20rem;
-    }
+  /* 4K+ screens */
+  @media (orientation: landscape) and (min-width: 2560px) {
     .tv-mode {
-      --tv-card-width: 22rem;
+      --tv-card-width: 14rem;
+      font-size: 18px;
+      --card-width-lg: 12rem;
+      --card-width-xl: 14rem;
+      --card-width-2xl: 16rem;
+      --tv-sidebar-width: 280px;
     }
   }
 }
@@ -288,36 +309,25 @@
     box-shadow: 0 0 0 3px hsl(var(--star-purple) / 0.2), var(--shadow-sm);
   }
 
-  /* TV Mode focus styles - high visibility for remote navigation
-     Using 4px solid outline + 1.05x scale transform per requirements */
+  /* TV Mode focus styles - 3px high-contrast border for visibility at 10ft */
   .tv-mode *:focus {
     outline: none;
   }
 
   .tv-mode *:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: 4px;
+    outline-offset: 2px;
     border-radius: var(--radius);
-    box-shadow: 0 0 30px hsl(var(--tv-focus-ring) / 0.6);
-    transform: scale(1.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, outline 0.1s ease;
+    box-shadow: 0 0 16px hsl(var(--tv-focus-ring) / 0.5);
+    transform: scale(1.02);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.1s ease;
     z-index: 10;
     position: relative;
   }
 
-  /* Disable animation for less visual noise */
-  @keyframes tv-focus-glow {
-    0%, 100% {
-      box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
-    }
-    50% {
-      box-shadow: 0 0 40px hsl(var(--tv-focus-ring) / 0.8);
-    }
-  }
-
-  /* Media cards get larger scale on focus */
+  /* Media cards get modest scale on focus */
   .tv-mode .media-card {
-    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
     box-shadow: var(--shadow-md);
     will-change: transform;
   }
@@ -325,11 +335,11 @@
   .tv-mode .media-card:focus,
   .tv-mode .media-card:focus-visible,
   .tv-mode .media-card:focus-within {
-    transform: scale(1.08);
+    transform: scale(1.04);
     z-index: 20;
     box-shadow: 0 0 0 var(--tv-focus-ring-width) hsl(var(--tv-focus-ring)), 
-                0 0 40px hsl(var(--tv-focus-ring) / 0.7),
-                var(--shadow-xl);
+                0 0 20px hsl(var(--tv-focus-ring) / 0.5),
+                var(--shadow-lg);
     outline: none;
   }
 
@@ -338,7 +348,7 @@
     opacity: 1;
   }
 
-  /* TV mode sidebar navigation - larger touch targets */
+  /* TV mode sidebar navigation - dense targets */
   .tv-mode [data-sidebar="true"] a,
   .tv-mode [data-sidebar="true"] button {
     min-height: var(--tv-min-target);
@@ -350,11 +360,11 @@
   .tv-mode [data-sidebar="true"] a:focus-visible,
   .tv-mode [data-sidebar="true"] button:focus,
   .tv-mode [data-sidebar="true"] button:focus-visible {
-    background: hsl(var(--primary) / 0.25);
+    background: hsl(var(--primary) / 0.2);
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: -2px;
-    box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
-    transform: scale(1.02);
+    outline-offset: -1px;
+    box-shadow: 0 0 12px hsl(var(--tv-focus-ring) / 0.4);
+    transform: scale(1.01);
   }
 
   /* Smooth scrolling for keyboard navigation */
@@ -362,7 +372,7 @@
     scroll-behavior: smooth;
   }
 
-  /* Standard focus for all interactive elements in TV mode */
+  /* Standard focus for all interactive elements in TV mode - 3px border */
   .tv-mode button:focus,
   .tv-mode button:focus-visible,
   .tv-mode a:focus,
@@ -374,23 +384,23 @@
   .tv-mode select:focus,
   .tv-mode select:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: 4px;
-    box-shadow: 0 0 25px hsl(var(--tv-focus-ring) / 0.6);
+    outline-offset: 2px;
+    box-shadow: 0 0 14px hsl(var(--tv-focus-ring) / 0.5);
   }
 
-  /* Hero buttons focus in TV mode - scale up */
+  /* Hero buttons focus in TV mode - subtle scale */
   .tv-mode main button:focus,
   .tv-mode main button:focus-visible {
-    transform: scale(1.05);
+    transform: scale(1.02);
   }
 
-  /* TV mode larger buttons - minimum 80x80 targets */
+  /* TV mode dense buttons - normalized sizing (40-50% smaller) */
   .tv-mode .tv-button {
     min-height: var(--tv-min-target);
     min-width: var(--tv-min-target);
-    font-size: 1.25rem;
-    padding: 1.25rem 2.5rem;
-    box-shadow: var(--shadow-md);
+    font-size: 0.875rem;
+    padding: 0.625rem 1.25rem;
+    box-shadow: var(--shadow-sm);
   }
 
   .tv-mode .tv-button-icon {
@@ -398,26 +408,26 @@
     min-width: var(--tv-min-target);
   }
 
-  /* TV mode sidebar items */
+  /* TV mode sidebar items - dense layout */
   .tv-mode .tv-nav-item {
-    padding: 1.25rem 1.5rem;
-    font-size: 1.25rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
     min-height: var(--tv-min-target);
   }
 
-  /* TV mode text scaling for 22px base */
+  /* TV mode text scaling - normalized */
   .tv-mode .tv-title {
-    font-size: 3.5rem;
-    line-height: 1.1;
+    font-size: 2.25rem;
+    line-height: 1.15;
   }
 
   .tv-mode .tv-subtitle {
-    font-size: 1.5rem;
+    font-size: 1rem;
     line-height: 1.4;
   }
 
   .tv-mode .tv-row-title {
-    font-size: 1.5rem;
+    font-size: 1.125rem;
   }
 
   /* TV mode scrollbar hidden but scrollable */
@@ -429,14 +439,34 @@
   .tv-mode .tv-row {
     display: flex;
     flex-direction: row;
-    gap: 1.5rem;
+    gap: 1rem;
     overflow-x: auto;
   }
 
   .tv-mode .tv-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  /* Landscape-specific TV grid adjustments */
+  @media (orientation: landscape) and (min-width: 1280px) {
+    .tv-mode .tv-row {
+      gap: 0.875rem;
+    }
+
+    .tv-mode .tv-title {
+      font-size: 2rem;
+    }
+
+    .tv-mode .tv-subtitle {
+      font-size: 0.9375rem;
+    }
+
+    .tv-mode .tv-button {
+      font-size: 0.8125rem;
+      padding: 0.5rem 1rem;
+    }
   }
 
   /* Text shadow for readability over images */

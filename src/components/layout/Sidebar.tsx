@@ -168,10 +168,10 @@ export function Sidebar({
           to={path}
           onClick={handleNavClick}
           className={cn(
-            "flex-1 flex items-center gap-3 rounded-lg text-sm font-medium transition-all",
-            // TV Mode: larger touch targets (min 80px height)
+            "flex-1 flex items-center gap-2 rounded-lg text-sm font-medium transition-all",
+            // TV Mode: dense touch targets (44-48px height)
             isTVMode 
-              ? "px-5 py-5 min-h-[80px] text-lg" 
+              ? "px-3 py-2.5 min-h-[44px] text-sm" 
               : "px-4 py-3",
             collapsed && !mobileOpen ? "justify-center px-2" : "",
             isActive(path)
@@ -181,7 +181,7 @@ export function Sidebar({
         >
           <Icon className={cn(
             "flex-shrink-0",
-            isTVMode ? "w-7 h-7" : "w-5 h-5"
+            isTVMode ? "w-5 h-5" : "w-5 h-5"
           )} />
           {(!collapsed || mobileOpen) && <span>{label}</span>}
         </Link>
@@ -235,7 +235,7 @@ export function Sidebar({
               onClick={handleNavClick}
               className={cn(
                 "flex items-center justify-center rounded-lg text-sm font-medium transition-all",
-                isTVMode ? "px-3 py-5 min-h-[80px]" : "px-2 py-3",
+                isTVMode ? "px-2 py-2.5 min-h-[44px]" : "px-2 py-3",
                 isActive(path)
                   ? "sidebar-active"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -243,7 +243,7 @@ export function Sidebar({
             >
               <Icon className={cn(
                 "flex-shrink-0",
-                isTVMode ? "w-7 h-7" : "w-5 h-5"
+                isTVMode ? "w-5 h-5" : "w-5 h-5"
               )} />
             </Link>
           </TooltipTrigger>
@@ -271,14 +271,14 @@ export function Sidebar({
         onKeyDown={handleSidebarKeyDown}
         className={cn(
           "fixed left-0 top-0 z-50 h-screen border-r border-border flex flex-col transition-all duration-300 overflow-hidden",
-          // Desktop sizing - wider in TV mode
+          // Desktop sizing - reduced width in TV mode (~240px vs original ~288px)
           isTVMode 
-            ? (collapsed ? "w-20" : "w-72")
+            ? (collapsed ? "w-14" : "w-60")
             : (collapsed ? "w-16" : "w-64"),
           // Mobile: hidden by default, shown when mobileOpen
           "max-md:-translate-x-full",
           mobileOpen && "max-md:translate-x-0 max-md:w-64",
-          isTVMode && mobileOpen && "max-md:w-72"
+          isTVMode && mobileOpen && "max-md:w-60"
         )}
       >
         {/* Space Background with Fade */}
@@ -357,10 +357,10 @@ export function Sidebar({
         {/* Navigation */}
         <ScrollArea className={cn(
           "relative z-10 flex-1 px-2 py-2",
-          isTVMode && "px-3 py-3"
+          isTVMode && "px-2 py-1.5"
         )}>
           <nav>
-            <ul className={cn("space-y-1", isTVMode && "space-y-2")}>
+            <ul className={cn("space-y-1", isTVMode && "space-y-0.5")}>
               {navItems.map((item, index) => (
                 <li key={item.path}>
                   <NavItem {...item} index={index} />
@@ -373,7 +373,7 @@ export function Sidebar({
         {/* Bottom Actions */}
         <div className={cn(
           "relative z-10 p-2 border-t border-border/50 space-y-1",
-          isTVMode && "p-3 space-y-2"
+          isTVMode && "p-2 space-y-0.5"
         )}>
           {/* Real-Debrid Status Indicator */}
           {collapsed && !mobileOpen ? (
@@ -384,17 +384,17 @@ export function Sidebar({
                   disabled={rdStatus === "loading"}
                   className={cn(
                     "flex items-center justify-center rounded-lg text-sm transition-colors hover:bg-secondary/50",
-                    isTVMode ? "px-3 py-5 min-h-[80px]" : "px-2 py-2",
+                    isTVMode ? "px-2 py-2.5 min-h-[44px]" : "px-2 py-2",
                     rdStatus === "connected" && "text-green-500",
                     rdStatus === "disconnected" && "text-yellow-500",
                     rdStatus === "error" && "text-destructive",
                     rdStatus === "loading" && "text-muted-foreground"
                   )}
                 >
-                  {rdStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
-                  {rdStatus === "connected" && <Cloud className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
-                  {rdStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
-                  {rdStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
+                  {rdStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {rdStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {rdStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {rdStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
@@ -409,19 +409,19 @@ export function Sidebar({
               onClick={refreshRdStatus}
               disabled={rdStatus === "loading"}
               className={cn(
-                "w-full flex items-center justify-between gap-3 rounded-lg font-medium transition-colors",
-                isTVMode ? "px-5 py-4 min-h-[70px] text-base" : "px-4 py-2 text-xs",
+                "w-full flex items-center justify-between gap-2 rounded-lg font-medium transition-colors",
+                isTVMode ? "px-3 py-2 min-h-[40px] text-xs" : "px-4 py-2 text-xs",
                 rdStatus === "connected" && "text-green-500 bg-green-500/10 hover:bg-green-500/20",
                 rdStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20",
                 rdStatus === "error" && "text-destructive bg-destructive/10 hover:bg-destructive/20",
                 rdStatus === "loading" && "text-muted-foreground bg-secondary/50"
               )}
             >
-              <div className="flex items-center gap-3">
-                {rdStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
-                {rdStatus === "connected" && <Cloud className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
-                {rdStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
-                {rdStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />}
+              <div className="flex items-center gap-2">
+                {rdStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {rdStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {rdStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {rdStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
                 <span>
                   {rdStatus === "loading" && "Checking RD..."}
                   {rdStatus === "connected" && `RD: ${rdUser?.username || "Connected"}`}
@@ -430,7 +430,7 @@ export function Sidebar({
                 </span>
               </div>
               {rdStatus !== "loading" && (
-                <span className={cn("opacity-60", isTVMode ? "text-sm" : "text-[10px]")}>Refresh</span>
+                <span className={cn("opacity-60", isTVMode ? "text-[10px]" : "text-[10px]")}>Refresh</span>
               )}
             </button>
           )}
@@ -444,13 +444,13 @@ export function Sidebar({
                   onClick={handleNavClick}
                   className={cn(
                     "flex items-center justify-center rounded-lg text-sm font-medium transition-all",
-                    isTVMode ? "px-3 py-5 min-h-[80px]" : "px-2 py-3",
+                    isTVMode ? "px-2 py-2.5 min-h-[44px]" : "px-2 py-3",
                     isActive("/settings")
                       ? "sidebar-active"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
-                  <Settings className={cn("flex-shrink-0", isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+                  <Settings className={cn("flex-shrink-0", isTVMode ? "w-5 h-5" : "w-5 h-5")} />
                 </Link>
               </TooltipTrigger>
               <TooltipContent side="right">Settings</TooltipContent>
@@ -460,14 +460,14 @@ export function Sidebar({
               to="/settings"
               onClick={handleNavClick}
               className={cn(
-                "flex items-center gap-3 rounded-lg font-medium transition-all",
-                isTVMode ? "px-5 py-5 min-h-[80px] text-lg" : "px-4 py-3 text-sm",
+                "flex items-center gap-2 rounded-lg font-medium transition-all",
+                isTVMode ? "px-3 py-2.5 min-h-[44px] text-sm" : "px-4 py-3 text-sm",
                 isActive("/settings")
                   ? "sidebar-active"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               )}
             >
-              <Settings className={cn("flex-shrink-0", isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+              <Settings className={cn("flex-shrink-0", isTVMode ? "w-5 h-5" : "w-5 h-5")} />
               <span>Settings</span>
             </Link>
           )}
@@ -479,10 +479,10 @@ export function Sidebar({
                   onClick={signOut}
                   className={cn(
                     "w-full flex items-center justify-center rounded-lg font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all",
-                    isTVMode ? "px-3 py-5 min-h-[80px] text-lg" : "px-2 py-3 text-sm"
+                    isTVMode ? "px-2 py-2.5 min-h-[44px] text-sm" : "px-2 py-3 text-sm"
                   )}
                 >
-                  <LogOut className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+                  <LogOut className={cn(isTVMode ? "w-5 h-5" : "w-5 h-5")} />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">Sign Out</TooltipContent>
@@ -491,11 +491,11 @@ export function Sidebar({
             <button
               onClick={signOut}
               className={cn(
-                "w-full flex items-center gap-3 rounded-lg font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all",
-                isTVMode ? "px-5 py-5 min-h-[80px] text-lg" : "px-4 py-3 text-sm"
+                "w-full flex items-center gap-2 rounded-lg font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all",
+                isTVMode ? "px-3 py-2.5 min-h-[44px] text-sm" : "px-4 py-3 text-sm"
               )}
             >
-              <LogOut className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+              <LogOut className={cn(isTVMode ? "w-5 h-5" : "w-5 h-5")} />
               Sign Out
             </button>
           )}

@@ -21,10 +21,10 @@ const buttonVariants = cva(
         sm: "h-9 rounded-md px-3 [&_svg]:size-4",
         lg: "h-11 rounded-md px-8 [&_svg]:size-5",
         icon: "h-10 w-10 [&_svg]:size-4",
-        // TV-optimized sizes for 10-foot UI (minimum 80x80px targets)
-        tv: "h-20 min-w-20 px-8 py-4 text-xl [&_svg]:size-7",
-        "tv-icon": "h-20 w-20 [&_svg]:size-8",
-        "tv-lg": "h-24 min-w-24 px-10 py-5 text-2xl [&_svg]:size-9",
+        // TV-optimized sizes - dense layout (reduced ~40-50% from original)
+        tv: "h-11 min-w-11 px-4 py-2 text-sm [&_svg]:size-5",
+        "tv-icon": "h-11 w-11 [&_svg]:size-5",
+        "tv-lg": "h-12 min-w-12 px-5 py-2.5 text-base [&_svg]:size-6",
       },
     },
     defaultVariants: {
