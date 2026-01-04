@@ -137,10 +137,10 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label htmlFor="tv-mode" className={cn("font-medium", isTVMode && "text-lg")}>
+              <Label htmlFor="tv-mode" className={cn("font-medium", isTVMode && "text-sm")}>
                 Enable TV Mode
               </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-sm")}>
                 Larger text, buttons, and better focus states for remote navigation
               </p>
             </div>
@@ -148,7 +148,6 @@ export default function SettingsPage() {
               id="tv-mode"
               checked={isTVMode}
               onCheckedChange={handleTVModeChange}
-              className={isTVMode ? "scale-125" : ""}
             />
           </div>
           
@@ -316,10 +315,10 @@ export default function SettingsPage() {
           {/* Auto Quality Downgrade */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label htmlFor="auto-quality" className={cn("font-medium", isTVMode && "text-lg")}>
+              <Label htmlFor="auto-quality" className={cn("font-medium", isTVMode && "text-sm")}>
                 Auto quality adjustment
               </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-sm")}>
                 Automatically switch to lower quality on slow connections
               </p>
             </div>
@@ -327,7 +326,6 @@ export default function SettingsPage() {
               id="auto-quality"
               checked={playbackSettings.autoQualityDowngrade}
               onCheckedChange={(checked) => updatePlaybackSetting('autoQualityDowngrade', checked)}
-              className={isTVMode ? "scale-125" : ""}
             />
           </div>
 

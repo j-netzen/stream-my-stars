@@ -646,10 +646,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       {/* Buffering indicator with health status */}
       {isBuffering && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           {settings.isSlowConnection && (
-            <p className="text-white/80 text-sm mt-4 flex items-center gap-2">
-              <WifiOff className="w-4 h-4" />
+            <p className="text-white/80 text-xs mt-2 flex items-center gap-1">
+              <WifiOff className="w-3 h-3" />
               Slow connection detected
             </p>
           )}
@@ -704,10 +704,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           <Button
             variant="ghost"
             size="icon"
-            className="w-24 h-24 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto"
+            className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 text-white pointer-events-auto"
             onClick={handlePlayPause}
           >
-            <Play className="h-12 w-12 ml-1" />
+            <Play className="h-6 w-6 ml-0.5" />
           </Button>
         </div>
       )}
@@ -783,7 +783,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 onClick={handlePlayPause}
                 style={{ pointerEvents: 'auto' }}
               >
-                {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
 
               <Button
