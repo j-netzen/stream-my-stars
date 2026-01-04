@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -21,10 +21,10 @@ const buttonVariants = cva(
         sm: "h-9 rounded-md px-3 [&_svg]:size-4",
         lg: "h-11 rounded-md px-8 [&_svg]:size-5",
         icon: "h-10 w-10 [&_svg]:size-4",
-        // TV-optimized sizes for 10-foot UI
-        tv: "h-14 px-8 py-4 text-lg [&_svg]:size-6",
-        "tv-icon": "h-14 w-14 [&_svg]:size-6",
-        "tv-lg": "h-16 px-10 py-5 text-xl [&_svg]:size-7",
+        // TV-optimized sizes for 10-foot UI (minimum 80x80px targets)
+        tv: "h-20 min-w-20 px-8 py-4 text-xl [&_svg]:size-7",
+        "tv-icon": "h-20 w-20 [&_svg]:size-8",
+        "tv-lg": "h-24 min-w-24 px-10 py-5 text-2xl [&_svg]:size-9",
       },
     },
     defaultVariants: {

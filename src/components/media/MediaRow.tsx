@@ -76,43 +76,51 @@ export function MediaRow({
   if (media.length === 0) return null;
 
   return (
-    <div className={cn("space-y-3", isTVMode ? "space-y-4" : "landscape:space-y-2")}>
+    <div className={cn("space-y-3", isTVMode ? "space-y-6" : "landscape:space-y-2")}>
+      {/* Row header - flexbox layout */}
       <div className={cn(
         "flex items-center justify-between",
-        isTVMode ? "px-8" : "px-4 md:px-6"
+        isTVMode ? "px-12" : "px-4 md:px-6"
       )}>
         <h2 className={cn(
           "font-semibold",
-          isTVMode ? "tv-row-title text-xl" : "text-lg landscape:text-base"
+          isTVMode ? "tv-row-title text-2xl" : "text-lg landscape:text-base"
         )}>
           {title}
         </h2>
-        <div className={cn("flex", isTVMode ? "gap-3" : "gap-2")}>
+        <div className={cn("flex", isTVMode ? "gap-4" : "gap-2")}>
           <Button
             variant="ghost"
-            size={isTVMode ? "default" : "icon"}
+            size={isTVMode ? "tv-icon" : "icon"}
             onClick={() => scroll("left")}
-            className={cn(isTVMode ? "tv-button-icon h-12 w-12" : "h-8 w-8")}
+            className={cn(
+              isTVMode ? "h-20 w-20" : "h-8 w-8",
+              "tv-inline-link" // Exception for min-size in TV mode
+            )}
           >
-            <ChevronLeft className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />
+            <ChevronLeft className={cn(isTVMode ? "w-8 h-8" : "w-4 h-4")} />
           </Button>
           <Button
             variant="ghost"
-            size={isTVMode ? "default" : "icon"}
+            size={isTVMode ? "tv-icon" : "icon"}
             onClick={() => scroll("right")}
-            className={cn(isTVMode ? "tv-button-icon h-12 w-12" : "h-8 w-8")}
+            className={cn(
+              isTVMode ? "h-20 w-20" : "h-8 w-8",
+              "tv-inline-link" // Exception for min-size in TV mode
+            )}
           >
-            <ChevronRight className={cn(isTVMode ? "w-6 h-6" : "w-4 h-4")} />
+            <ChevronRight className={cn(isTVMode ? "w-8 h-8" : "w-4 h-4")} />
           </Button>
         </div>
       </div>
 
+      {/* Horizontal scrolling row - uses flexbox (no floats) */}
       <div
         ref={scrollRef}
         className={cn(
-          "flex overflow-x-auto scrollbar-hide snap-x snap-mandatory",
+          "flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory",
           isTVMode 
-            ? "gap-5 px-8 pb-4" 
+            ? "gap-6 px-12 pb-6" 
             : "gap-3 md:gap-4 px-4 md:px-6 pb-3 landscape:gap-4 landscape:pb-2"
         )}
       >

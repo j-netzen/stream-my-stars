@@ -54,7 +54,11 @@ export function MainLayout({ children }: MainLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={cn(
+      "min-h-screen bg-background",
+      // TV Mode: Apply 5% overscan safe zone
+      isTVMode && "tv-safe-zone"
+    )}>
       <Sidebar
         onAddMedia={() => setIsAddMediaOpen(true)}
         collapsed={sidebarCollapsed}
@@ -65,7 +69,10 @@ export function MainLayout({ children }: MainLayoutProps) {
       
       {/* Top bar with mobile menu trigger and theme toggle - respects safe area */}
       <div 
-        className="fixed right-0 left-0 md:left-auto z-30 flex items-center justify-between md:justify-end px-4 h-14 bg-background/80 backdrop-blur-sm border-b md:border-0 fixed-safe-top safe-x"
+        className={cn(
+          "fixed right-0 left-0 md:left-auto z-30 flex items-center justify-between md:justify-end px-4 h-14 bg-background/80 backdrop-blur-sm border-b md:border-0 fixed-safe-top safe-x",
+          isTVMode && "h-20" // Larger header in TV mode
+        )}
         style={{ top: 'var(--safe-area-inset-top, 0px)' }}
       >
         <MobileMenuTrigger onClick={() => setMobileMenuOpen(true)} />
@@ -78,11 +85,17 @@ export function MainLayout({ children }: MainLayoutProps) {
           "min-h-screen transition-all duration-300 safe-bottom",
           // Desktop: offset by sidebar width
           sidebarCollapsed ? "md:ml-16" : "md:ml-64",
+          // TV Mode: wider sidebar offset
+          isTVMode && (sidebarCollapsed ? "md:ml-20" : "md:ml-72"),
           // Mobile: no offset, add top padding for menu button + safe area
-          "ml-0 pt-16 md:pt-0"
+          "ml-0 pt-16 md:pt-0",
+          // TV Mode: extra padding for overscan
+          isTVMode && "pt-24 md:pt-0"
         )}
         style={{ 
-          paddingTop: 'calc(4rem + var(--safe-area-inset-top, 0px))',
+          paddingTop: isTVMode 
+            ? 'calc(6rem + var(--safe-area-inset-top, 0px))'
+            : 'calc(4rem + var(--safe-area-inset-top, 0px))',
         }}
       >
         {children}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useTVMode } from "./useTVMode";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface FocusableSection {
   id: string;
@@ -8,12 +9,18 @@ interface FocusableSection {
 }
 
 /**
- * Enhanced TV navigation hook that provides comprehensive 
- * directional navigation for TV remotes
+ * Enhanced TV navigation hook for Android TV (10-foot experience)
+ * Provides:
+ * - Spatial D-pad navigation (arrow keys)
+ * - Enter key triggers click on focused elements
+ * - Back button (Escape/Backspace) navigates back or closes modals
+ * - Focus management with visible focus rings
  */
 export function useTVNavigation() {
   const { isTVMode } = useTVMode();
   const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Get all focusable elements in a container
   const getFocusableElements = useCallback((container?: HTMLElement | null): HTMLElement[] => {
@@ -107,6 +114,40 @@ export function useTVNavigation() {
     return candidates[0]?.element || null;
   }, []);
 
+  // Close any open dialog
+  const closeDialog = useCallback((): boolean => {
+    // Check for Radix dialogs
+    const dialogOverlay = document.querySelector('[data-radix-dialog-overlay]');
+    if (dialogOverlay) {
+      const closeButton = document.querySelector<HTMLElement>(
+        '[data-radix-dialog-content] [data-close], ' +
+        '[data-radix-dialog-content] button[aria-label="Close"], ' +
+        '[data-radix-dialog-content] button:has(.lucide-x)'
+      );
+      if (closeButton) {
+        closeButton.click();
+        return true;
+      }
+      // Try pressing escape on the overlay
+      dialogOverlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return true;
+    }
+
+    // Check for role="dialog" elements
+    const dialog = document.querySelector('[role="dialog"]');
+    if (dialog) {
+      const closeButton = dialog.querySelector<HTMLElement>(
+        '[data-close], [aria-label="Close"], button:has(.lucide-x)'
+      );
+      if (closeButton) {
+        closeButton.click();
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
+
   // Main navigation handler
   const handleNavigation = useCallback((e: KeyboardEvent) => {
     if (!isTVMode) return;
@@ -161,17 +202,59 @@ export function useTVNavigation() {
       }
       
       // Only allow Escape to close the popup, let the component handle arrow keys
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' && e.key !== 'Backspace') return;
     }
 
-    // Don't handle if in an input
     const activeElement = document.activeElement as HTMLElement;
-    if (
+    
+    // Check if we're in an input field
+    const isInInput = 
       activeElement instanceof HTMLInputElement ||
       activeElement instanceof HTMLTextAreaElement ||
-      activeElement instanceof HTMLSelectElement
-    ) {
-      // Allow Enter/Escape in inputs
+      activeElement instanceof HTMLSelectElement;
+
+    // Handle Back button (keyCode 8 = Backspace, keyCode 27 = Escape)
+    // These should navigate back or close modals
+    if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 8 || e.keyCode === 27) {
+      // Don't intercept Backspace in input fields
+      if (e.key === 'Backspace' && isInInput) return;
+      
+      e.preventDefault();
+      
+      // First try to close any open dialogs/modals
+      if (closeDialog()) {
+        return;
+      }
+
+      // Check for open popover/dropdown and close it
+      if (openRadixContent) {
+        const closeEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+        openRadixContent.dispatchEvent(closeEvent);
+        return;
+      }
+
+      // Focus sidebar if in main content
+      const sidebar = document.querySelector('[data-sidebar="true"]');
+      const isInSidebar = sidebar?.contains(activeElement);
+      
+      if (!isInSidebar && sidebar) {
+        const activeNavLink = sidebar.querySelector<HTMLElement>('a.sidebar-active') ||
+                             sidebar.querySelector<HTMLElement>('a[href]');
+        if (activeNavLink) {
+          activeNavLink.focus();
+          return;
+        }
+      }
+
+      // Navigate back in history
+      if (location.pathname !== '/') {
+        navigate(-1);
+      }
+      return;
+    }
+
+    // Don't handle arrow keys in inputs
+    if (isInInput) {
       if (e.key !== 'Enter' && e.key !== 'Escape') return;
     }
 
@@ -207,58 +290,31 @@ export function useTVNavigation() {
       }
     }
 
-    // Enter key to activate
-    if (e.key === 'Enter' || e.key === ' ') {
+    // Enter key (keyCode 13) triggers click on focused element
+    if (e.key === 'Enter' || e.keyCode === 13) {
       if (activeElement && activeElement.click) {
-        // Let the element handle it naturally for buttons/links
-        // Only manually click for tabindex elements
-        if (activeElement.getAttribute('tabindex') === '0' && 
-            !(activeElement instanceof HTMLButtonElement) &&
-            !(activeElement instanceof HTMLAnchorElement)) {
+        // For tabindex elements that aren't naturally clickable, manually trigger click
+        const isNativeClickable = 
+          activeElement instanceof HTMLButtonElement ||
+          activeElement instanceof HTMLAnchorElement ||
+          activeElement instanceof HTMLInputElement;
+        
+        if (!isNativeClickable && activeElement.getAttribute('tabindex') === '0') {
           e.preventDefault();
           activeElement.click();
         }
+        // Native elements handle Enter naturally - let them do their thing
       }
     }
 
-    // Escape to go back or close dialogs
-    if (e.key === 'Escape') {
-      // Check for open dialogs first
-      const dialog = document.querySelector('[role="dialog"]');
-      if (dialog) {
-        // Find close button in dialog
-        const closeButton = dialog.querySelector<HTMLElement>('[data-close], [aria-label="Close"], button:has(.lucide-x)');
-        if (closeButton) {
-          e.preventDefault();
-          closeButton.click();
-          return;
-        }
-      }
-
-      // Focus sidebar if in main content
-      const sidebar = document.querySelector('[data-sidebar="true"]');
-      const isInSidebar = sidebar?.contains(activeElement);
-      
-      if (!isInSidebar && sidebar) {
-        const activeNavLink = sidebar.querySelector<HTMLElement>('a.sidebar-active') ||
-                             sidebar.querySelector<HTMLElement>('a[href]');
-        if (activeNavLink) {
-          e.preventDefault();
-          activeNavLink.focus();
-        }
-      }
-    }
-
-    // Back button (common on TV remotes, mapped to Backspace)
-    if (e.key === 'Backspace') {
-      // Navigate back if not in input
-      if (!(activeElement instanceof HTMLInputElement) &&
-          !(activeElement instanceof HTMLTextAreaElement)) {
+    // Space key also activates (common for buttons)
+    if (e.key === ' ' && !isInInput) {
+      if (activeElement && activeElement.getAttribute('tabindex') === '0') {
         e.preventDefault();
-        window.history.back();
+        activeElement.click();
       }
     }
-  }, [isTVMode, getFocusableElements, findNearestInDirection]);
+  }, [isTVMode, getFocusableElements, findNearestInDirection, closeDialog, navigate, location.pathname]);
 
   // Set up global listener
   useEffect(() => {

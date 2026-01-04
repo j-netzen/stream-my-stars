@@ -56,9 +56,9 @@ export function MediaCard({
   return (
     <div 
       className={cn(
-        "media-card group cosmic-border rounded-lg transition-all duration-300",
-        "hover:shadow-star-glow hover:scale-[1.02]",
-        isTVMode && "hover:scale-105"
+        "media-card group cosmic-border rounded-lg transition-all duration-200",
+        "hover:shadow-star-glow",
+        isTVMode ? "hover:scale-105 focus-within:scale-108" : "hover:scale-[1.02]"
       )}
       tabIndex={0}
       role="button"
@@ -68,8 +68,8 @@ export function MediaCard({
       {/* Poster */}
       <div className={cn(
         "relative bg-secondary rounded-lg overflow-hidden shadow-star-md",
-        "transition-shadow duration-300 group-hover:shadow-star-lg",
-        isTVMode ? "aspect-[2/3]" : "aspect-[2/3]"
+        "transition-shadow duration-200 group-hover:shadow-star-lg",
+        "aspect-[2/3]"
       )}>
         {posterUrl ? (
           <img
@@ -80,36 +80,40 @@ export function MediaCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <Play className={cn("w-12 h-12", isTVMode && "w-16 h-16")} />
+            <Play className={cn("w-12 h-12", isTVMode && "w-20 h-20")} />
           </div>
         )}
 
         {/* Hover/Focus Overlay - always visible on TV for focused items */}
         <div className={cn(
-          "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4 transition-opacity duration-300",
+          "absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end transition-opacity duration-200",
           isTVMode 
             ? "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 p-6" 
-            : "opacity-0 group-hover:opacity-100"
+            : "opacity-0 group-hover:opacity-100 p-4"
         )}>
-          <div className={cn("flex gap-2", isTVMode && "gap-3")}>
+          {/* Button container - flexbox layout */}
+          <div className={cn("flex flex-row gap-2", isTVMode && "gap-4")}>
             <Button
               onClick={() => onPlay?.(media)}
-              className={cn("flex-1 gap-2", isTVMode && "tv-button")}
+              className={cn(
+                "flex-1 gap-2",
+                isTVMode && "h-16 text-lg"
+              )}
               size={isTVMode ? "lg" : "sm"}
               tabIndex={-1}
             >
-              <Play className={cn("w-4 h-4", isTVMode && "w-6 h-6")} />
+              <Play className={cn("w-4 h-4", isTVMode && "w-7 h-7")} />
               {showContinue && progress && progressPercent > 0 ? "Continue" : "Play"}
             </Button>
             <Button
               onClick={() => onMoreInfo?.(media)}
               variant="secondary"
               size={isTVMode ? "lg" : "sm"}
-              className={isTVMode ? "tv-button" : ""}
+              className={cn(isTVMode && "h-16 w-16")}
               title="More Info"
               tabIndex={-1}
             >
-              <Info className={cn("w-4 h-4", isTVMode && "w-6 h-6")} />
+              <Info className={cn("w-4 h-4", isTVMode && "w-7 h-7")} />
             </Button>
           </div>
         </div>
@@ -158,17 +162,20 @@ export function MediaCard({
 
       </div>
 
-      {/* Info */}
-      <div className={cn("p-3 bg-card/80 backdrop-blur-sm", isTVMode && "p-4")}>
+      {/* Info - flexbox layout */}
+      <div className={cn(
+        "flex flex-col p-3 bg-card/80 backdrop-blur-sm", 
+        isTVMode && "p-5"
+      )}>
         <h3 className={cn(
           "font-medium line-clamp-1 group-hover:text-primary transition-colors",
-          isTVMode ? "text-lg" : "text-sm"
+          isTVMode ? "text-xl" : "text-sm"
         )}>
           {media.title}
         </h3>
         <p className={cn(
           "text-muted-foreground mt-1",
-          isTVMode ? "text-base" : "text-xs"
+          isTVMode ? "text-lg" : "text-xs"
         )}>
           {media.release_date?.split("-")[0] || "Unknown year"}
           {media.rating && (

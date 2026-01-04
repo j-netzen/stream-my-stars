@@ -132,14 +132,38 @@
     --tv-focus-ring: 265 85% 70%;
   }
 
-  /* TV Mode - larger everything for 10-foot UI */
+  /* TV Mode - Leanback 10-foot UI for Android TV
+     Base font: 22px, min touch targets: 80x80px, 5% overscan margins */
   .tv-mode {
     --tv-card-width: 18rem;
-    --tv-focus-ring-width: 6px;
-    font-size: 18px;
+    --tv-focus-ring-width: 4px;
+    --tv-overscan: 5%;
+    --tv-min-target: 80px;
+    font-size: 22px;
     --card-width-lg: 14rem;
     --card-width-xl: 16rem;
     --card-width-2xl: 18rem;
+  }
+
+  /* TV Mode overscan safe zone - 5% margin for TV bezels */
+  .tv-mode body {
+    padding: var(--tv-overscan);
+    box-sizing: border-box;
+  }
+
+  /* Ensure all interactive elements meet minimum 80x80px target */
+  .tv-mode button,
+  .tv-mode a,
+  .tv-mode [role="button"],
+  .tv-mode [tabindex="0"] {
+    min-height: var(--tv-min-target);
+    min-width: var(--tv-min-target);
+  }
+
+  /* Exception for inline text links and icon-only elements */
+  .tv-mode .tv-inline-link {
+    min-height: auto;
+    min-width: auto;
   }
 
   /* Landscape mode optimizations */
@@ -264,20 +288,25 @@
     box-shadow: 0 0 0 3px hsl(var(--star-purple) / 0.2), var(--shadow-sm);
   }
 
-  /* TV Mode focus styles - high visibility for remote navigation */
+  /* TV Mode focus styles - high visibility for remote navigation
+     Using 4px solid outline + 1.05x scale transform per requirements */
   .tv-mode *:focus {
     outline: none;
   }
 
   .tv-mode *:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: 3px;
+    outline-offset: 4px;
     border-radius: var(--radius);
     box-shadow: 0 0 30px hsl(var(--tv-focus-ring) / 0.6);
-    animation: tv-focus-pulse 2s ease-in-out infinite;
+    transform: scale(1.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, outline 0.1s ease;
+    z-index: 10;
+    position: relative;
   }
 
-  @keyframes tv-focus-pulse {
+  /* Disable animation for less visual noise */
+  @keyframes tv-focus-glow {
     0%, 100% {
       box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
     }
@@ -286,21 +315,22 @@
     }
   }
 
+  /* Media cards get larger scale on focus */
   .tv-mode .media-card {
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
     box-shadow: var(--shadow-md);
+    will-change: transform;
   }
 
   .tv-mode .media-card:focus,
   .tv-mode .media-card:focus-visible,
   .tv-mode .media-card:focus-within {
-    transform: scale(1.1);
+    transform: scale(1.08);
     z-index: 20;
     box-shadow: 0 0 0 var(--tv-focus-ring-width) hsl(var(--tv-focus-ring)), 
                 0 0 40px hsl(var(--tv-focus-ring) / 0.7),
                 var(--shadow-xl);
     outline: none;
-    animation: tv-focus-pulse 2s ease-in-out infinite;
   }
 
   .tv-mode .media-card:focus-within .group-hover\:opacity-100,
@@ -308,7 +338,14 @@
     opacity: 1;
   }
 
-  /* TV mode sidebar navigation */
+  /* TV mode sidebar navigation - larger touch targets */
+  .tv-mode [data-sidebar="true"] a,
+  .tv-mode [data-sidebar="true"] button {
+    min-height: var(--tv-min-target);
+    display: flex;
+    align-items: center;
+  }
+
   .tv-mode [data-sidebar="true"] a:focus,
   .tv-mode [data-sidebar="true"] a:focus-visible,
   .tv-mode [data-sidebar="true"] button:focus,
@@ -317,6 +354,7 @@
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
     outline-offset: -2px;
     box-shadow: 0 0 20px hsl(var(--tv-focus-ring) / 0.5);
+    transform: scale(1.02);
   }
 
   /* Smooth scrolling for keyboard navigation */
@@ -324,47 +362,52 @@
     scroll-behavior: smooth;
   }
 
-  /* Better focus for all interactive elements in TV mode */
+  /* Standard focus for all interactive elements in TV mode */
   .tv-mode button:focus,
   .tv-mode button:focus-visible,
   .tv-mode a:focus,
   .tv-mode a:focus-visible,
   .tv-mode [tabindex="0"]:focus,
-  .tv-mode [tabindex="0"]:focus-visible {
+  .tv-mode [tabindex="0"]:focus-visible,
+  .tv-mode input:focus,
+  .tv-mode input:focus-visible,
+  .tv-mode select:focus,
+  .tv-mode select:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
-    outline-offset: 3px;
+    outline-offset: 4px;
     box-shadow: 0 0 25px hsl(var(--tv-focus-ring) / 0.6);
   }
 
-  /* Hero buttons focus in TV mode */
+  /* Hero buttons focus in TV mode - scale up */
   .tv-mode main button:focus,
   .tv-mode main button:focus-visible {
     transform: scale(1.05);
   }
 
-  /* TV mode larger buttons */
+  /* TV mode larger buttons - minimum 80x80 targets */
   .tv-mode .tv-button {
-    min-height: 3.5rem;
-    min-width: 3.5rem;
-    font-size: 1.125rem;
-    padding: 1rem 2rem;
+    min-height: var(--tv-min-target);
+    min-width: var(--tv-min-target);
+    font-size: 1.25rem;
+    padding: 1.25rem 2.5rem;
     box-shadow: var(--shadow-md);
   }
 
   .tv-mode .tv-button-icon {
-    min-height: 3.5rem;
-    min-width: 3.5rem;
+    min-height: var(--tv-min-target);
+    min-width: var(--tv-min-target);
   }
 
-  /* TV mode sidebar */
+  /* TV mode sidebar items */
   .tv-mode .tv-nav-item {
-    padding: 1rem 1.5rem;
-    font-size: 1.125rem;
+    padding: 1.25rem 1.5rem;
+    font-size: 1.25rem;
+    min-height: var(--tv-min-target);
   }
 
-  /* TV mode text scaling */
+  /* TV mode text scaling for 22px base */
   .tv-mode .tv-title {
-    font-size: 4rem;
+    font-size: 3.5rem;
     line-height: 1.1;
   }
 
@@ -380,6 +423,20 @@
   /* TV mode scrollbar hidden but scrollable */
   .tv-mode .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* TV mode - ensure flexbox layouts (no floats) */
+  .tv-mode .tv-row {
+    display: flex;
+    flex-direction: row;
+    gap: 1.5rem;
+    overflow-x: auto;
+  }
+
+  .tv-mode .tv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
   }
 
   /* Text shadow for readability over images */
