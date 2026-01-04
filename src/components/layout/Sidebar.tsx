@@ -329,16 +329,16 @@ export function Sidebar({
         </div>
 
         {/* Add Media Button */}
-        <div className="relative z-10 p-3">
+        <div className="relative z-10 p-2">
           {collapsed && !mobileOpen ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   onClick={onAddMedia}
                   className="w-full bg-primary hover:bg-primary/90"
-                  size="icon"
+                  size="sm"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3 h-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">Add Media</TooltipContent>
@@ -346,9 +346,10 @@ export function Sidebar({
           ) : (
             <Button
               onClick={onAddMedia}
-              className="w-full gap-2 bg-primary hover:bg-primary/90"
+              className="w-full gap-1.5 bg-primary hover:bg-primary/90"
+              size="sm"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3" />
               Add Media
             </Button>
           )}

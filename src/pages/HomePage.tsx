@@ -118,24 +118,24 @@ export default function HomePage() {
                 </p>
               )}
               {/* Button row - flexbox layout */}
-              <div className={cn("flex flex-row", isTVMode ? "gap-4 mt-2" : "gap-2 landscape:gap-3")}>
+              <div className={cn("flex flex-row", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
                 <Button
-                  size={isTVMode ? "tv-lg" : "lg"}
-                  className={cn("gap-3", isTVMode && "h-20 px-10 text-xl")}
+                  size={isTVMode ? "tv" : "lg"}
+                  className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
                   onClick={() => handlePlay(featured)}
                   tabIndex={0}
                 >
-                  <Play className={cn("fill-current", isTVMode ? "w-8 h-8" : "w-5 h-5")} />
+                  <Play className={cn("fill-current", isTVMode ? "w-4 h-4" : "w-5 h-5")} />
                   Play
                 </Button>
                 <Button 
-                  size={isTVMode ? "tv-lg" : "lg"}
+                  size={isTVMode ? "tv" : "lg"}
                   variant="secondary" 
-                  className={cn("gap-3", isTVMode && "h-20 px-10 text-xl")}
+                  className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
                   onClick={() => setDetailsMedia(featured)}
                   tabIndex={0}
                 >
-                  <Info className={cn(isTVMode ? "w-8 h-8" : "w-5 h-5")} />
+                  <Info className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
                   More Info
                 </Button>
               </div>
@@ -209,10 +209,10 @@ export default function HomePage() {
             isTVMode ? "py-32" : "py-20"
           )}>
             <div className={cn(
-              "bg-secondary rounded-full flex items-center justify-center mb-6",
-              isTVMode ? "w-32 h-32" : "w-24 h-24"
+              "bg-secondary rounded-full flex items-center justify-center mb-4",
+              isTVMode ? "w-16 h-16" : "w-24 h-24"
             )}>
-              <Play className={cn("text-muted-foreground", isTVMode ? "w-16 h-16" : "w-12 h-12")} />
+              <Play className={cn("text-muted-foreground", isTVMode ? "w-8 h-8" : "w-12 h-12")} />
             </div>
             <h2 className={cn("font-semibold mb-2", isTVMode ? "text-4xl" : "text-2xl")}>
               Your library is empty
