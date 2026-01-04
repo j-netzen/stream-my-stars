@@ -76,7 +76,9 @@ export default function HomePage() {
       {featured && (
         <div className={cn(
           "relative overflow-hidden z-20",
-          isTVMode ? "h-[70vh] max-h-[600px]" : "h-[50vh] min-h-[320px] max-h-[500px] landscape:h-[60vh] landscape:max-h-[450px]"
+          isTVMode 
+            ? "h-[65vh] max-h-[700px] mx-[5%]" // Overscan safe margins in TV mode
+            : "h-[50vh] min-h-[320px] max-h-[500px] landscape:h-[60vh] landscape:max-h-[450px]"
         )}>
           {/* Background */}
           <div
@@ -92,44 +94,48 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
           </div>
 
-          {/* Content */}
+          {/* Content - flexbox layout */}
           <div className={cn(
-            "relative z-40 h-full flex items-end",
-            isTVMode ? "pb-16 px-12" : "pb-8 px-6 landscape:pb-6 landscape:px-8"
+            "relative z-40 h-full flex flex-col justify-end",
+            isTVMode ? "pb-20 px-16" : "pb-8 px-6 landscape:pb-6 landscape:px-8"
           )}>
-            <div className={cn("space-y-3", isTVMode ? "max-w-3xl space-y-4" : "max-w-xl landscape:max-w-2xl")}>
+            <div className={cn(
+              "flex flex-col space-y-3",
+              isTVMode ? "max-w-4xl space-y-5" : "max-w-xl landscape:max-w-2xl"
+            )}>
               <h1 className={cn(
                 "font-bold text-shadow",
-                isTVMode ? "tv-title text-5xl" : "text-3xl landscape:text-4xl"
+                isTVMode ? "text-5xl leading-tight" : "text-3xl landscape:text-4xl"
               )}>
                 {featured.title}
               </h1>
               {featured.overview && (
                 <p className={cn(
                   "text-white/80 text-shadow",
-                  isTVMode ? "tv-subtitle text-lg line-clamp-2" : "text-sm line-clamp-2 landscape:text-base landscape:line-clamp-2"
+                  isTVMode ? "text-2xl line-clamp-2" : "text-sm line-clamp-2 landscape:text-base landscape:line-clamp-2"
                 )}>
                   {featured.overview}
                 </p>
               )}
-              <div className={cn("flex", isTVMode ? "gap-3" : "gap-2 landscape:gap-3")}>
+              {/* Button row - flexbox layout */}
+              <div className={cn("flex flex-row", isTVMode ? "gap-4 mt-2" : "gap-2 landscape:gap-3")}>
                 <Button
                   size={isTVMode ? "tv-lg" : "lg"}
-                  className="gap-2"
+                  className={cn("gap-3", isTVMode && "h-20 px-10 text-xl")}
                   onClick={() => handlePlay(featured)}
                   tabIndex={0}
                 >
-                  <Play className={cn("fill-current", isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+                  <Play className={cn("fill-current", isTVMode ? "w-8 h-8" : "w-5 h-5")} />
                   Play
                 </Button>
                 <Button 
                   size={isTVMode ? "tv-lg" : "lg"}
                   variant="secondary" 
-                  className="gap-2"
+                  className={cn("gap-3", isTVMode && "h-20 px-10 text-xl")}
                   onClick={() => setDetailsMedia(featured)}
                   tabIndex={0}
                 >
-                  <Info className={cn(isTVMode ? "w-7 h-7" : "w-5 h-5")} />
+                  <Info className={cn(isTVMode ? "w-8 h-8" : "w-5 h-5")} />
                   More Info
                 </Button>
               </div>
@@ -138,10 +144,12 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Content Rows */}
+      {/* Content Rows - Leanback horizontal scrolling layout */}
       <div className={cn(
         "pb-12 relative z-30",
-        isTVMode ? "space-y-8 mt-4" : "space-y-6 mt-2 landscape:space-y-4 landscape:-mt-4"
+        isTVMode 
+          ? "space-y-10 mt-6 mx-[5%]" // TV overscan margins
+          : "space-y-6 mt-2 landscape:space-y-4 landscape:-mt-4"
       )}>
         {movies.length > 0 && (
           <MediaRow
