@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sidebar, MobileMenuTrigger } from "./Sidebar";
 import { AddMediaDialog } from "@/components/media/AddMediaDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
@@ -102,6 +103,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       </main>
       
       <AddMediaDialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen} />
+      <PWAInstallPrompt />
     </div>
   );
 }
