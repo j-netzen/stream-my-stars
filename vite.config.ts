@@ -15,38 +15,10 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["app-icon.png", "splash.png"],
-      manifest: {
-        name: "Stream My Stars",
-        short_name: "StreamStars",
-        description: "Your personal streaming media library",
-        theme_color: "#1a1025",
-        background_color: "#1a1025",
-        display: "standalone",
-        orientation: "any",
-        start_url: "/",
-        scope: "/",
-        icons: [
-          {
-            src: "/app-icon.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/app-icon.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-          {
-            src: "/app-icon.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-        ],
-      },
+      includeAssets: ["icon-192.png", "icon-512.png", "splash.png"],
+      manifest: false, // Use the static manifest.json in public folder
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff,woff2}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/i,
@@ -54,12 +26,31 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: "tmdb-images",
               expiration: {
-                maxEntries: 100,
+                maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "supabase-api",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 5, // 5 minutes
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },
         ],
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api/],
       },
     }),
   ].filter(Boolean),
