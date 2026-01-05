@@ -1,0 +1,107 @@
+{
+  "name": "Stream My Stars",
+  "short_name": "StreamStars",
+  "start_url": "/",
+  "id": "/?source=pwa",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#1a1025",
+  "background_color": "#0d0a12",
+  "description": "Your personal streaming media library. Organize movies, TV shows, and live TV in one beautiful interface.",
+  "dir": "ltr",
+  "lang": "en-US",
+  "categories": ["entertainment", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/app-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/splash.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Home screen showing media library"
+    },
+    {
+      "src": "/splash.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile view of media library"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/app-icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Movies",
+      "short_name": "Movies",
+      "url": "/movies",
+      "icons": [
+        {
+          "src": "/app-icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "TV Shows",
+      "short_name": "TV Shows",
+      "url": "/tv-shows",
+      "icons": [
+        {
+          "src": "/app-icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Live TV",
+      "short_name": "Live TV",
+      "url": "/live-tv",
+      "icons": [
+        {
+          "src": "/app-icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
