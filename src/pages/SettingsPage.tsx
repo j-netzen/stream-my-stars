@@ -356,29 +356,69 @@ export default function SettingsPage() {
             UI Scale
           </CardTitle>
           <CardDescription className={isTVMode ? "text-base" : ""}>
-            Adjust the overall interface size
+            Adjust the overall interface size for your viewing distance
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-3">
-            {(Object.keys(SCALE_PRESETS) as ScalePreset[]).map((preset) => (
-              <Button
-                key={preset}
-                variant={currentPreset === preset ? "default" : "outline"}
-                size={isTVMode ? "lg" : "default"}
-                onClick={() => handleScaleChange(preset)}
-                className={cn(
-                  "min-w-[100px]",
-                  currentPreset === preset && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                )}
-              >
-                {SCALE_PRESETS[preset].label} ({SCALE_PRESETS[preset].value}%)
-              </Button>
-            ))}
+        <CardContent className="space-y-6">
+          {/* Quick Presets */}
+          <div className="space-y-2">
+            <Label className={cn("font-medium", isTVMode && "text-base")}>Quick Presets</Label>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(SCALE_PRESETS) as ScalePreset[]).map((preset) => (
+                <Button
+                  key={preset}
+                  variant={currentPreset === preset ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleScaleChange(preset)}
+                  className={cn(
+                    currentPreset === preset && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                  )}
+                >
+                  {SCALE_PRESETS[preset].label}
+                </Button>
+              ))}
+            </div>
           </div>
-          <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-            Current scale: <span className="font-medium text-foreground">{uiScale}%</span>
-          </p>
+
+          {/* Fine-tune Slider */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className={cn("font-medium", isTVMode && "text-base")}>
+                Fine-tune Scale
+              </Label>
+              <span className={cn("font-mono font-medium", isTVMode ? "text-base" : "text-sm")}>
+                {uiScale}%
+              </span>
+            </div>
+            <Slider
+              value={[uiScale]}
+              min={80}
+              max={120}
+              step={5}
+              onValueChange={(value) => setUIScale(value[0])}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>80% (Smaller)</span>
+              <span>120% (Larger)</span>
+            </div>
+          </div>
+
+          {/* Reset Button */}
+          <div className="flex items-center justify-between pt-2 border-t">
+            <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+              Adjust for your TV viewing distance. Sit closer? Use smaller scale.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setUIScale(SCALE_PRESETS.normal.value)}
+              disabled={uiScale === SCALE_PRESETS.normal.value}
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Reset
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
