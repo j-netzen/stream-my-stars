@@ -41,7 +41,7 @@
   "screenshots": [
     {
       "src": "/screenshot-wide.png",
-      "sizes": "1920x1088",
+      "sizes": "1920x1024",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Desktop home screen with movie library and sidebar navigation"
