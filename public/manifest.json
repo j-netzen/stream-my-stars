@@ -14,25 +14,25 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/app-icon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/app-icon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/app-icon.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/app-icon.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -61,7 +61,7 @@
       "url": "/",
       "icons": [
         {
-          "src": "/app-icon.png",
+          "src": "/icon-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -73,7 +73,7 @@
       "url": "/movies",
       "icons": [
         {
-          "src": "/app-icon.png",
+          "src": "/icon-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -85,7 +85,7 @@
       "url": "/tv-shows",
       "icons": [
         {
-          "src": "/app-icon.png",
+          "src": "/icon-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -97,7 +97,7 @@
       "url": "/live-tv",
       "icons": [
         {
-          "src": "/app-icon.png",
+          "src": "/icon-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
