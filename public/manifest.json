@@ -40,18 +40,18 @@
   ],
   "screenshots": [
     {
-      "src": "/splash.png",
-      "sizes": "1920x1080",
+      "src": "/screenshot-wide.png",
+      "sizes": "1920x1088",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Home screen showing media library"
+      "label": "Desktop home screen with movie library and sidebar navigation"
     },
     {
-      "src": "/splash.png",
-      "sizes": "1080x1920",
+      "src": "/screenshot-narrow.png",
+      "sizes": "1088x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Mobile view of media library"
+      "label": "Mobile home screen with featured content and bottom navigation"
     }
   ],
   "shortcuts": [
