@@ -66,6 +66,7 @@ export function StreamSelectionDialog({
   const [error, setError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [qualityFilter, setQualityFilter] = useState<string>("best");
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
   const [isCompactView, setIsCompactView] = useState(() => {
     const saved = localStorage.getItem("streamDialog-compactView");
     return saved !== null ? saved === "true" : true;
@@ -92,10 +93,39 @@ export function StreamSelectionDialog({
   // Track failed streams for visual indicator
   const [failedStreams, setFailedStreams] = useState<Set<string>>(new Set());
 
-  // Filter streams based on quality selection
+  // Filter streams based on quality and language selection
   const filteredStreams = streams.filter((stream) => {
-    if (qualityFilter === "all") return true;
     const info = parseStreamInfo(stream);
+    const title = stream.title?.toLowerCase() || "";
+    
+    // Language filter
+    if (languageFilter !== "all") {
+      // Check for language indicators in the stream title
+      const hasEnglish = title.includes("english") || 
+                         title.includes("eng") || 
+                         title.includes("en ") ||
+                         title.includes("[en]") ||
+                         title.includes("(en)") ||
+                         // Exclude non-English indicators
+                         (!title.includes("hindi") && 
+                          !title.includes("spanish") && 
+                          !title.includes("french") && 
+                          !title.includes("german") &&
+                          !title.includes("italian") &&
+                          !title.includes("portuguese") &&
+                          !title.includes("russian") &&
+                          !title.includes("chinese") &&
+                          !title.includes("japanese") &&
+                          !title.includes("korean") &&
+                          !title.includes("tamil") &&
+                          !title.includes("telugu") &&
+                          !title.includes("dual audio"));
+      
+      if (languageFilter === "english" && !hasEnglish) return false;
+    }
+    
+    // Quality filter
+    if (qualityFilter === "all") return true;
     const quality = info.quality?.toLowerCase() || "";
     
     // "Best" filter: optimal file size based on duration
@@ -980,6 +1010,15 @@ export function StreamSelectionDialog({
                       )}
                     </Button>
                     <Filter className="w-3 h-3 text-muted-foreground" />
+                    <Select value={languageFilter} onValueChange={setLanguageFilter}>
+                      <SelectTrigger className={cn("w-[90px]", isTVMode ? "h-10" : "h-8")}>
+                        <SelectValue placeholder="Language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="english">English</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Select value={qualityFilter} onValueChange={setQualityFilter}>
                       <SelectTrigger className={cn("w-[100px]", isTVMode ? "h-10" : "h-8")}>
                         <SelectValue placeholder="Quality" />
