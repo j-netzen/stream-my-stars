@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ThemeProvider } from "next-themes";
 import { TVModeProvider } from "@/hooks/useTVMode";
+import { BrowseHereProvider } from "@/hooks/useBrowseHere";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
@@ -27,6 +28,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TVModeProvider>
+        <BrowseHereProvider>
         <AuthProvider>
           <TooltipProvider>
           <Toaster />
@@ -114,6 +116,7 @@ const App = () => (
           </ErrorBoundary>
           </TooltipProvider>
         </AuthProvider>
+        </BrowseHereProvider>
       </TVModeProvider>
     </ThemeProvider>
   </QueryClientProvider>

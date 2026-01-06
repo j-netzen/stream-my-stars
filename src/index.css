@@ -148,6 +148,32 @@
     --tv-sidebar-collapsed: 56px;
   }
 
+  /* BrowseHere / Android TV Browser optimizations */
+  .browsehere-mode {
+    /* Larger focus rings for TV distance */
+    --tv-focus-ring-width: 4px;
+    --tv-min-target: 56px;
+    /* Disable smooth scrolling for snappier D-pad response */
+    scroll-behavior: auto;
+  }
+
+  .browsehere-mode video {
+    /* Let BrowseHere's native player handle video */
+    pointer-events: auto !important;
+  }
+
+  .browsehere-mode .video-custom-controls {
+    /* Hide custom controls when BrowseHere handles playback */
+    display: none !important;
+  }
+
+  /* High contrast focus for TV viewing distance */
+  .browsehere-mode *:focus-visible {
+    outline: 4px solid hsl(var(--tv-focus-ring)) !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 24px hsl(var(--tv-focus-ring) / 0.6) !important;
+  }
+
   /* TV Mode overscan safe zone - 5% margin for TV bezels */
   .tv-mode body {
     padding: var(--tv-overscan);
