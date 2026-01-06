@@ -194,9 +194,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     const video = videoRef.current;
     if (!video) return;
 
-    // Set audio state
-    video.muted = isMuted;
+    // Always ensure audio is set correctly - force unmuted and set volume
+    video.muted = false;
     video.volume = volume;
+    setIsMuted(false);
 
     // Always auto-play and enter fullscreen
     if (!hasAutoPlayedRef.current) {
@@ -221,7 +222,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         });
       });
     }
-  }, [isMuted, volume, enterFullscreen]);
+  }, [volume, enterFullscreen]);
 
   // Reset auto-play/fullscreen refs when media changes
   useEffect(() => {
