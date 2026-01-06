@@ -66,7 +66,7 @@ export function StreamSelectionDialog({
   const [error, setError] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [qualityFilter, setQualityFilter] = useState<string>("best");
-  const [languageFilter, setLanguageFilter] = useState<string>("all");
+  const [languageFilter, setLanguageFilter] = useState<string>("english");
   const [isCompactView, setIsCompactView] = useState(() => {
     const saved = localStorage.getItem("streamDialog-compactView");
     return saved !== null ? saved === "true" : true;
