@@ -464,16 +464,6 @@ export function StreamSelectionDialog({
     const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
     const needsRdDownload = isMagnetLink(stream.url) || isTorrentioResolveUrl;
     
-    // Ask for confirmation before adding to Real-Debrid
-    if (needsRdDownload && !skipConfirmation) {
-      const streamInfo = parseStreamInfo(stream);
-      const streamName = streamInfo.quality ? `${streamInfo.quality} (${streamInfo.size || 'Unknown size'})` : stream.title;
-      const confirmed = await confirmAddToRealDebrid(streamName);
-      if (!confirmed) {
-        throw new Error("Download cancelled by user");
-      }
-    }
-    
     const handleProgress = (progress: number) => {
       setResolveProgress(progress);
       if (progress < 100) {
