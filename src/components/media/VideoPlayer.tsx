@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
+import { useBrowseHere } from "@/hooks/useBrowseHere";
 
 interface Media {
   id: string;
@@ -38,6 +39,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const bufferStallCountRef = useRef<number>(0);
 
   const { settings } = usePlaybackSettings();
+  
+  // BrowseHere / Android TV browser detection
+  const { useNativePlayer } = useBrowseHere();
   
   // Lock to landscape orientation on native apps
   useVideoPlayerOrientation(true);
@@ -621,8 +625,8 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         preload="auto"
         playsInline
         muted={isMuted}
-        controls={false}
-        style={{ pointerEvents: 'none' }} // Let overlay handle clicks
+        controls={useNativePlayer}
+        style={{ pointerEvents: useNativePlayer ? 'auto' : 'none' }}
       >
         {src && <source src={src} />}
       </video>
@@ -713,9 +717,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       )}
 
       {/* Controls overlay - z-20 to stay above video and click overlay */}
+      {/* Custom controls - hidden when using native player (BrowseHere, etc.) */}
+      {!useNativePlayer && (
       <div
         className={cn(
-          "absolute z-20 flex flex-col justify-between transition-opacity duration-300",
+          "absolute z-20 flex flex-col justify-between transition-opacity duration-300 video-custom-controls",
           // Use fixed inset-0 during fullscreen for UI persistence
           isInFullscreen ? "fixed inset-0" : "absolute inset-0",
           showControls ? "opacity-100" : "opacity-0"
@@ -835,6 +841,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

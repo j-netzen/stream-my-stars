@@ -30,6 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useStreamGateway } from '@/hooks/useStreamGateway';
 import { Badge } from '@/components/ui/badge';
+import { useBrowseHere } from '@/hooks/useBrowseHere';
 
 interface GatewayPlayerProps {
   src: string;
@@ -52,6 +53,9 @@ export function GatewayPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // BrowseHere / Android TV browser detection
+  const { useNativePlayer } = useBrowseHere();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -230,6 +234,8 @@ export function GatewayPlayer({
           className="w-full h-full object-contain"
           poster={poster}
           playsInline
+          preload="auto"
+          controls={useNativePlayer}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onTimeUpdate={handleTimeUpdate}

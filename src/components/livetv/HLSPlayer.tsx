@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useVideoPlayerOrientation } from '@/hooks/useScreenOrientation';
+import { useBrowseHere } from '@/hooks/useBrowseHere';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -159,6 +160,9 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
   const hasShownErrorToast = useRef(false);
   const retryCountRef = useRef(0);
   const maxRetries = 3;
+  
+  // BrowseHere / Android TV browser detection
+  const { useNativePlayer, isBrowseHere } = useBrowseHere();
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -715,6 +719,9 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         className="w-full h-full object-contain"
         playsInline
         crossOrigin="anonymous"
+        // Use native controls for BrowseHere and similar TV browsers
+        controls={useNativePlayer}
+        preload="auto"
         style={{ 
           transform: 'translateZ(0)', // Force GPU layer
           backfaceVisibility: 'hidden',
@@ -853,9 +860,10 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
         </div>
       </div>
 
-      {/* Controls */}
+      {/* Controls - hidden when using native player (BrowseHere, etc.) */}
+      {!useNativePlayer && (
       <div className={cn(
-        "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity z-20",
+        "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity z-20 video-custom-controls",
         effectiveShowControls ? "opacity-100" : "opacity-0 pointer-events-none"
       )}>
         <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
@@ -969,6 +977,7 @@ export const HLSPlayer = forwardRef<HTMLDivElement, HLSPlayerProps>(({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 });
