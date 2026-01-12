@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
@@ -33,8 +33,37 @@ export default function TVShowsPage() {
     m.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Get a featured show (prefer one with backdrop)
-  const featured = tvShows.find((m) => m.backdrop_path) || tvShows[0];
+  // Get shows with backdrops for hero rotation
+  const showsWithBackdrops = useMemo(() => 
+    tvShows.filter((m) => m.backdrop_path), 
+    [tvShows]
+  );
+  
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Rotate featured show every 30 seconds
+  useEffect(() => {
+    if (showsWithBackdrops.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setFeaturedIndex((prev) => {
+          let newIndex;
+          do {
+            newIndex = Math.floor(Math.random() * showsWithBackdrops.length);
+          } while (newIndex === prev && showsWithBackdrops.length > 1);
+          return newIndex;
+        });
+        setIsTransitioning(false);
+      }, 500);
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [showsWithBackdrops.length]);
+  
+  const featured = showsWithBackdrops[featuredIndex] || tvShows[0];
 
   const handlePlay = (item: Media) => {
     if (item.tmdb_id) {
@@ -66,11 +95,16 @@ export default function TVShowsPage() {
     <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
       {/* Hero Section */}
       {featured && (
-        <MediaHero 
-          featured={featured} 
-          onPlay={handlePlay} 
-          onMoreInfo={setDetailsMedia} 
-        />
+        <div className={cn(
+          "transition-opacity duration-500",
+          isTransitioning ? "opacity-0" : "opacity-100"
+        )}>
+          <MediaHero 
+            featured={featured} 
+            onPlay={handlePlay} 
+            onMoreInfo={setDetailsMedia} 
+          />
+        </div>
       )}
 
       <div className={cn(
