@@ -1,16 +1,20 @@
 import { useState, useMemo } from "react";
 import { useMedia, Media, WatchProviderInfo } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
+import { useTVMode } from "@/hooks/useTVMode";
 import { MediaCard } from "@/components/media/MediaCard";
 import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { TrendingNetworkRow } from "@/components/networks/TrendingNetworkRow";
+import { HeroCarousel } from "@/components/media/HeroCarousel";
+import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Tv2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
-import { getWatchProviders, TMDB_IMAGE_BASE } from "@/lib/tmdb";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { getWatchProviders, TMDB_IMAGE_BASE, getTrending, TMDBSearchResult } from "@/lib/tmdb";
+import { cn } from "@/lib/utils";
 
 // Common streaming networks with their TMDB provider IDs
 const KNOWN_NETWORKS: { id: number; name: string; logo?: string }[] = [
@@ -33,9 +37,17 @@ export default function NetworksPage() {
   const queryClient = useQueryClient();
   const { media, deleteMedia, isLoading } = useMedia();
   const { progress } = useWatchProgress();
+  const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState<number | null>(null);
   const [isUpdatingProviders, setIsUpdatingProviders] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<TMDBSearchResult | null>(null);
+
+  // Fetch trending for hero carousel
+  const { data: trending = [], isLoading: trendingLoading } = useQuery({
+    queryKey: ["trending-networks"],
+    queryFn: () => getTrending("all"),
+  });
 
   // Group media by network/provider
   const { networkGroups, uncategorizedMedia, availableNetworks } = useMemo(() => {
@@ -140,6 +152,10 @@ export default function NetworksPage() {
     setIsUpdatingProviders(false);
   };
 
+  const handleAddFromHero = (item: TMDBSearchResult) => {
+    setSelectedItem(item);
+  };
+
   const selectedNetworkData = availableNetworks.find((n) => n.id === selectedNetwork);
   const networkMedia = selectedNetwork === -1
     ? uncategorizedMedia
@@ -150,201 +166,220 @@ export default function NetworksPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Loader2 className={cn("animate-spin text-primary", isTVMode ? "w-12 h-12" : "w-8 h-8")} />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-            <Tv2 className="w-5 h-5 text-purple-500" />
+    <div className="min-h-screen">
+      {/* Hero Carousel - Top 5 Trending */}
+      <HeroCarousel 
+        items={trending} 
+        onAddToLibrary={handleAddFromHero}
+        isLoading={trendingLoading}
+      />
+
+      <div className={cn(
+        "p-6 space-y-8",
+        isTVMode && "mx-[5%]"
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+              <Tv2 className="w-5 h-5 text-purple-500" />
+            </div>
+            <div>
+              <h1 className={cn("font-bold", isTVMode ? "text-3xl" : "text-2xl")}>Networks</h1>
+              <p className="text-sm text-muted-foreground">
+                Browse your media by streaming platform
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Networks</h1>
-            <p className="text-sm text-muted-foreground">
-              Browse your media by streaming platform
-            </p>
-          </div>
+
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleUpdateProviders}
+            disabled={isUpdatingProviders}
+          >
+            {isUpdatingProviders ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            Update Streaming Info
+          </Button>
         </div>
 
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={handleUpdateProviders}
-          disabled={isUpdatingProviders}
-        >
-          {isUpdatingProviders ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <RefreshCw className="w-4 h-4" />
-          )}
-          Update Streaming Info
-        </Button>
-      </div>
+        {/* Trending Content Rows */}
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold">Trending on Networks</h2>
+          {KNOWN_NETWORKS.slice(0, 6).map((network) => (
+            <TrendingNetworkRow
+              key={network.id}
+              providerId={network.id}
+              providerName={network.name}
+              providerLogo={network.logo}
+            />
+          ))}
+        </div>
 
-      {/* Trending Content Rows */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold">Trending on Networks</h2>
-        {KNOWN_NETWORKS.slice(0, 6).map((network) => (
-          <TrendingNetworkRow
-            key={network.id}
-            providerId={network.id}
-            providerName={network.name}
-            providerLogo={network.logo}
-          />
-        ))}
-      </div>
+        {/* My Library Section */}
+        <div className="pt-4 border-t border-border space-y-4">
+          <h2 className="text-xl font-semibold">My Library</h2>
 
-      {/* My Library Section */}
-      <div className="pt-4 border-t border-border space-y-4">
-        <h2 className="text-xl font-semibold">My Library</h2>
-
-        <div className="flex gap-6">
-        {/* Networks List */}
-        <div className="w-64 flex-shrink-0 space-y-2">
-          {/* Uncategorized filter */}
-          {uncategorizedMedia.length > 0 && (
-            <Card
-              withSpaceBg
-              onClick={() => setSelectedNetwork(-1)}
-              className={`cursor-pointer p-3 transition-all ${
-                selectedNetwork === -1
-                  ? "ring-2 ring-amber-500 shadow-star-glow"
-                  : "hover:shadow-star-lg"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <Tv2 className="w-4 h-4 text-amber-500" />
-                </div>
-                <div>
-                  <p className="font-medium text-amber-600 dark:text-amber-400">No Streaming Info</p>
-                  <p className="text-xs text-muted-foreground">
-                    {uncategorizedMedia.length} items
-                  </p>
-                </div>
-              </div>
-            </Card>
-          )}
-          
-          {availableNetworks.length === 0 && uncategorizedMedia.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Tv2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No network data yet</p>
-              <p className="text-xs mt-1">Add media to see streaming platforms</p>
-            </div>
-          ) : (
-            availableNetworks.map((network) => (
+          <div className="flex gap-6">
+          {/* Networks List */}
+          <div className="w-64 flex-shrink-0 space-y-2">
+            {/* Uncategorized filter */}
+            {uncategorizedMedia.length > 0 && (
               <Card
-                key={network.id}
                 withSpaceBg
-                onClick={() => setSelectedNetwork(network.id)}
+                onClick={() => setSelectedNetwork(-1)}
                 className={`cursor-pointer p-3 transition-all ${
-                  selectedNetwork === network.id
-                    ? "ring-2 ring-primary shadow-star-glow"
+                  selectedNetwork === -1
+                    ? "ring-2 ring-amber-500 shadow-star-glow"
                     : "hover:shadow-star-lg"
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  {network.logo ? (
-                    <img
-                      src={`${TMDB_IMAGE_BASE}/w92${network.logo}`}
-                      alt={network.name}
-                      className="w-8 h-8 rounded-lg object-contain bg-white"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                      <Tv2 className="w-4 h-4 text-primary" />
-                    </div>
-                  )}
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                    <Tv2 className="w-4 h-4 text-amber-500" />
+                  </div>
                   <div>
-                    <p className="font-medium">{network.name}</p>
+                    <p className="font-medium text-amber-600 dark:text-amber-400">No Streaming Info</p>
                     <p className="text-xs text-muted-foreground">
-                      {network.count} items
+                      {uncategorizedMedia.length} items
                     </p>
                   </div>
                 </div>
               </Card>
-            ))
-          )}
-        </div>
-
-        {/* Network Content */}
-        <div className="flex-1">
-          {selectedNetwork === -1 ? (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400">No Streaming Info</h2>
-              <p className="text-sm text-muted-foreground">
-                These items don't have streaming platform data. Click "Update Streaming Info" to fetch it from TMDB.
-              </p>
-              {uncategorizedMedia.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {uncategorizedMedia.map((item) => (
-                    <MediaCard
-                      key={item.id}
-                      media={item}
-                      progress={progress.find((p) => p.media_id === item.id)}
-                      onPlay={setActiveMedia}
-                      onDelete={(m) => deleteMedia.mutate(m.id)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>All media has streaming info!</p>
-                </div>
-              )}
-            </div>
-          ) : selectedNetwork && selectedNetworkData ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                {selectedNetworkData.logo && (
-                  <img
-                    src={`${TMDB_IMAGE_BASE}/w92${selectedNetworkData.logo}`}
-                    alt={selectedNetworkData.name}
-                    className="w-10 h-10 rounded-lg object-contain bg-white"
-                  />
-                )}
-                <h2 className="text-xl font-semibold">{selectedNetworkData.name}</h2>
+            )}
+            
+            {availableNetworks.length === 0 && uncategorizedMedia.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Tv2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No network data yet</p>
+                <p className="text-xs mt-1">Add media to see streaming platforms</p>
               </div>
-              {networkMedia.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {networkMedia.map((item) => (
-                    <MediaCard
-                      key={item.id}
-                      media={item}
-                      progress={progress.find((p) => p.media_id === item.id)}
-                      onPlay={setActiveMedia}
-                      onDelete={(m) => deleteMedia.mutate(m.id)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No media on this network</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center py-20">
-              <Tv2 className="w-16 h-16 text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Select a network</h2>
-              <p className="text-muted-foreground">
-                Choose a streaming platform from the list to view its content
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-      </div>
+            ) : (
+              availableNetworks.map((network) => (
+                <Card
+                  key={network.id}
+                  withSpaceBg
+                  onClick={() => setSelectedNetwork(network.id)}
+                  className={`cursor-pointer p-3 transition-all ${
+                    selectedNetwork === network.id
+                      ? "ring-2 ring-primary shadow-star-glow"
+                      : "hover:shadow-star-lg"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {network.logo ? (
+                      <img
+                        src={`${TMDB_IMAGE_BASE}/w92${network.logo}`}
+                        alt={network.name}
+                        className="w-8 h-8 rounded-lg object-contain bg-white"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <Tv2 className="w-4 h-4 text-primary" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium">{network.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {network.count} items
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
 
-      {activeMedia && (
-        <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
-      )}
+          {/* Network Content */}
+          <div className="flex-1">
+            {selectedNetwork === -1 ? (
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold text-amber-600 dark:text-amber-400">No Streaming Info</h2>
+                <p className="text-sm text-muted-foreground">
+                  These items don't have streaming platform data. Click "Update Streaming Info" to fetch it from TMDB.
+                </p>
+                {uncategorizedMedia.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {uncategorizedMedia.map((item) => (
+                      <MediaCard
+                        key={item.id}
+                        media={item}
+                        progress={progress.find((p) => p.media_id === item.id)}
+                        onPlay={setActiveMedia}
+                        onDelete={(m) => deleteMedia.mutate(m.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p>All media has streaming info!</p>
+                  </div>
+                )}
+              </div>
+            ) : selectedNetwork && selectedNetworkData ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  {selectedNetworkData.logo && (
+                    <img
+                      src={`${TMDB_IMAGE_BASE}/w92${selectedNetworkData.logo}`}
+                      alt={selectedNetworkData.name}
+                      className="w-10 h-10 rounded-lg object-contain bg-white"
+                    />
+                  )}
+                  <h2 className="text-xl font-semibold">{selectedNetworkData.name}</h2>
+                </div>
+                {networkMedia.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {networkMedia.map((item) => (
+                      <MediaCard
+                        key={item.id}
+                        media={item}
+                        progress={progress.find((p) => p.media_id === item.id)}
+                        onPlay={setActiveMedia}
+                        onDelete={(m) => deleteMedia.mutate(m.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <p>No media on this network</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <Tv2 className="w-16 h-16 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-semibold mb-2">Select a network</h2>
+                <p className="text-muted-foreground">
+                  Choose a streaming platform from the list to view its content
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        </div>
+
+        {activeMedia && (
+          <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
+        )}
+
+        {/* Add to Library Dialog */}
+        <AddFromDiscoverDialog
+          item={selectedItem}
+          open={!!selectedItem}
+          onOpenChange={(open) => !open && setSelectedItem(null)}
+        />
+      </div>
     </div>
   );
 }

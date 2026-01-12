@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
+import { useTVMode } from "@/hooks/useTVMode";
 import { MediaCard } from "@/components/media/MediaCard";
+import { MediaHero } from "@/components/media/MediaHero";
 import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
@@ -9,10 +11,12 @@ import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { Input } from "@/components/ui/input";
 import { Search, Film, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function MoviesPage() {
   const { media, isLoading, deleteMedia, refetch } = useMedia();
   const { progress } = useWatchProgress();
+  const { isTVMode } = useTVMode();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
@@ -29,8 +33,10 @@ export default function MoviesPage() {
     m.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Get a featured movie (prefer one with backdrop)
+  const featured = movies.find((m) => m.backdrop_path) || movies[0];
+
   const handlePlay = (item: Media) => {
-    // Always show stream selection for media with TMDB ID
     if (item.tmdb_id) {
       setStreamSelectMedia(item);
     } else {
@@ -51,22 +57,34 @@ export default function MoviesPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Loader2 className={cn("animate-spin text-primary", isTVMode ? "w-12 h-12" : "w-8 h-8")} />
       </div>
     );
   }
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="min-h-screen">
-      <div className="p-6 space-y-6">
-        {/* Header */}
+      {/* Hero Section */}
+      {featured && (
+        <MediaHero 
+          featured={featured} 
+          onPlay={handlePlay} 
+          onMoreInfo={setDetailsMedia} 
+        />
+      )}
+
+      <div className={cn(
+        "p-6 space-y-6",
+        isTVMode && "mx-[5%]"
+      )}>
+        {/* Header with Search */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
               <Film className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Movies</h1>
+              <h1 className={cn("font-bold", isTVMode ? "text-3xl" : "text-2xl")}>All Movies</h1>
               <p className="text-sm text-muted-foreground">
                 {movies.length} movies in your library
               </p>
