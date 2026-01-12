@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
+import { TMDBSearchResult, getImageUrl, getVideos } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Star, Calendar } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Star, Calendar, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
+import { toast } from "sonner";
 
 interface HeroCarouselProps {
   items: TMDBSearchResult[];
@@ -14,8 +15,28 @@ interface HeroCarouselProps {
 export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const { isTVMode } = useTVMode();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTrailer = async (item: TMDBSearchResult) => {
+    setIsLoadingTrailer(true);
+    try {
+      const mediaType = item.media_type === "movie" ? "movie" : "tv";
+      const videos = await getVideos(item.id, mediaType);
+      const trailer = videos.find(v => v.type === "Trailer" && v.site === "YouTube") || videos[0];
+      
+      if (trailer) {
+        window.open(`https://www.youtube.com/watch?v=${trailer.key}`, "_blank");
+      } else {
+        toast.error("No trailer available");
+      }
+    } catch (error) {
+      toast.error("Failed to load trailer");
+    } finally {
+      setIsLoadingTrailer(false);
+    }
+  };
 
   // Auto-scroll every 5 seconds
   useEffect(() => {
@@ -175,7 +196,7 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
           )}
           
           {/* Button row */}
-          <div className={cn("flex flex-row", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
+          <div className={cn("flex flex-row flex-wrap", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
             {onAddToLibrary && (
               <Button
                 size={isTVMode ? "tv" : "lg"}
@@ -187,6 +208,17 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
                 Add to Library
               </Button>
             )}
+            <Button
+              size={isTVMode ? "tv" : "lg"}
+              variant="secondary"
+              className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
+              onClick={() => handleTrailer(currentItem)}
+              disabled={isLoadingTrailer}
+              tabIndex={0}
+            >
+              <Film className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
+              {isLoadingTrailer ? "Loading..." : "Trailer"}
+            </Button>
           </div>
         </div>
       </div>

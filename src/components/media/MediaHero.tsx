@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Media } from "@/hooks/useMedia";
-import { getImageUrl } from "@/lib/tmdb";
+import { getImageUrl, getVideos } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Play, Info, Star, Calendar, Clock } from "lucide-react";
+import { Play, Info, Star, Calendar, Clock, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
+import { toast } from "sonner";
 
 interface MediaHeroProps {
   featured: Media;
@@ -13,10 +15,34 @@ interface MediaHeroProps {
 
 export function MediaHero({ featured, onPlay, onMoreInfo }: MediaHeroProps) {
   const { isTVMode } = useTVMode();
+  const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   
   const featuredBackdrop = featured?.backdrop_path
     ? getImageUrl(featured.backdrop_path, "original")
     : null;
+
+  const handleTrailer = async () => {
+    if (!featured.tmdb_id) {
+      toast.error("No trailer available");
+      return;
+    }
+    
+    setIsLoadingTrailer(true);
+    try {
+      const videos = await getVideos(featured.tmdb_id, featured.media_type as "movie" | "tv");
+      const trailer = videos.find(v => v.type === "Trailer" && v.site === "YouTube") || videos[0];
+      
+      if (trailer) {
+        window.open(`https://www.youtube.com/watch?v=${trailer.key}`, "_blank");
+      } else {
+        toast.error("No trailer available");
+      }
+    } catch (error) {
+      toast.error("Failed to load trailer");
+    } finally {
+      setIsLoadingTrailer(false);
+    }
+  };
 
   return (
     <div className={cn(
@@ -107,7 +133,7 @@ export function MediaHero({ featured, onPlay, onMoreInfo }: MediaHeroProps) {
           )}
           
           {/* Button row */}
-          <div className={cn("flex flex-row", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
+          <div className={cn("flex flex-row flex-wrap", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
             <Button
               size={isTVMode ? "tv" : "lg"}
               className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
@@ -116,6 +142,17 @@ export function MediaHero({ featured, onPlay, onMoreInfo }: MediaHeroProps) {
             >
               <Play className={cn("fill-current", isTVMode ? "w-4 h-4" : "w-5 h-5")} />
               Play
+            </Button>
+            <Button 
+              size={isTVMode ? "tv" : "lg"}
+              variant="secondary" 
+              className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
+              onClick={handleTrailer}
+              disabled={isLoadingTrailer}
+              tabIndex={0}
+            >
+              <Film className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
+              {isLoadingTrailer ? "Loading..." : "Trailer"}
             </Button>
             <Button 
               size={isTVMode ? "tv" : "lg"}
