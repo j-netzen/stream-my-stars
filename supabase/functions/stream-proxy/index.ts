@@ -138,6 +138,7 @@ serve(async (req) => {
 
     let response: Response;
     try {
+      // Use manual redirect handling to validate redirect targets for SSRF protection
       response = await fetch(decodedUrl, {
         method: req.method === 'HEAD' ? 'HEAD' : 'GET',
         headers: {
@@ -148,7 +149,70 @@ serve(async (req) => {
           'Range': req.headers.get('range') || '',
         },
         signal: controller.signal,
+        redirect: 'manual', // Don't auto-follow redirects to prevent SSRF via redirect chains
       });
+
+      // Handle redirects manually - validate redirect targets
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('Location');
+        if (location) {
+          const redirectUrl = new URL(location, decodedUrl);
+          
+          // Block redirects to private hosts
+          if (isPrivateHost(redirectUrl.hostname)) {
+            console.warn(`[PROXY] Blocked redirect to private host: ${redirectUrl.hostname}`);
+            return createErrorResponse(
+              "VALIDATION_ERROR",
+              "Redirect to private host blocked",
+              403,
+              { code: "BLOCKED_REDIRECT" }
+            );
+          }
+          
+          // Follow the redirect manually with the validated URL
+          console.log(`[PROXY] Following redirect to: ${redirectUrl.hostname}${redirectUrl.pathname.substring(0, 50)}...`);
+          response = await fetch(redirectUrl.href, {
+            method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+            headers: {
+              'User-Agent': 'MediaHub/1.0 StreamProxy (Android; iOS; Web)',
+              'Accept': '*/*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Referer': redirectUrl.origin + '/',
+              'Range': req.headers.get('range') || '',
+            },
+            signal: controller.signal,
+            redirect: 'manual',
+          });
+          
+          // Handle second-level redirect (limit depth to prevent loops)
+          if (response.status >= 300 && response.status < 400) {
+            const secondLocation = response.headers.get('Location');
+            if (secondLocation) {
+              const secondRedirectUrl = new URL(secondLocation, redirectUrl.href);
+              if (isPrivateHost(secondRedirectUrl.hostname)) {
+                console.warn(`[PROXY] Blocked second redirect to private host: ${secondRedirectUrl.hostname}`);
+                return createErrorResponse(
+                  "VALIDATION_ERROR",
+                  "Redirect to private host blocked",
+                  403,
+                  { code: "BLOCKED_REDIRECT" }
+                );
+              }
+              console.log(`[PROXY] Following second redirect to: ${secondRedirectUrl.hostname}...`);
+              response = await fetch(secondRedirectUrl.href, {
+                method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+                headers: {
+                  'User-Agent': 'MediaHub/1.0 StreamProxy (Android; iOS; Web)',
+                  'Accept': '*/*',
+                  'Referer': secondRedirectUrl.origin + '/',
+                  'Range': req.headers.get('range') || '',
+                },
+                signal: controller.signal,
+              });
+            }
+          }
+        }
+      }
     } catch (fetchError) {
       clearTimeout(timeoutId);
       const isTimeout = fetchError instanceof Error && fetchError.name === 'AbortError';
