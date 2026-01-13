@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { TMDBSearchResult, getImageUrl, getVideos } from "@/lib/tmdb";
+import { TMDBSearchResult, getImageUrl, getVideos, TMDBVideo } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Star, Calendar, Film } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Plus, ChevronLeft, ChevronRight, Star, Calendar, Film, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
 import { toast } from "sonner";
@@ -16,6 +17,8 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
+  const [trailer, setTrailer] = useState<TMDBVideo | null>(null);
+  const [showTrailerDialog, setShowTrailerDialog] = useState(false);
   const { isTVMode } = useTVMode();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -24,10 +27,12 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
     try {
       const mediaType = item.media_type === "movie" ? "movie" : "tv";
       const videos = await getVideos(item.id, mediaType);
-      const trailer = videos.find(v => v.type === "Trailer" && v.site === "YouTube") || videos[0];
+      const foundTrailer = videos.find(v => v.type === "Trailer" && v.site === "YouTube") 
+        || videos.find(v => v.site === "YouTube");
       
-      if (trailer) {
-        window.open(`https://www.youtube.com/watch?v=${trailer.key}`, "_blank");
+      if (foundTrailer) {
+        setTrailer(foundTrailer);
+        setShowTrailerDialog(true);
       } else {
         toast.error("No trailer available");
       }
@@ -241,6 +246,35 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
           ))}
         </div>
       )}
+
+      {/* Trailer Dialog */}
+      <Dialog open={showTrailerDialog} onOpenChange={setShowTrailerDialog}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-background border-border">
+          <div className="relative">
+            <div className="flex items-center gap-3 p-4 border-b border-border">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTrailerDialog(false)}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <h3 className="font-semibold">{trailer?.name}</h3>
+            </div>
+            <div className="aspect-video">
+              {trailer && (
+                <iframe
+                  src={`https://www.youtube.com/embed/${trailer.key}?autoplay=1`}
+                  title={trailer.name}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
