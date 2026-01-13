@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Star, Loader2, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Loader2, Plus, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { discoverByProvider, TMDB_IMAGE_BASE, TMDBSearchResult } from "@/lib/tmdb";
 import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";
+import { useMedia, Media } from "@/hooks/useMedia";
 
 // Mock data fallback
 const MOCK_TRENDING: Record<number, { movies: TMDBSearchResult[]; tv: TMDBSearchResult[] }> = {
@@ -75,16 +77,19 @@ interface TrendingNetworkRowProps {
 interface TrendingCardProps {
   item: TMDBSearchResult;
   onAdd: (item: TMDBSearchResult) => void;
+  libraryItem?: Media;
+  onPlay?: (media: Media) => void;
 }
 
-function TrendingCard({ item, onAdd }: TrendingCardProps) {
+function TrendingCard({ item, onAdd, libraryItem, onPlay }: TrendingCardProps) {
+  const isInLibrary = !!libraryItem;
   const title = item.title || item.name || "Unknown";
   
   return (
     <div className="flex-shrink-0 w-32 group cursor-pointer">
       <div 
         className="relative aspect-[2/3] rounded-lg overflow-hidden bg-muted transition-transform duration-300 group-hover:scale-105 group-hover:shadow-star-glow"
-        onClick={() => onAdd(item)}
+        onClick={() => isInLibrary && onPlay ? onPlay(libraryItem) : onAdd(item)}
       >
         {item.poster_path ? (
           <img
@@ -100,10 +105,17 @@ function TrendingCard({ item, onAdd }: TrendingCardProps) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button size="sm" variant="secondary" className="gap-1 h-7 text-xs">
-            <Plus className="w-3 h-3" />
-            Add
-          </Button>
+          {isInLibrary ? (
+            <Button size="sm" variant="secondary" className="gap-1 h-7 text-xs">
+              <Play className="w-3 h-3" />
+              Play
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" className="gap-1 h-7 text-xs">
+              <Plus className="w-3 h-3" />
+              Add
+            </Button>
+          )}
         </div>
       </div>
       <div className="mt-2 space-y-1">
@@ -118,9 +130,21 @@ function TrendingCard({ item, onAdd }: TrendingCardProps) {
 }
 
 export function TrendingNetworkRow({ providerId, providerName, providerLogo }: TrendingNetworkRowProps) {
+  const navigate = useNavigate();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { media: libraryMedia = [] } = useMedia();
   const [selectedItem, setSelectedItem] = useState<TMDBSearchResult | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Helper to find if an item is already in library
+  const findInLibrary = (item: TMDBSearchResult): Media | undefined => {
+    return libraryMedia.find(m => m.tmdb_id === item.id);
+  };
+
+  const handlePlay = (media: Media) => {
+    const type = media.media_type === "movie" ? "movies" : "tv-shows";
+    navigate(`/${type}?play=${media.id}`);
+  };
 
   const { data: movies, isLoading: moviesLoading } = useQuery({
     queryKey: ["trending-network", providerId, "movie"],
@@ -200,6 +224,8 @@ export function TrendingNetworkRow({ providerId, providerName, providerLogo }: T
                   key={`${item.media_type}-${item.id}`} 
                   item={item} 
                   onAdd={handleAddClick}
+                  libraryItem={findInLibrary(item)}
+                  onPlay={handlePlay}
                 />
               ))
             )}

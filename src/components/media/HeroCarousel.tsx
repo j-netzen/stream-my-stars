@@ -2,24 +2,32 @@ import { useState, useEffect, useRef } from "react";
 import { TMDBSearchResult, getImageUrl, getVideos, TMDBVideo } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Plus, ChevronLeft, ChevronRight, Star, Calendar, Film, ArrowLeft } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Star, Calendar, Film, ArrowLeft, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
 import { toast } from "sonner";
+import { Media } from "@/hooks/useMedia";
 
 interface HeroCarouselProps {
   items: TMDBSearchResult[];
   onAddToLibrary?: (item: TMDBSearchResult) => void;
+  onPlay?: (media: Media) => void;
+  libraryMedia?: Media[];
   isLoading?: boolean;
 }
 
-export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselProps) {
+export function HeroCarousel({ items, onAddToLibrary, onPlay, libraryMedia = [], isLoading }: HeroCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const [trailer, setTrailer] = useState<TMDBVideo | null>(null);
   const [showTrailerDialog, setShowTrailerDialog] = useState(false);
   const { isTVMode } = useTVMode();
+
+  // Helper to find if current item is in library
+  const findInLibrary = (item: TMDBSearchResult): Media | undefined => {
+    return libraryMedia.find(m => m.tmdb_id === item.id);
+  };
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTrailer = async (item: TMDBSearchResult) => {
@@ -94,6 +102,8 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
   }
 
   const currentItem = displayItems[currentIndex];
+  const currentLibraryItem = currentItem ? findInLibrary(currentItem) : undefined;
+  const isInLibrary = !!currentLibraryItem;
   const backdropUrl = currentItem?.backdrop_path
     ? getImageUrl(currentItem.backdrop_path, "original")
     : null;
@@ -202,7 +212,17 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
           
           {/* Button row */}
           <div className={cn("flex flex-row flex-wrap", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
-            {onAddToLibrary && (
+            {isInLibrary && onPlay ? (
+              <Button
+                size={isTVMode ? "tv" : "lg"}
+                className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
+                onClick={() => onPlay(currentLibraryItem)}
+                tabIndex={0}
+              >
+                <Play className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
+                Play
+              </Button>
+            ) : onAddToLibrary && (
               <Button
                 size={isTVMode ? "tv" : "lg"}
                 className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
@@ -223,7 +243,8 @@ export function HeroCarousel({ items, onAddToLibrary, isLoading }: HeroCarouselP
             >
               <Film className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
               {isLoadingTrailer ? "Loading..." : "Trailer"}
-            </Button>
+              </Button>
+            )
           </div>
         </div>
       </div>

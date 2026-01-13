@@ -1,16 +1,26 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { searchTMDB, getTrending, getTVAiringToday, getPopularMovies, getNowPlayingMovies, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";
 import { HeroCarousel } from "@/components/media/HeroCarousel";
-import { Search, Compass, Film, Tv, Loader2, Star, Calendar, Plus } from "lucide-react";
+import { Search, Compass, Film, Tv, Loader2, Star, Calendar, Plus, Play } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useTVMode } from "@/hooks/useTVMode";
 import { cn } from "@/lib/utils";
+import { useMedia, Media } from "@/hooks/useMedia";
 
-function MediaResultCard({ item, onSelect }: { item: TMDBSearchResult; onSelect: (item: TMDBSearchResult) => void }) {
+interface MediaResultCardProps {
+  item: TMDBSearchResult;
+  onSelect: (item: TMDBSearchResult) => void;
+  libraryItem?: Media;
+  onPlay?: (media: Media) => void;
+}
+
+function MediaResultCard({ item, onSelect, libraryItem, onPlay }: MediaResultCardProps) {
+  const isInLibrary = !!libraryItem;
   return (
     <div className="media-card group">
       <div className="relative aspect-[2/3] bg-secondary">
@@ -33,14 +43,25 @@ function MediaResultCard({ item, onSelect }: { item: TMDBSearchResult; onSelect:
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-          <Button
-            onClick={() => onSelect(item)}
-            className="w-full gap-2"
-            size="sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add to Library
-          </Button>
+          {isInLibrary ? (
+            <Button
+              onClick={() => onPlay?.(libraryItem)}
+              className="w-full gap-2"
+              size="sm"
+            >
+              <Play className="w-4 h-4" />
+              Play
+            </Button>
+          ) : (
+            <Button
+              onClick={() => onSelect(item)}
+              className="w-full gap-2"
+              size="sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add to Library
+            </Button>
+          )}
         </div>
 
         {/* Type Badge */}
@@ -75,11 +96,23 @@ function MediaResultCard({ item, onSelect }: { item: TMDBSearchResult; onSelect:
 }
 
 export default function DiscoverPage() {
+  const navigate = useNavigate();
   const { isTVMode } = useTVMode();
+  const { media: libraryMedia = [] } = useMedia();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedItem, setSelectedItem] = useState<TMDBSearchResult | null>(null);
+
+  // Helper to find if an item is already in library
+  const findInLibrary = (item: TMDBSearchResult): Media | undefined => {
+    return libraryMedia.find(m => m.tmdb_id === item.id);
+  };
+
+  const handlePlay = (media: Media) => {
+    const type = media.media_type === "movie" ? "movies" : "tv-shows";
+    navigate(`/${type}?play=${media.id}`);
+  };
 
   const { data: trending = [], isLoading: trendingLoading } = useQuery({
     queryKey: ["trending"],
@@ -123,6 +156,8 @@ export default function DiscoverPage() {
       <HeroCarousel 
         items={trending} 
         onAddToLibrary={handleAddFromHero}
+        onPlay={handlePlay}
+        libraryMedia={libraryMedia}
         isLoading={trendingLoading}
       />
 
@@ -172,7 +207,7 @@ export default function DiscoverPage() {
             <h2 className="text-xl font-semibold">Search Results</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {searchResults.map((item) => (
-                <MediaResultCard key={`${item.media_type}-${item.id}`} item={item} onSelect={setSelectedItem} />
+                <MediaResultCard key={`${item.media_type}-${item.id}`} item={item} onSelect={setSelectedItem} libraryItem={findInLibrary(item)} onPlay={handlePlay} />
               ))}
             </div>
           </div>
@@ -192,7 +227,7 @@ export default function DiscoverPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {airingToday.map((item) => (
-                  <MediaResultCard key={`tv-${item.id}`} item={item} onSelect={setSelectedItem} />
+                  <MediaResultCard key={`tv-${item.id}`} item={item} onSelect={setSelectedItem} libraryItem={findInLibrary(item)} onPlay={handlePlay} />
                 ))}
               </div>
             )}
@@ -213,7 +248,7 @@ export default function DiscoverPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {popularMovies.map((item) => (
-                  <MediaResultCard key={`movie-${item.id}`} item={item} onSelect={setSelectedItem} />
+                  <MediaResultCard key={`movie-${item.id}`} item={item} onSelect={setSelectedItem} libraryItem={findInLibrary(item)} onPlay={handlePlay} />
                 ))}
               </div>
             )}
@@ -234,7 +269,7 @@ export default function DiscoverPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {nowPlayingMovies.map((item) => (
-                  <MediaResultCard key={`movie-${item.id}`} item={item} onSelect={setSelectedItem} />
+                  <MediaResultCard key={`movie-${item.id}`} item={item} onSelect={setSelectedItem} libraryItem={findInLibrary(item)} onPlay={handlePlay} />
                 ))}
               </div>
             )}
@@ -252,7 +287,7 @@ export default function DiscoverPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {trending.map((item) => (
-                  <MediaResultCard key={`${item.media_type}-${item.id}`} item={item} onSelect={setSelectedItem} />
+                  <MediaResultCard key={`${item.media_type}-${item.id}`} item={item} onSelect={setSelectedItem} libraryItem={findInLibrary(item)} onPlay={handlePlay} />
                 ))}
               </div>
             )}
