@@ -31,7 +31,7 @@ export function useLiveTV() {
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<LiveTVSettings>(DEFAULT_SETTINGS);
   const [sortEnabled, setSortEnabled] = useState(false);
-  const [proxyEnabled, setProxyEnabled] = useState(true); // Default ON for regional bypass
+  const [proxyEnabled, setProxyEnabled] = useState(false); // Default OFF
   const [hwAccelEnabled, setHwAccelEnabled] = useState(true); // Default ON for hardware acceleration
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSyncingState, setIsSyncingState] = useState(false); // Exposed sync status
