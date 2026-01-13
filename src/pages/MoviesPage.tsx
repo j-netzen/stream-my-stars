@@ -102,7 +102,6 @@ export default function MoviesPage() {
           <MediaHero 
             featured={featured} 
             onPlay={handlePlay} 
-            onMoreInfo={setDetailsMedia} 
           />
         </div>
       )}

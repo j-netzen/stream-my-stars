@@ -3,7 +3,7 @@ import { Media } from "@/hooks/useMedia";
 import { getImageUrl, getVideos, TMDBVideo } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Play, Info, Star, Calendar, Clock, Film, ArrowLeft } from "lucide-react";
+import { Play, Star, Calendar, Clock, Film, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTVMode } from "@/hooks/useTVMode";
 import { toast } from "sonner";
@@ -11,10 +11,9 @@ import { toast } from "sonner";
 interface MediaHeroProps {
   featured: Media;
   onPlay: (media: Media) => void;
-  onMoreInfo: (media: Media) => void;
 }
 
-export function MediaHero({ featured, onPlay, onMoreInfo }: MediaHeroProps) {
+export function MediaHero({ featured, onPlay }: MediaHeroProps) {
   const { isTVMode } = useTVMode();
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const [trailer, setTrailer] = useState<TMDBVideo | null>(null);
@@ -158,16 +157,6 @@ export function MediaHero({ featured, onPlay, onMoreInfo }: MediaHeroProps) {
             >
               <Film className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
               {isLoadingTrailer ? "Loading..." : "Trailer"}
-            </Button>
-            <Button 
-              size={isTVMode ? "tv" : "lg"}
-              variant="secondary" 
-              className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
-              onClick={() => onMoreInfo(featured)}
-              tabIndex={0}
-            >
-              <Info className={cn(isTVMode ? "w-4 h-4" : "w-5 h-5")} />
-              More Info
             </Button>
           </div>
         </div>
