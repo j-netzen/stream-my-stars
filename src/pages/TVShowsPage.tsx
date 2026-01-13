@@ -102,7 +102,6 @@ export default function TVShowsPage() {
           <MediaHero 
             featured={featured} 
             onPlay={handlePlay} 
-            onMoreInfo={setDetailsMedia} 
           />
         </div>
       )}
