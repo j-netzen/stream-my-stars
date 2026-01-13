@@ -147,22 +147,24 @@ export function HeroCarousel({ items, onAddToLibrary, onPlay, libraryMedia = [],
             size="icon"
             onClick={goToPrevious}
             className={cn(
-              "absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-background/50 hover:bg-background/80 rounded-full",
-              isTVMode ? "w-16 h-16" : "w-10 h-10"
+              "absolute left-4 top-1/2 -translate-y-1/2 z-50 rounded-full border-2 border-white/30 backdrop-blur-sm transition-all duration-200",
+              "bg-black/40 hover:bg-black/60 hover:border-white/50 hover:scale-110",
+              isTVMode ? "w-20 h-20" : "w-14 h-14"
             )}
           >
-            <ChevronLeft className={cn(isTVMode ? "w-8 h-8" : "w-6 h-6")} />
+            <ChevronLeft className={cn("text-white", isTVMode ? "w-12 h-12" : "w-8 h-8")} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={goToNext}
             className={cn(
-              "absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-background/50 hover:bg-background/80 rounded-full",
-              isTVMode ? "w-16 h-16" : "w-10 h-10"
+              "absolute right-4 top-1/2 -translate-y-1/2 z-50 rounded-full border-2 border-white/30 backdrop-blur-sm transition-all duration-200",
+              "bg-black/40 hover:bg-black/60 hover:border-white/50 hover:scale-110",
+              isTVMode ? "w-20 h-20" : "w-14 h-14"
             )}
           >
-            <ChevronRight className={cn(isTVMode ? "w-8 h-8" : "w-6 h-6")} />
+            <ChevronRight className={cn("text-white", isTVMode ? "w-12 h-12" : "w-8 h-8")} />
           </Button>
         </>
       )}
