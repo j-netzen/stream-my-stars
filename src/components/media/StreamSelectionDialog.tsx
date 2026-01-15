@@ -128,14 +128,14 @@ export function StreamSelectionDialog({
     if (qualityFilter === "all") return true;
     const quality = info.quality?.toLowerCase() || "";
     
-    // "Best" filter: optimal file size based on duration, but always include ≤2.5GB files
+    // "Best" filter: optimal file size based on duration, but always include ≤3GB files
     if (qualityFilter === "best") {
       if (!info.size) return false; // Skip streams without size info
       const sizeInMB = parseSizeToBytes(info.size);
       if (sizeInMB === 0) return false;
       
-      // Always include files 2.5GB or smaller regardless of runtime
-      const universalMaxSize = 2560; // 2.5GB in MB
+      // Always include files 3GB or smaller regardless of runtime
+      const universalMaxSize = 3072; // 3GB in MB
       if (sizeInMB <= universalMaxSize) return true;
       
       // For larger files, apply duration-based rules
