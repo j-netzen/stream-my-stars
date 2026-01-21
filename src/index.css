@@ -335,12 +335,24 @@
     box-shadow: 0 0 0 3px hsl(var(--star-purple) / 0.2), var(--shadow-sm);
   }
 
-  /* TV Mode focus styles - 3px high-contrast border for visibility at 10ft */
-  .tv-mode *:focus {
+  /* TV Mode focus styles - 3px high-contrast border for visibility at 10ft
+     ONLY shown in D-pad mode for cleaner mouse experience */
+  .tv-mode.mouse-mode *:focus {
     outline: none;
   }
 
-  .tv-mode *:focus-visible {
+  .tv-mode.mouse-mode *:focus-visible {
+    /* Standard browser focus in mouse mode - minimal */
+    outline: 2px solid hsl(var(--ring) / 0.5);
+    outline-offset: 2px;
+  }
+
+  /* D-pad mode: High visibility focus indicators */
+  .tv-mode.dpad-mode *:focus {
+    outline: none;
+  }
+
+  .tv-mode.dpad-mode *:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
     outline-offset: 2px;
     border-radius: var(--radius);
@@ -351,22 +363,30 @@
     position: relative;
   }
 
-  /* Media cards get modest scale on focus */
+  /* Media cards get modest scale on focus - D-pad mode only */
   .tv-mode .media-card {
     transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
     box-shadow: var(--shadow-md);
     will-change: transform;
   }
 
-  .tv-mode .media-card:focus,
-  .tv-mode .media-card:focus-visible,
-  .tv-mode .media-card:focus-within {
+  .tv-mode.dpad-mode .media-card:focus,
+  .tv-mode.dpad-mode .media-card:focus-visible,
+  .tv-mode.dpad-mode .media-card:focus-within {
     transform: scale(1.04);
     z-index: 20;
     box-shadow: 0 0 0 var(--tv-focus-ring-width) hsl(var(--tv-focus-ring)), 
                 0 0 20px hsl(var(--tv-focus-ring) / 0.5),
                 var(--shadow-lg);
     outline: none;
+  }
+
+  .tv-mode.mouse-mode .media-card:focus,
+  .tv-mode.mouse-mode .media-card:focus-visible,
+  .tv-mode.mouse-mode .media-card:focus-within {
+    /* Subtle focus in mouse mode */
+    box-shadow: var(--shadow-lg);
+    outline: 2px solid hsl(var(--ring) / 0.3);
   }
 
   .tv-mode .media-card:focus-within .group-hover\:opacity-100,
@@ -382,10 +402,11 @@
     align-items: center;
   }
 
-  .tv-mode [data-sidebar="true"] a:focus,
-  .tv-mode [data-sidebar="true"] a:focus-visible,
-  .tv-mode [data-sidebar="true"] button:focus,
-  .tv-mode [data-sidebar="true"] button:focus-visible {
+  /* Sidebar focus - D-pad mode only */
+  .tv-mode.dpad-mode [data-sidebar="true"] a:focus,
+  .tv-mode.dpad-mode [data-sidebar="true"] a:focus-visible,
+  .tv-mode.dpad-mode [data-sidebar="true"] button:focus,
+  .tv-mode.dpad-mode [data-sidebar="true"] button:focus-visible {
     background: hsl(var(--primary) / 0.2);
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
     outline-offset: -1px;
@@ -393,30 +414,49 @@
     transform: scale(1.01);
   }
 
-  /* Smooth scrolling for keyboard navigation */
-  .tv-mode {
+  .tv-mode.mouse-mode [data-sidebar="true"] a:focus,
+  .tv-mode.mouse-mode [data-sidebar="true"] button:focus {
+    /* Subtle focus in mouse mode */
+    background: hsl(var(--primary) / 0.1);
+    outline: none;
+  }
+
+  /* Smooth scrolling for keyboard navigation - D-pad mode only */
+  .tv-mode.dpad-mode {
     scroll-behavior: smooth;
   }
 
-  /* Standard focus for all interactive elements in TV mode - 3px border */
-  .tv-mode button:focus,
-  .tv-mode button:focus-visible,
-  .tv-mode a:focus,
-  .tv-mode a:focus-visible,
-  .tv-mode [tabindex="0"]:focus,
-  .tv-mode [tabindex="0"]:focus-visible,
-  .tv-mode input:focus,
-  .tv-mode input:focus-visible,
-  .tv-mode select:focus,
-  .tv-mode select:focus-visible {
+  .tv-mode.mouse-mode {
+    scroll-behavior: auto;
+  }
+
+  /* Standard focus for all interactive elements in TV mode - D-pad mode only */
+  .tv-mode.dpad-mode button:focus,
+  .tv-mode.dpad-mode button:focus-visible,
+  .tv-mode.dpad-mode a:focus,
+  .tv-mode.dpad-mode a:focus-visible,
+  .tv-mode.dpad-mode [tabindex="0"]:focus,
+  .tv-mode.dpad-mode [tabindex="0"]:focus-visible,
+  .tv-mode.dpad-mode input:focus,
+  .tv-mode.dpad-mode input:focus-visible,
+  .tv-mode.dpad-mode select:focus,
+  .tv-mode.dpad-mode select:focus-visible {
     outline: var(--tv-focus-ring-width) solid hsl(var(--tv-focus-ring));
     outline-offset: 2px;
     box-shadow: 0 0 14px hsl(var(--tv-focus-ring) / 0.5);
   }
 
-  /* Hero buttons focus in TV mode - subtle scale */
-  .tv-mode main button:focus,
-  .tv-mode main button:focus-visible {
+  /* Mouse mode - minimal focus for interactive elements */
+  .tv-mode.mouse-mode button:focus-visible,
+  .tv-mode.mouse-mode a:focus-visible,
+  .tv-mode.mouse-mode [tabindex="0"]:focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.5);
+    outline-offset: 2px;
+  }
+
+  /* Hero buttons focus in TV mode - subtle scale (D-pad only) */
+  .tv-mode.dpad-mode main button:focus,
+  .tv-mode.dpad-mode main button:focus-visible {
     transform: scale(1.02);
   }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useTVMode } from "./useTVMode";
+import { useTVMode, InputMode } from "./useTVMode";
 import { useNavigate, useLocation } from "react-router-dom";
 
 interface FocusableSection {
@@ -17,10 +17,13 @@ interface FocusableSection {
  * - Focus management with visible focus rings
  */
 export function useTVNavigation() {
-  const { isTVMode } = useTVMode();
+  const { isTVMode, inputMode } = useTVMode();
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Only enable keyboard navigation in D-pad mode
+  const isKeyboardNavEnabled = isTVMode && inputMode === "dpad";
 
   // Get all focusable elements in a container
   const getFocusableElements = useCallback((container?: HTMLElement | null): HTMLElement[] => {
@@ -150,7 +153,8 @@ export function useTVNavigation() {
 
   // Main navigation handler
   const handleNavigation = useCallback((e: KeyboardEvent) => {
-    if (!isTVMode) return;
+    // Only handle keyboard navigation when D-pad mode is active
+    if (!isKeyboardNavEnabled) return;
 
     // Don't handle if a Radix select/dropdown is open - let it handle its own navigation
     const openSelect = document.querySelector('[data-radix-select-content]');
@@ -314,15 +318,15 @@ export function useTVNavigation() {
         activeElement.click();
       }
     }
-  }, [isTVMode, getFocusableElements, findNearestInDirection, closeDialog, navigate, location.pathname]);
+  }, [isKeyboardNavEnabled, getFocusableElements, findNearestInDirection, closeDialog, navigate, location.pathname]);
 
-  // Set up global listener
+  // Set up global listener - only when D-pad mode is active
   useEffect(() => {
-    if (!isTVMode) return;
+    if (!isKeyboardNavEnabled) return;
 
     window.addEventListener('keydown', handleNavigation, true);
     return () => window.removeEventListener('keydown', handleNavigation, true);
-  }, [isTVMode, handleNavigation]);
+  }, [isKeyboardNavEnabled, handleNavigation]);
 
   // Focus restoration
   const restoreFocus = useCallback(() => {
@@ -348,10 +352,11 @@ export function useTVNavigation() {
  * Hook to make a container navigable with focus management
  */
 export function useFocusContainer(containerRef: React.RefObject<HTMLElement>) {
-  const { isTVMode } = useTVMode();
+  const { isTVMode, inputMode } = useTVMode();
+  const isKeyboardNavEnabled = isTVMode && inputMode === "dpad";
 
   useEffect(() => {
-    if (!isTVMode || !containerRef.current) return;
+    if (!isKeyboardNavEnabled || !containerRef.current) return;
 
     // Ensure container has proper focus management
     const container = containerRef.current;
@@ -377,5 +382,5 @@ export function useFocusContainer(containerRef: React.RefObject<HTMLElement>) {
 
     observer.observe(container);
     return () => observer.disconnect();
-  }, [isTVMode, containerRef]);
+  }, [isKeyboardNavEnabled, containerRef]);
 }
