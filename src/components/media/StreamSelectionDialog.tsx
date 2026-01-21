@@ -723,92 +723,74 @@ export function StreamSelectionDialog({
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 rounded-none border-none overflow-hidden bg-[#0a0a0f]">
-        {/* Stremio-style layout */}
-        <div className="flex h-full">
-          {/* Left Panel - Media Info */}
-          <div className="w-[360px] shrink-0 flex flex-col bg-[#0d0d14] border-r border-white/5">
-            {/* Header with close button */}
-            <div className="flex items-center justify-between p-4 border-b border-white/5">
-              <h2 className="text-lg font-semibold text-white">Select Stream</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onOpenChange(false)}
-                className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+        {/* Stremio-style layout - Horizontal navigation */}
+        <div className="flex flex-col h-full">
+          {/* Top Header Bar */}
+          <div className="flex items-center gap-4 px-6 py-4 bg-[#0d0d14] border-b border-white/5">
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              className="h-9 w-9 text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+            >
+              <X className="h-5 w-5" />
+            </Button>
 
-            {/* Media poster and info */}
+            {/* Media info - horizontal */}
             {media && (
-              <div className="p-4 space-y-4">
-                {/* Poster with backdrop */}
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-black/50">
-                  {backdropUrl ? (
-                    <img
-                      src={backdropUrl}
-                      alt={media.title}
-                      className="w-full h-full object-cover opacity-60"
-                    />
-                  ) : posterUrl ? (
-                    <img
-                      src={posterUrl}
-                      alt={media.title}
-                      className="w-full h-full object-cover opacity-60"
-                    />
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                {/* Small poster */}
+                <div className="w-12 h-16 rounded overflow-hidden bg-white/5 shrink-0">
+                  {posterUrl ? (
+                    <img src={posterUrl} alt={media.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      {media.media_type === "movie" ? (
-                        <Film className="w-12 h-12 text-white/20" />
-                      ) : (
-                        <Tv className="w-12 h-12 text-white/20" />
-                      )}
+                      {media.media_type === "movie" ? <Film className="w-5 h-5 text-white/20" /> : <Tv className="w-5 h-5 text-white/20" />}
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <h3 className="text-white font-bold text-xl leading-tight">{media.title}</h3>
+                </div>
+
+                {/* Title and meta */}
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-semibold text-white truncate">{media.title}</h2>
+                  <div className="flex items-center gap-3 text-sm text-white/50">
+                    <span className="flex items-center gap-1">
+                      {media.media_type === "movie" ? <Film className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5" />}
+                      {media.media_type === "movie" ? "Movie" : "TV"}
+                    </span>
+                    {media.release_date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {media.release_date.slice(0, 4)}
+                      </span>
+                    )}
+                    {media.rating && media.rating > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Star className="w-3.5 h-3.5 text-yellow-500" />
+                        {media.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {media.runtime && media.runtime > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        {media.media_type === "tv" ? `~${media.runtime}m` : `${Math.floor(media.runtime / 60)}h ${media.runtime % 60}m`}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Meta info */}
-                <div className="flex flex-wrap items-center gap-3 text-sm text-white/60">
-                  <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
-                    {media.media_type === "movie" ? <Film className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5" />}
-                    {media.media_type === "movie" ? "Movie" : "TV Series"}
-                  </span>
-                  {media.release_date && (
-                    <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
-                      <Calendar className="w-3.5 h-3.5" />
-                      {media.release_date.slice(0, 4)}
-                    </span>
-                  )}
-                  {media.rating && media.rating > 0 && (
-                    <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
-                      <Star className="w-3.5 h-3.5 text-yellow-500" />
-                      {media.rating.toFixed(1)}
-                    </span>
-                  )}
-                  {media.runtime && media.runtime > 0 && (
-                    <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
-                      <Clock className="w-3.5 h-3.5" />
-                      {media.media_type === "tv" ? `~${media.runtime}m` : `${Math.floor(media.runtime / 60)}h ${media.runtime % 60}m`}
-                    </span>
-                  )}
-                </div>
-
-                {/* Season/Episode picker for TV */}
+                {/* Season/Episode picker for TV - inline */}
                 {media.media_type === "tv" && (
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="flex-1 justify-between bg-white/5 border-white/10 hover:bg-white/10 text-white">
-                          <span>Season {selectedSeason}</span>
-                          <ChevronDown className="w-4 h-4 opacity-60" />
+                        <Button variant="outline" size="sm" className="bg-white/5 border-white/10 hover:bg-white/10 text-white gap-1">
+                          <span>S{selectedSeason}</span>
+                          <ChevronDown className="w-3 h-3 opacity-60" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="start">
+                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="end">
                         <div className="grid grid-cols-5 gap-1 max-h-[200px] overflow-y-auto">
                           {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
                             <Button
@@ -826,12 +808,12 @@ export function StreamSelectionDialog({
                     </Popover>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="flex-1 justify-between bg-white/5 border-white/10 hover:bg-white/10 text-white">
-                          <span>Episode {selectedEpisode}</span>
-                          <ChevronDown className="w-4 h-4 opacity-60" />
+                        <Button variant="outline" size="sm" className="bg-white/5 border-white/10 hover:bg-white/10 text-white gap-1">
+                          <span>E{selectedEpisode}</span>
+                          <ChevronDown className="w-3 h-3 opacity-60" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="start">
+                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="end">
                         <div className="grid grid-cols-5 gap-1 max-h-[200px] overflow-y-auto">
                           {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
                             <Button
@@ -847,94 +829,94 @@ export function StreamSelectionDialog({
                         </div>
                       </PopoverContent>
                     </Popover>
-                    <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="icon" className="bg-white/5 border-white/10 hover:bg-white/10 text-white">
+                    <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="icon" className="h-8 w-8 bg-white/5 border-white/10 hover:bg-white/10 text-white">
                       {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     </Button>
                   </div>
                 )}
               </div>
             )}
+          </div>
 
-            {/* Tabs */}
-            <div className="px-4 border-b border-white/5">
-              <div className="flex">
-                <button
-                  onClick={() => setActiveTab("streams")}
-                  className={cn(
-                    "flex-1 py-3 text-sm font-medium transition-colors border-b-2 -mb-px",
-                    activeTab === "streams" 
-                      ? "text-white border-primary" 
-                      : "text-white/50 border-transparent hover:text-white/80"
-                  )}
-                >
-                  <Wifi className="w-4 h-4 inline-block mr-2" />
-                  Streams
-                </button>
-                <button
-                  onClick={() => setActiveTab("downloads")}
-                  className={cn(
-                    "flex-1 py-3 text-sm font-medium transition-colors border-b-2 -mb-px",
-                    activeTab === "downloads" 
-                      ? "text-white border-primary" 
-                      : "text-white/50 border-transparent hover:text-white/80"
-                  )}
-                >
-                  <HardDrive className="w-4 h-4 inline-block mr-2" />
-                  Downloads
-                </button>
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="p-4 space-y-3 border-b border-white/5">
-              <div className="flex gap-2">
-                <Select value={qualityFilter} onValueChange={setQualityFilter}>
-                  <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Quality" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a24] border-white/10">
-                    <SelectItem value="all">All Quality</SelectItem>
-                    <SelectItem value="best">Best</SelectItem>
-                    <SelectItem value="4k">4K</SelectItem>
-                    <SelectItem value="1080p">1080p</SelectItem>
-                    <SelectItem value="720p">720p</SelectItem>
-                    <SelectItem value="480p">480p/SD</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={languageFilter} onValueChange={setLanguageFilter}>
-                  <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-white">
-                    <SelectValue placeholder="Language" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a24] border-white/10">
-                    <SelectItem value="all">All Languages</SelectItem>
-                    <SelectItem value="english">English</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Stream count */}
-              <div className="text-xs text-white/40">
-                {activeTab === "streams" ? (
-                  isSearching ? "Searching..." : `${filteredStreams.length} streams available`
-                ) : (
-                  isLoadingDownloads ? "Loading..." : `${filteredDownloads.length} downloads`
+          {/* Horizontal Navigation Bar - Stremio style */}
+          <div className="flex items-center gap-6 px-6 py-3 bg-[#0d0d14]/80 border-b border-white/5">
+            {/* Tabs - horizontal like Stremio */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setActiveTab("streams")}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                  activeTab === "streams" 
+                    ? "bg-primary text-white" 
+                    : "text-white/60 hover:text-white hover:bg-white/5"
                 )}
-              </div>
+              >
+                <Wifi className="w-4 h-4 inline-block mr-2" />
+                Streams
+              </button>
+              <button
+                onClick={() => setActiveTab("downloads")}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                  activeTab === "downloads" 
+                    ? "bg-primary text-white" 
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <HardDrive className="w-4 h-4 inline-block mr-2" />
+                Downloads
+              </button>
             </div>
 
-            {/* Real-Debrid status */}
+            {/* Divider */}
+            <div className="w-px h-6 bg-white/10" />
+
+            {/* Filters - horizontal */}
+            <div className="flex items-center gap-2">
+              <Select value={qualityFilter} onValueChange={setQualityFilter}>
+                <SelectTrigger className="w-[120px] h-9 bg-white/5 border-white/10 text-white text-sm">
+                  <SelectValue placeholder="Quality" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a24] border-white/10">
+                  <SelectItem value="all">All Quality</SelectItem>
+                  <SelectItem value="best">Best</SelectItem>
+                  <SelectItem value="4k">4K</SelectItem>
+                  <SelectItem value="1080p">1080p</SelectItem>
+                  <SelectItem value="720p">720p</SelectItem>
+                  <SelectItem value="480p">480p/SD</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={languageFilter} onValueChange={setLanguageFilter}>
+                <SelectTrigger className="w-[120px] h-9 bg-white/5 border-white/10 text-white text-sm">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1a1a24] border-white/10">
+                  <SelectItem value="all">All Languages</SelectItem>
+                  <SelectItem value="english">English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Stream count - right aligned */}
+            <div className="ml-auto text-sm text-white/40">
+              {activeTab === "streams" ? (
+                isSearching ? "Searching..." : `${filteredStreams.length} streams`
+              ) : (
+                isLoadingDownloads ? "Loading..." : `${filteredDownloads.length} downloads`
+              )}
+            </div>
+
+            {/* Real-Debrid status indicator */}
             {(rdStatus === "service_unavailable" || rdStatus === "error") && (
-              <div className="p-4 bg-red-500/10 border-b border-red-500/20">
-                <p className="text-xs text-red-400 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {rdError || "Real-Debrid unavailable"}
-                </p>
+              <div className="flex items-center gap-2 text-xs text-red-400">
+                <AlertCircle className="w-4 h-4" />
+                <span>RD unavailable</span>
               </div>
             )}
           </div>
 
-          {/* Right Panel - Stream List */}
-          <div className="flex-1 flex flex-col min-w-0 bg-[#0a0a0f]">
+          {/* Main Content Area - Stream List */}
+          <div className="flex-1 flex flex-col min-h-0 bg-[#0a0a0f]">
             {activeTab === "streams" ? (
               <>
                 {/* Loading state */}
