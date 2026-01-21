@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useTVMode, SCALE_PRESETS, ScalePreset } from "@/hooks/useTVMode";
+import { useTVMode, SCALE_PRESETS, ScalePreset, InputMode } from "@/hooks/useTVMode";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2 } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -20,7 +20,7 @@ import { hasOAuthTokens, clearStoredTokens } from "@/lib/realDebridOAuth";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
-  const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset } = useTVMode();
+  const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset, inputMode, setInputMode } = useTVMode();
   const { settings: playbackSettings, updateSetting: updatePlaybackSetting, measureConnectionSpeed } = usePlaybackSettings();
   const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
@@ -181,6 +181,84 @@ export default function SettingsPage() {
           <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
             Tip: You can also enable TV mode by adding <code className="bg-secondary px-1.5 py-0.5 rounded">?tv=1</code> to the URL.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Input Mode */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            {inputMode === "dpad" ? (
+              <Gamepad2 className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            ) : (
+              <Mouse className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            )}
+            Input Mode
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Choose how you navigate the interface
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3">
+            <Button
+              variant={inputMode === "mouse" ? "default" : "outline"}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2",
+                inputMode === "mouse" && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                isTVMode && "h-14 text-lg"
+              )}
+              onClick={() => {
+                setInputMode("mouse");
+                toast.success("Switched to Mouse mode");
+              }}
+            >
+              <Mouse className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+              Mouse
+            </Button>
+            <Button
+              variant={inputMode === "dpad" ? "default" : "outline"}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2",
+                inputMode === "dpad" && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                isTVMode && "h-14 text-lg"
+              )}
+              onClick={() => {
+                setInputMode("dpad");
+                toast.success("Switched to D-pad mode");
+              }}
+            >
+              <Gamepad2 className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+              D-pad / Remote
+            </Button>
+          </div>
+
+          <div className={cn(
+            "flex items-start gap-3 p-4 rounded-lg",
+            inputMode === "dpad" ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
+          )}>
+            {inputMode === "dpad" ? (
+              <>
+                <Gamepad2 className={cn("text-primary flex-shrink-0", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+                <div>
+                  <p className={cn("font-medium", isTVMode && "text-lg")}>D-pad Mode Active</p>
+                  <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                    Use arrow keys or TV remote to navigate. Press Enter/OK to select.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Mouse className={cn("text-muted-foreground flex-shrink-0", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+                <div>
+                  <p className={cn("font-medium", isTVMode && "text-lg")}>Mouse Mode Active</p>
+                  <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                    Click and scroll to navigate. Best for desktop and touch devices.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
 
