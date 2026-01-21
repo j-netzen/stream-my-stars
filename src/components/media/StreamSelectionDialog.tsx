@@ -284,6 +284,7 @@ export function StreamSelectionDialog({
 
   // Update scroll state on mount and when content changes
   useEffect(() => {
+    if (!open || activeTab !== "streams") return;
     const el = streamsScrollRef.current;
     if (!el) return;
     
@@ -317,9 +318,10 @@ export function StreamSelectionDialog({
       cancelAnimationFrame(raf2);
       clearTimeout(timeout);
     };
-  }, [updateStreamsScrollState, filteredStreams.length]);
+  }, [open, activeTab, updateStreamsScrollState, filteredStreams.length]);
   
   useEffect(() => {
+    if (!open || activeTab !== "downloads") return;
     const el = downloadsScrollRef.current;
     if (!el) return;
     
@@ -348,7 +350,7 @@ export function StreamSelectionDialog({
       cancelAnimationFrame(raf2);
       clearTimeout(timeout);
     };
-  }, [updateDownloadsScrollState, filteredDownloads.length]);
+  }, [open, activeTab, updateDownloadsScrollState, filteredDownloads.length]);
 
   // Auto-focus first stream when list loads or filter changes
   useEffect(() => {
@@ -380,7 +382,7 @@ export function StreamSelectionDialog({
       case 'ArrowUp':
         e.preventDefault();
         // Focus header navigation arrows
-        streamsNavLeftRef.current?.focus();
+        (streamsCanScrollRight ? streamsNavRightRef : streamsNavLeftRef).current?.focus();
         break;
       case 'Enter':
       case ' ':
@@ -437,7 +439,7 @@ export function StreamSelectionDialog({
       case 'ArrowUp':
         e.preventDefault();
         // Focus header navigation arrows
-        downloadsNavLeftRef.current?.focus();
+        (downloadsCanScrollRight ? downloadsNavRightRef : downloadsNavLeftRef).current?.focus();
         break;
       case 'Enter':
       case ' ':
@@ -1196,30 +1198,40 @@ export function StreamSelectionDialog({
                           {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
                         </span>
                         <div className="flex items-center gap-2">
-                          {streamsCanScrollLeft && (
-                            <Button
-                              ref={streamsNavLeftRef}
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => scrollContainerBy(streamsScrollRef.current, -400)}
-                              onKeyDown={(e) => handleStreamsNavKeyDown(e, true)}
-                              className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all"
-                            >
-                              <ChevronLeft className="w-5 h-5" />
-                            </Button>
-                          )}
-                          {streamsCanScrollRight && (
-                            <Button
-                              ref={streamsNavRightRef}
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => scrollContainerBy(streamsScrollRef.current, 400)}
-                              onKeyDown={(e) => handleStreamsNavKeyDown(e, false)}
-                              className="h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                            >
-                              <ChevronRight className="w-5 h-5" />
-                            </Button>
-                          )}
+                          <Button
+                            ref={streamsNavLeftRef}
+                            variant="ghost"
+                            size="icon"
+                            aria-disabled={!streamsCanScrollLeft}
+                            onClick={() => {
+                              if (!streamsCanScrollLeft) return;
+                              scrollContainerBy(streamsScrollRef.current, -400);
+                            }}
+                            onKeyDown={(e) => handleStreamsNavKeyDown(e, true)}
+                            className={cn(
+                              "h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all",
+                              !streamsCanScrollLeft && "opacity-30"
+                            )}
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </Button>
+                          <Button
+                            ref={streamsNavRightRef}
+                            variant="ghost"
+                            size="icon"
+                            aria-disabled={!streamsCanScrollRight}
+                            onClick={() => {
+                              if (!streamsCanScrollRight) return;
+                              scrollContainerBy(streamsScrollRef.current, 400);
+                            }}
+                            onKeyDown={(e) => handleStreamsNavKeyDown(e, false)}
+                            className={cn(
+                              "h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                              !streamsCanScrollRight && "opacity-30"
+                            )}
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -1416,30 +1428,40 @@ export function StreamSelectionDialog({
                         {filteredDownloads.length} download{filteredDownloads.length !== 1 ? 's' : ''} available
                       </span>
                       <div className="flex items-center gap-2">
-                        {downloadsCanScrollLeft && (
-                          <Button
-                            ref={downloadsNavLeftRef}
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => scrollContainerBy(downloadsScrollRef.current, -400)}
-                            onKeyDown={(e) => handleDownloadsNavKeyDown(e, true)}
-                            className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all"
-                          >
-                            <ChevronLeft className="w-5 h-5" />
-                          </Button>
-                        )}
-                        {downloadsCanScrollRight && (
-                          <Button
-                            ref={downloadsNavRightRef}
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => scrollContainerBy(downloadsScrollRef.current, 400)}
-                            onKeyDown={(e) => handleDownloadsNavKeyDown(e, false)}
-                            className="h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                          >
-                            <ChevronRight className="w-5 h-5" />
-                          </Button>
-                        )}
+                        <Button
+                          ref={downloadsNavLeftRef}
+                          variant="ghost"
+                          size="icon"
+                          aria-disabled={!downloadsCanScrollLeft}
+                          onClick={() => {
+                            if (!downloadsCanScrollLeft) return;
+                            scrollContainerBy(downloadsScrollRef.current, -400);
+                          }}
+                          onKeyDown={(e) => handleDownloadsNavKeyDown(e, true)}
+                          className={cn(
+                            "h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all",
+                            !downloadsCanScrollLeft && "opacity-30"
+                          )}
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </Button>
+                        <Button
+                          ref={downloadsNavRightRef}
+                          variant="ghost"
+                          size="icon"
+                          aria-disabled={!downloadsCanScrollRight}
+                          onClick={() => {
+                            if (!downloadsCanScrollRight) return;
+                            scrollContainerBy(downloadsScrollRef.current, 400);
+                          }}
+                          onKeyDown={(e) => handleDownloadsNavKeyDown(e, false)}
+                          className={cn(
+                            "h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
+                            !downloadsCanScrollRight && "opacity-30"
+                          )}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </Button>
                       </div>
                     </div>
 
