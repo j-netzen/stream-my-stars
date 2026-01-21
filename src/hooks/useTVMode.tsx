@@ -9,6 +9,9 @@ export const SCALE_PRESETS = {
 
 export type ScalePreset = keyof typeof SCALE_PRESETS;
 
+// Input mode: mouse (default) or dpad (TV remote / gamepad)
+export type InputMode = "mouse" | "dpad";
+
 // TV detection: large screens (typically 1920+ wide) without touch support
 // or when explicitly enabled via URL param ?tv=1
 function detectTVMode(): boolean {
@@ -42,6 +45,13 @@ function getStoredScale(): number {
   return SCALE_PRESETS.normal.value;
 }
 
+function getStoredInputMode(): InputMode {
+  if (typeof window === "undefined") return "mouse";
+  const stored = localStorage.getItem("input-mode");
+  if (stored === "dpad") return "dpad";
+  return "mouse";
+}
+
 interface TVModeContextType {
   isTVMode: boolean;
   setTVMode: (enabled: boolean) => void;
@@ -49,6 +59,8 @@ interface TVModeContextType {
   uiScale: number;
   setUIScale: (scale: number) => void;
   currentPreset: ScalePreset | null;
+  inputMode: InputMode;
+  setInputMode: (mode: InputMode) => void;
 }
 
 const TVModeContext = createContext<TVModeContextType | undefined>(undefined);
@@ -56,10 +68,12 @@ const TVModeContext = createContext<TVModeContextType | undefined>(undefined);
 export function TVModeProvider({ children }: { children: ReactNode }) {
   const [isTVMode, setIsTVMode] = useState(false);
   const [uiScale, setUIScaleState] = useState<number>(SCALE_PRESETS.normal.value);
+  const [inputMode, setInputModeState] = useState<InputMode>("mouse");
 
   useEffect(() => {
     setIsTVMode(detectTVMode());
     setUIScaleState(getStoredScale());
+    setInputModeState(getStoredInputMode());
   }, []);
 
   useEffect(() => {
@@ -77,6 +91,17 @@ export function TVModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.fontSize = `${uiScale}%`;
   }, [uiScale]);
 
+  useEffect(() => {
+    // Apply input mode class to document for CSS targeting
+    if (inputMode === "dpad") {
+      document.documentElement.classList.add("dpad-mode");
+      document.documentElement.classList.remove("mouse-mode");
+    } else {
+      document.documentElement.classList.add("mouse-mode");
+      document.documentElement.classList.remove("dpad-mode");
+    }
+  }, [inputMode]);
+
   const setTVMode = (enabled: boolean) => {
     localStorage.setItem("tv-mode", String(enabled));
     setIsTVMode(enabled);
@@ -91,13 +116,27 @@ export function TVModeProvider({ children }: { children: ReactNode }) {
     setUIScaleState(scale);
   };
 
+  const setInputMode = (mode: InputMode) => {
+    localStorage.setItem("input-mode", mode);
+    setInputModeState(mode);
+  };
+
   // Determine current preset
   const currentPreset = (Object.keys(SCALE_PRESETS) as ScalePreset[]).find(
     (key) => SCALE_PRESETS[key].value === uiScale
   ) || null;
 
   return (
-    <TVModeContext.Provider value={{ isTVMode, setTVMode, toggleTVMode, uiScale, setUIScale, currentPreset }}>
+    <TVModeContext.Provider value={{ 
+      isTVMode, 
+      setTVMode, 
+      toggleTVMode, 
+      uiScale, 
+      setUIScale, 
+      currentPreset,
+      inputMode,
+      setInputMode,
+    }}>
       {children}
     </TVModeContext.Provider>
   );
