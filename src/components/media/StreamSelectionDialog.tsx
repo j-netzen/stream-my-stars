@@ -3,6 +3,7 @@ import { Media, useMedia } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
+import { useHorizontalScroll } from "@/hooks/useHorizontalScroll";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
@@ -64,6 +65,10 @@ export function StreamSelectionDialog({
   const [languageFilter, setLanguageFilter] = useState<string>("english");
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
   
+  // Horizontal scroll refs for touch/mouse drag
+  const streamsScrollRef = useHorizontalScroll<HTMLDivElement>();
+  const downloadsScrollRef = useHorizontalScroll<HTMLDivElement>();
+  
   // Refs to track streams for auto-retry when player reports playback error
   const filteredStreamsRef = useRef<TorrentioStream[]>([]);
   const currentStreamIndexRef = useRef<number>(0);
@@ -78,6 +83,7 @@ export function StreamSelectionDialog({
   
   // Track failed streams for visual indicator
   const [failedStreams, setFailedStreams] = useState<Set<string>>(new Set());
+
 
   // Filter streams based on quality and language selection
   const filteredStreams = streams.filter((stream) => {
@@ -949,7 +955,10 @@ export function StreamSelectionDialog({
 
                 {/* Stream list - HORIZONTAL SCROLL */}
                 {!isSearching && !error && (
-                  <div className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-6 py-4 scrollbar-hide">
+                  <div 
+                    ref={streamsScrollRef}
+                    className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-6 py-4 scrollbar-hide"
+                  >
                     {filteredStreams.length === 0 && streams.length > 0 ? (
                       <div className="flex-1 flex items-center justify-center text-white/40">
                         No streams match the selected filters
@@ -1126,7 +1135,10 @@ export function StreamSelectionDialog({
 
                 {/* Downloads list - HORIZONTAL SCROLL */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
-                  <div className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-6 py-4 scrollbar-hide">
+                  <div 
+                    ref={downloadsScrollRef}
+                    className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-6 py-4 scrollbar-hide"
+                  >
                     <div className="flex gap-3">
                       {filteredDownloads.map((download, index) => {
                         const quality = extractQuality(download.filename);
