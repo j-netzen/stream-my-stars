@@ -1081,171 +1081,176 @@ export function StreamSelectionDialog({
 
                 {/* Stream list - HORIZONTAL SCROLL with arrows */}
                 {!isSearching && !error && (
-                  <div className="flex-1 flex items-center relative group">
-                    {/* Left Arrow Button - fades based on scroll position */}
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* Header with title and arrows */}
                     {filteredStreams.length > 0 && (
-                      <button
-                        onClick={() => {
-                          if (streamsScrollRef.current) {
-                            streamsScrollRef.current.scrollBy({ left: -300, behavior: scrollBehavior });
-                          }
-                        }}
-                        className={cn(
-                          "absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
-                          streamsCanScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
-                        )}
-                      >
-                        <ChevronLeft className="w-6 h-6" />
-                      </button>
+                      <div className="flex items-center justify-between px-6 py-2">
+                        <span className="text-sm text-white/40">
+                          {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
+                        </span>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (streamsScrollRef.current) {
+                                streamsScrollRef.current.scrollBy({ left: -400, behavior: scrollBehavior });
+                              }
+                            }}
+                            disabled={!streamsCanScrollLeft}
+                            className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-30"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (streamsScrollRef.current) {
+                                streamsScrollRef.current.scrollBy({ left: 400, behavior: scrollBehavior });
+                              }
+                            }}
+                            disabled={!streamsCanScrollRight}
+                            className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </Button>
+                        </div>
+                      </div>
                     )}
 
-                    {/* Scrollable area - horizontal row like home page */}
-                    <div 
-                      ref={streamsScrollRef}
-                      className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-12 py-6 items-center h-full"
-                      style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
-                    >
-                      {filteredStreams.length === 0 && streams.length > 0 ? (
-                        <div className="flex-1 flex items-center justify-center text-white/40">
-                          No streams match the selected filters
-                        </div>
-                      ) : filteredStreams.length === 0 ? (
-                        <div className="flex-1 flex items-center justify-center text-white/40">
-                          No streams found
-                        </div>
-                      ) : (
-                        <>
-                          {filteredStreams.map((stream, index) => {
-                            const details = extractStreamDetails(stream);
-                            const isCurrentlyResolving = resolvingStream === stream.url;
-                            const isFocused = focusedIndex === index;
-                            const hasFailed = failedStreams.has(stream.url);
-                            
-                            return (
-                              <button
-                                key={index}
-                                ref={(el) => (streamButtonsRef.current[index] = el)}
-                                onClick={() => handleStreamSelect(stream)}
-                                onKeyDown={(e) => handleKeyDown(e, index, stream)}
-                                onFocus={() => setFocusedIndex(index)}
-                                disabled={isResolving}
-                                className={cn(
-                                  "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
-                                  hasFailed
-                                    ? "bg-red-500/10 border-2 border-red-500/30 opacity-60"
-                                    : isCurrentlyResolving
-                                    ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
-                                    : isFocused
-                                    ? "bg-white/10 border-2 border-primary scale-105"
-                                    : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
-                                  "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
-                                  isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
-                                )}
-                              >
-                                {/* Top section - Provider icon and play button */}
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center">
-                                    {details.isDirectLink ? (
-                                      <Zap className="w-6 h-6 text-green-400" />
-                                    ) : (
-                                      <Wifi className="w-6 h-6 text-white/40" />
-                                    )}
-                                  </div>
-                                  
-                                  {isCurrentlyResolving ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                      {resolveStatus && (
-                                        <span className="text-[10px] text-primary">{resolveStatus}</span>
+                    {/* Scrollable row */}
+                    <div className="flex-1 flex items-center">
+                      <div 
+                        ref={streamsScrollRef}
+                        className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-6 py-4 items-center w-full"
+                        style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
+                      >
+                        {filteredStreams.length === 0 && streams.length > 0 ? (
+                          <div className="flex-1 flex items-center justify-center text-white/40">
+                            No streams match the selected filters
+                          </div>
+                        ) : filteredStreams.length === 0 ? (
+                          <div className="flex-1 flex items-center justify-center text-white/40">
+                            No streams found
+                          </div>
+                        ) : (
+                          <>
+                            {filteredStreams.map((stream, index) => {
+                              const details = extractStreamDetails(stream);
+                              const isCurrentlyResolving = resolvingStream === stream.url;
+                              const isFocused = focusedIndex === index;
+                              const hasFailed = failedStreams.has(stream.url);
+                              
+                              return (
+                                <button
+                                  key={index}
+                                  ref={(el) => (streamButtonsRef.current[index] = el)}
+                                  onClick={() => handleStreamSelect(stream)}
+                                  onKeyDown={(e) => handleKeyDown(e, index, stream)}
+                                  onFocus={() => setFocusedIndex(index)}
+                                  disabled={isResolving}
+                                  className={cn(
+                                    "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
+                                    hasFailed
+                                      ? "bg-red-500/10 border-2 border-red-500/30 opacity-60"
+                                      : isCurrentlyResolving
+                                      ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
+                                      : isFocused
+                                      ? "bg-white/10 border-2 border-primary scale-105"
+                                      : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
+                                    "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
+                                    isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
+                                  )}
+                                >
+                                  {/* Top section - Provider icon and play button */}
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center">
+                                      {details.isDirectLink ? (
+                                        <Zap className="w-6 h-6 text-green-400" />
+                                      ) : (
+                                        <Wifi className="w-6 h-6 text-white/40" />
                                       )}
                                     </div>
-                                  ) : (
-                                    <div className={cn(
-                                      "w-12 h-12 rounded-full flex items-center justify-center transition-all",
-                                      isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
-                                    )}>
-                                      <Play className="w-6 h-6 ml-0.5" />
-                                    </div>
-                                  )}
-                                </div>
+                                    
+                                    {isCurrentlyResolving ? (
+                                      <div className="flex flex-col items-center gap-1">
+                                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                        {resolveStatus && (
+                                          <span className="text-[10px] text-primary">{resolveStatus}</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className={cn(
+                                        "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                                        isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
+                                      )}>
+                                        <Play className="w-6 h-6 ml-0.5" />
+                                      </div>
+                                    )}
+                                  </div>
 
-                                {/* Quality badges row */}
-                                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                  {details.quality && (
-                                    <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(details.quality))}>
-                                      {details.quality}
-                                    </span>
-                                  )}
-                                  {details.hdr && (
-                                    <span className="px-2 py-1 rounded text-xs font-semibold bg-amber-500/20 text-amber-400">
-                                      {details.hdr}
-                                    </span>
-                                  )}
-                                  {details.isDirectLink && (
-                                    <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400 flex items-center gap-1">
-                                      <Zap className="w-3 h-3" />
-                                      Cached
-                                    </span>
-                                  )}
-                                  {hasFailed && (
-                                    <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
-                                      Failed
-                                    </span>
-                                  )}
-                                </div>
+                                  {/* Quality badges row */}
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                    {details.quality && (
+                                      <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(details.quality))}>
+                                        {details.quality}
+                                      </span>
+                                    )}
+                                    {details.hdr && (
+                                      <span className="px-2 py-1 rounded text-xs font-semibold bg-amber-500/20 text-amber-400">
+                                        {details.hdr}
+                                      </span>
+                                    )}
+                                    {details.isDirectLink && (
+                                      <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400 flex items-center gap-1">
+                                        <Zap className="w-3 h-3" />
+                                        Cached
+                                      </span>
+                                    )}
+                                    {hasFailed && (
+                                      <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
+                                        Failed
+                                      </span>
+                                    )}
+                                  </div>
 
-                                {/* Codec/Audio badges */}
-                                <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                                  {details.codec && (
-                                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
-                                      {details.codec}
-                                    </span>
-                                  )}
-                                  {details.audio && (
-                                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
-                                      {details.audio}
-                                    </span>
-                                  )}
-                                </div>
+                                  {/* Codec/Audio badges */}
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                                    {details.codec && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
+                                        {details.codec}
+                                      </span>
+                                    )}
+                                    {details.audio && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
+                                        {details.audio}
+                                      </span>
+                                    )}
+                                  </div>
 
-                                {/* Title - truncated to 2 lines */}
-                                <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
-                                  {stream.title || stream.name}
-                                </p>
+                                  {/* Title - truncated to 2 lines */}
+                                  <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
+                                    {stream.title || stream.name}
+                                  </p>
 
-                                {/* Bottom row - Size and provider */}
-                                <div className="flex items-center justify-between text-xs text-white/40">
-                                  {details.size && (
-                                    <span className="flex items-center gap-1">
-                                      <HardDrive className="w-3.5 h-3.5" />
-                                      {details.size}
-                                    </span>
-                                  )}
-                                  <span className="truncate max-w-[120px]">{details.provider}</span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </>
-                      )}
-                    </div>
-
-                    {/* Right Arrow Button - fades based on scroll position */}
-                    {filteredStreams.length > 0 && (
-                      <button
-                        onClick={() => {
-                          if (streamsScrollRef.current) {
-                            streamsScrollRef.current.scrollBy({ left: 300, behavior: scrollBehavior });
-                          }
-                        }}
-                        className={cn(
-                          "absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
-                          streamsCanScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
+                                  {/* Bottom row - Size and provider */}
+                                  <div className="flex items-center justify-between text-xs text-white/40">
+                                    {details.size && (
+                                      <span className="flex items-center gap-1">
+                                        <HardDrive className="w-3.5 h-3.5" />
+                                        {details.size}
+                                      </span>
+                                    )}
+                                    <span className="truncate max-w-[120px]">{details.provider}</span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </>
                         )}
-                      >
-                        <ChevronRight className="w-6 h-6" />
-                      </button>
-                    )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
@@ -1299,113 +1304,120 @@ export function StreamSelectionDialog({
 
                 {/* Downloads list - HORIZONTAL SCROLL with arrows */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
-                  <div className="flex-1 flex items-center relative group">
-                    {/* Left Arrow Button - fades based on scroll position */}
-                    <button
-                      onClick={() => {
-                        if (downloadsScrollRef.current) {
-                          downloadsScrollRef.current.scrollBy({ left: -300, behavior: scrollBehavior });
-                        }
-                      }}
-                      className={cn(
-                        "absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
-                        downloadsCanScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
-                      )}
-                    >
-                      <ChevronLeft className="w-6 h-6" />
-                    </button>
-
-                    {/* Scrollable area - horizontal row like home page */}
-                    <div 
-                      ref={downloadsScrollRef}
-                      className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-12 py-6 items-center h-full"
-                      style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
-                    >
-                      {filteredDownloads.map((download, index) => {
-                        const quality = extractQuality(download.filename);
-                        const isCurrentlyResolving = resolvingStream === download.download;
-                        const isFocused = downloadFocusedIndex === index;
-                        
-                        return (
-                          <button
-                            key={download.id}
-                            ref={(el) => (downloadButtonsRef.current[index] = el)}
-                            onClick={() => handleDownloadSelect(download)}
-                            onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
-                            onFocus={() => setDownloadFocusedIndex(index)}
-                            disabled={isResolving}
-                            className={cn(
-                              "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
-                              isCurrentlyResolving
-                                ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
-                                : isFocused
-                                ? "bg-white/10 border-2 border-primary scale-105"
-                                : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
-                              "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
-                              isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
-                            )}
-                          >
-                            {/* Top section - Icon and play button */}
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-                                <HardDrive className="w-6 h-6 text-green-400" />
-                              </div>
-                              
-                              {isCurrentlyResolving ? (
-                                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                              ) : (
-                                <div className={cn(
-                                  "w-12 h-12 rounded-full flex items-center justify-center transition-all",
-                                  isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
-                                )}>
-                                  <Play className="w-6 h-6 ml-0.5" />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Quality badges */}
-                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                              {quality && (
-                                <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(quality))}>
-                                  {quality}
-                                </span>
-                              )}
-                              <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400">
-                                Downloaded
-                              </span>
-                            </div>
-
-                            {/* Filename - truncated to 2 lines */}
-                            <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
-                              {download.filename}
-                            </p>
-
-                            {/* File size */}
-                            <div className="flex items-center text-xs text-white/40">
-                              <span className="flex items-center gap-1">
-                                <HardDrive className="w-3.5 h-3.5" />
-                                {formatFileSize(download.filesize)}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* Header with count and arrows */}
+                    <div className="flex items-center justify-between px-6 py-2">
+                      <span className="text-sm text-white/40">
+                        {filteredDownloads.length} download{filteredDownloads.length !== 1 ? 's' : ''} available
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (downloadsScrollRef.current) {
+                              downloadsScrollRef.current.scrollBy({ left: -400, behavior: scrollBehavior });
+                            }
+                          }}
+                          disabled={!downloadsCanScrollLeft}
+                          className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-30"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (downloadsScrollRef.current) {
+                              downloadsScrollRef.current.scrollBy({ left: 400, behavior: scrollBehavior });
+                            }
+                          }}
+                          disabled={!downloadsCanScrollRight}
+                          className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-30"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </Button>
+                      </div>
                     </div>
 
-                    {/* Right Arrow Button - fades based on scroll position */}
-                    <button
-                      onClick={() => {
-                        if (downloadsScrollRef.current) {
-                          downloadsScrollRef.current.scrollBy({ left: 300, behavior: scrollBehavior });
-                        }
-                      }}
-                      className={cn(
-                        "absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
-                        downloadsCanScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
-                      )}
-                    >
-                      <ChevronRight className="w-6 h-6" />
-                    </button>
+                    {/* Scrollable row */}
+                    <div className="flex-1 flex items-center">
+                      <div 
+                        ref={downloadsScrollRef}
+                        className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-6 py-4 items-center w-full"
+                        style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
+                      >
+                        {filteredDownloads.map((download, index) => {
+                          const quality = extractQuality(download.filename);
+                          const isCurrentlyResolving = resolvingStream === download.download;
+                          const isFocused = downloadFocusedIndex === index;
+                          
+                          return (
+                            <button
+                              key={download.id}
+                              ref={(el) => (downloadButtonsRef.current[index] = el)}
+                              onClick={() => handleDownloadSelect(download)}
+                              onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
+                              onFocus={() => setDownloadFocusedIndex(index)}
+                              disabled={isResolving}
+                              className={cn(
+                                "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
+                                isCurrentlyResolving
+                                  ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
+                                  : isFocused
+                                  ? "bg-white/10 border-2 border-primary scale-105"
+                                  : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
+                                "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
+                                isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
+                              )}
+                            >
+                              {/* Top section - Icon and play button */}
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                                  <HardDrive className="w-6 h-6 text-green-400" />
+                                </div>
+                                
+                                {isCurrentlyResolving ? (
+                                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                ) : (
+                                  <div className={cn(
+                                    "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                                    isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
+                                  )}>
+                                    <Play className="w-6 h-6 ml-0.5" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Quality badges */}
+                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                {quality && (
+                                  <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(quality))}>
+                                    {quality}
+                                  </span>
+                                )}
+                                <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400">
+                                  Downloaded
+                                </span>
+                              </div>
+
+                              {/* Filename - truncated to 2 lines */}
+                              <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
+                                {download.filename}
+                              </p>
+
+                              {/* File size */}
+                              <div className="flex items-center text-xs text-white/40">
+                                <span className="flex items-center gap-1">
+                                  <HardDrive className="w-3.5 h-3.5" />
+                                  {formatFileSize(download.filesize)}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
