@@ -4,7 +4,7 @@ import { useTVMode } from "@/hooks/useTVMode";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
-import { useHorizontalScroll } from "@/hooks/useHorizontalScroll";
+
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
@@ -23,7 +23,7 @@ import {
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -67,13 +67,13 @@ export function StreamSelectionDialog({
   const [languageFilter, setLanguageFilter] = useState<string>("english");
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
   
-  // Horizontal scroll refs for touch/mouse drag
-  const streamsScrollRef = useHorizontalScroll<HTMLDivElement>();
+  // Scroll refs for vertical scrolling
+  const streamsScrollRef = useRef<HTMLDivElement>(null);
   const downloadsScrollRef = useRef<HTMLDivElement>(null);
   
-  // Scroll boundary state for hiding arrow buttons (horizontal for streams)
-  const [streamsCanScrollLeft, setStreamsCanScrollLeft] = useState(false);
-  const [streamsCanScrollRight, setStreamsCanScrollRight] = useState(false);
+  // Scroll boundary state for streams (vertical)
+  const [streamsCanScrollUp, setStreamsCanScrollUp] = useState(false);
+  const [streamsCanScrollDown, setStreamsCanScrollDown] = useState(false);
   
   // Scroll boundary state for downloads (vertical)
   const [downloadsCanScrollUp, setDownloadsCanScrollUp] = useState(false);
@@ -83,15 +83,15 @@ export function StreamSelectionDialog({
   const [streamsScrollProgress, setStreamsScrollProgress] = useState(0);
   const [downloadsScrollProgress, setDownloadsScrollProgress] = useState(0);
   
-  // Check scroll boundaries for streams
+  // Check scroll boundaries for streams (vertical)
   const updateStreamsScrollState = useCallback(() => {
     const el = streamsScrollRef.current;
     if (!el) return;
-    setStreamsCanScrollLeft(el.scrollLeft > 0);
-    setStreamsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
-    // Calculate scroll progress percentage
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    const progress = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+    setStreamsCanScrollUp(el.scrollTop > 0);
+    setStreamsCanScrollDown(el.scrollTop < el.scrollHeight - el.clientHeight - 1);
+    // Calculate scroll progress percentage (vertical)
+    const maxScroll = el.scrollHeight - el.clientHeight;
+    const progress = maxScroll > 0 ? (el.scrollTop / maxScroll) * 100 : 0;
     setStreamsScrollProgress(progress);
   }, []);
   
@@ -112,29 +112,29 @@ export function StreamSelectionDialog({
   const currentStreamIndexRef = useRef<number>(0);
 
   // Refs for header navigation buttons (D-pad focus)
-  const streamsNavLeftRef = useRef<HTMLButtonElement>(null);
-  const streamsNavRightRef = useRef<HTMLButtonElement>(null);
-  const downloadsNavLeftRef = useRef<HTMLButtonElement>(null);
-  const downloadsNavRightRef = useRef<HTMLButtonElement>(null);
+  const streamsNavUpRef = useRef<HTMLButtonElement>(null);
+  const streamsNavDownRef = useRef<HTMLButtonElement>(null);
+  const downloadsNavUpRef = useRef<HTMLButtonElement>(null);
+  const downloadsNavDownRef = useRef<HTMLButtonElement>(null);
 
   const scrollBehavior: ScrollBehavior = isBrowseHere ? "auto" : "smooth";
 
-  // Helper to scroll container with fallback for TV browsers that may not support scrollBy
-  const scrollContainerBy = useCallback((container: HTMLElement | null, delta: number) => {
+  // Helper to scroll container vertically with fallback for TV browsers that may not support scrollBy
+  const scrollContainerByVertical = useCallback((container: HTMLElement | null, delta: number) => {
     if (!container) return;
     if (typeof container.scrollBy === 'function') {
-      container.scrollBy({ left: delta, behavior: scrollBehavior });
+      container.scrollBy({ top: delta, behavior: scrollBehavior });
     } else {
       // Fallback for older browsers
-      container.scrollLeft += delta;
+      container.scrollTop += delta;
     }
   }, [scrollBehavior]);
 
-  const centerElementInScroll = useCallback(
+  const centerElementInScrollVertical = useCallback(
     (container: HTMLElement | null, el: HTMLElement | null) => {
       if (!container || !el) return;
-      const left = el.offsetLeft - (container.clientWidth - el.clientWidth) / 2;
-      container.scrollTo({ left, behavior: scrollBehavior });
+      const top = el.offsetTop - (container.clientHeight - el.clientHeight) / 2;
+      container.scrollTo({ top, behavior: scrollBehavior });
     },
     [scrollBehavior],
   );
@@ -149,10 +149,10 @@ export function StreamSelectionDialog({
         const btn = streamButtonsRef.current[clamped];
         if (!btn) return;
         btn.focus();
-        centerElementInScroll(streamsScrollRef.current, btn);
+        centerElementInScrollVertical(streamsScrollRef.current, btn);
       });
     },
-    [centerElementInScroll, streamsScrollRef],
+    [centerElementInScrollVertical, streamsScrollRef],
   );
 
   // Fail-Safe state
@@ -290,10 +290,10 @@ export function StreamSelectionDialog({
         const btn = downloadButtonsRef.current[clamped];
         if (!btn) return;
         btn.focus();
-        centerElementInScroll(downloadsScrollRef.current, btn);
+        centerElementInScrollVertical(downloadsScrollRef.current, btn);
       });
     },
-    [centerElementInScroll, downloadsScrollRef, filteredDownloads.length],
+    [centerElementInScrollVertical, downloadsScrollRef, filteredDownloads.length],
   );
 
   // Update scroll state on mount and when content changes
@@ -380,23 +380,23 @@ export function StreamSelectionDialog({
     }
   }, [filteredDownloads.length, isLoadingDownloads, activeTab, focusDownloadAtIndex]);
 
-  // Keyboard navigation for TV remotes - horizontal scrolling
+  // Keyboard navigation for TV remotes - vertical scrolling
   const handleKeyDown = (e: React.KeyboardEvent, index: number, stream: TorrentioStream) => {
     if (isResolving) return;
 
     switch (e.key) {
-      case 'ArrowRight':
+      case 'ArrowDown':
         e.preventDefault();
         focusStreamAtIndex(index + 1);
         break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        focusStreamAtIndex(index - 1);
-        break;
       case 'ArrowUp':
         e.preventDefault();
-        // Focus header navigation arrows
-        (streamsCanScrollRight ? streamsNavRightRef : streamsNavLeftRef).current?.focus();
+        if (index === 0) {
+          // Focus header navigation arrows
+          streamsNavDownRef.current?.focus();
+        } else {
+          focusStreamAtIndex(index - 1);
+        }
         break;
       case 'Enter':
       case ' ':
@@ -406,53 +406,49 @@ export function StreamSelectionDialog({
     }
   };
 
-  // Keyboard navigation for header arrow buttons (streams)
-  const handleStreamsNavKeyDown = (e: React.KeyboardEvent, isLeft: boolean) => {
+  // Keyboard navigation for header arrow buttons (streams - vertical)
+  const handleStreamsNavKeyDown = (e: React.KeyboardEvent, isUp: boolean) => {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        focusStreamAtIndex(focusedIndex);
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (isLeft) {
-          streamsNavRightRef.current?.focus();
+        if (isUp) {
+          streamsNavDownRef.current?.focus();
         } else {
-          scrollContainerBy(streamsScrollRef.current, 400);
+          focusStreamAtIndex(focusedIndex);
         }
         break;
-      case 'ArrowLeft':
+      case 'ArrowUp':
         e.preventDefault();
-        if (!isLeft) {
-          streamsNavLeftRef.current?.focus();
+        if (!isUp) {
+          streamsNavUpRef.current?.focus();
         } else {
-          scrollContainerBy(streamsScrollRef.current, -400);
+          scrollContainerByVertical(streamsScrollRef.current, -300);
         }
         break;
       case 'Enter':
       case ' ':
         e.preventDefault();
-        scrollContainerBy(streamsScrollRef.current, isLeft ? -400 : 400);
+        scrollContainerByVertical(streamsScrollRef.current, isUp ? -300 : 300);
         break;
     }
   };
 
-  // Keyboard navigation for downloads - horizontal scrolling
+  // Keyboard navigation for downloads - vertical scrolling
   const handleDownloadKeyDown = (e: React.KeyboardEvent, index: number, download: RealDebridUnrestrictedLink) => {
     if (isResolving) return;
 
     switch (e.key) {
-      case 'ArrowRight':
+      case 'ArrowDown':
         e.preventDefault();
         focusDownloadAtIndex(index + 1);
         break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        focusDownloadAtIndex(index - 1);
-        break;
       case 'ArrowUp':
         e.preventDefault();
-        // Focus header navigation arrows (vertical scroll: down button takes priority)
+        if (index === 0) {
+          downloadsNavDownRef.current?.focus();
+        } else {
+          focusDownloadAtIndex(index - 1);
+        }
         break;
       case 'Enter':
       case ' ':
@@ -462,33 +458,29 @@ export function StreamSelectionDialog({
     }
   };
 
-  // Keyboard navigation for header arrow buttons (downloads)
-  const handleDownloadsNavKeyDown = (e: React.KeyboardEvent, isLeft: boolean) => {
+  // Keyboard navigation for header arrow buttons (downloads - vertical)
+  const handleDownloadsNavKeyDown = (e: React.KeyboardEvent, isUp: boolean) => {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        focusDownloadAtIndex(downloadFocusedIndex);
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (isLeft) {
-          downloadsNavRightRef.current?.focus();
+        if (isUp) {
+          downloadsNavDownRef.current?.focus();
         } else {
-          scrollContainerBy(downloadsScrollRef.current, 400);
+          focusDownloadAtIndex(downloadFocusedIndex);
         }
         break;
-      case 'ArrowLeft':
+      case 'ArrowUp':
         e.preventDefault();
-        if (!isLeft) {
-          downloadsNavLeftRef.current?.focus();
+        if (!isUp) {
+          downloadsNavUpRef.current?.focus();
         } else {
-          scrollContainerBy(downloadsScrollRef.current, -400);
+          scrollContainerByVertical(downloadsScrollRef.current, -300);
         }
         break;
       case 'Enter':
       case ' ':
         e.preventDefault();
-        scrollContainerBy(downloadsScrollRef.current, isLeft ? -400 : 400);
+        scrollContainerByVertical(downloadsScrollRef.current, isUp ? -300 : 300);
         break;
     }
   };
@@ -1201,84 +1193,84 @@ export function StreamSelectionDialog({
                   </div>
                 )}
 
-                {/* Stream list - HORIZONTAL SCROLL */}
+                {/* Stream list - VERTICAL SCROLL */}
                 {!isSearching && !error && (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Header with stream count and navigation arrows - Stremio style */}
+                    {/* Header with stream count and navigation arrows */}
                     {filteredStreams.length > 0 && (
-                      <div className="flex flex-col px-6 py-3 gap-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-semibold text-white">
-                            {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
-                          </span>
-                        </div>
-                        {/* Navigation arrows row */}
-                        <div className="flex items-center justify-center gap-6">
-                          <Button
-                            ref={streamsNavLeftRef}
-                            variant="outline"
-                            size="lg"
-                            aria-disabled={!streamsCanScrollLeft}
-                            onClick={() => {
-                              if (!streamsCanScrollLeft) return;
-                              scrollContainerBy(streamsScrollRef.current, -400);
-                            }}
-                            onKeyDown={(e) => handleStreamsNavKeyDown(e, true)}
-                            className={cn(
-                              "h-12 w-24 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-primary transition-all flex items-center justify-center gap-2",
-                              !streamsCanScrollLeft && "opacity-30 cursor-not-allowed"
-                            )}
-                          >
-                            <span className="text-sm font-medium">Prev</span>
-                            <ChevronLeft className="w-6 h-6" />
-                          </Button>
-                          <Button
-                            ref={streamsNavRightRef}
-                            variant="default"
-                            size="lg"
-                            aria-disabled={!streamsCanScrollRight}
-                            onClick={() => {
-                              if (!streamsCanScrollRight) return;
-                              scrollContainerBy(streamsScrollRef.current, 400);
-                            }}
-                            onKeyDown={(e) => handleStreamsNavKeyDown(e, false)}
-                            className={cn(
-                              "h-12 w-24 rounded-lg bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all flex items-center justify-center gap-2",
-                              !streamsCanScrollRight && "opacity-30 cursor-not-allowed"
-                            )}
-                          >
-                            <span className="text-sm font-medium">Next</span>
-                            <ChevronRight className="w-6 h-6" />
-                          </Button>
-                        </div>
+                      <div className="flex flex-col items-center gap-3 px-6 py-3">
+                        <span className="text-lg font-semibold text-white">
+                          {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
+                        </span>
+                        
+                        {/* Scroll Up/Down buttons */}
+                        {(streamsCanScrollUp || streamsCanScrollDown) && (
+                          <div className="flex items-center justify-center gap-4">
+                            <Button
+                              ref={streamsNavUpRef}
+                              variant="default"
+                              size="lg"
+                              onClick={() => {
+                                if (!streamsCanScrollUp) return;
+                                scrollContainerByVertical(streamsScrollRef.current, -300);
+                              }}
+                              onKeyDown={(e) => handleStreamsNavKeyDown(e, true)}
+                              className={cn(
+                                "h-12 w-28 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all flex items-center justify-center gap-2",
+                                !streamsCanScrollUp && "opacity-30 cursor-not-allowed"
+                              )}
+                            >
+                              <span className="text-sm font-medium">Up</span>
+                              <ChevronUp className="w-5 h-5" />
+                            </Button>
+                            <Button
+                              ref={streamsNavDownRef}
+                              variant="default"
+                              size="lg"
+                              onClick={() => {
+                                if (!streamsCanScrollDown) return;
+                                scrollContainerByVertical(streamsScrollRef.current, 300);
+                              }}
+                              onKeyDown={(e) => handleStreamsNavKeyDown(e, false)}
+                              className={cn(
+                                "h-12 w-28 rounded-lg bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all flex items-center justify-center gap-2",
+                                !streamsCanScrollDown && "opacity-30 cursor-not-allowed"
+                              )}
+                            >
+                              <span className="text-sm font-medium">Down</span>
+                              <ChevronDown className="w-5 h-5" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {/* Scrollable content with edge fades */}
-                    <div className="flex-1 flex items-center relative">
-                      {/* Left edge fade */}
-                      {streamsCanScrollLeft && (
-                        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+                    <div className="flex-1 relative min-h-0">
+                      {/* Top edge fade */}
+                      {streamsCanScrollUp && (
+                        <div className="absolute left-0 right-0 top-0 h-12 bg-gradient-to-b from-[#0a0a0f] to-transparent z-10 pointer-events-none" />
                       )}
-                      {/* Right edge fade */}
-                      {streamsCanScrollRight && (
-                        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+                      {/* Bottom edge fade */}
+                      {streamsCanScrollDown && (
+                        <div className="absolute left-0 right-0 bottom-0 h-12 bg-gradient-to-t from-[#0a0a0f] to-transparent z-10 pointer-events-none" />
                       )}
                       <div 
                         ref={streamsScrollRef}
-                        className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-6 py-4 items-center w-full"
-                        style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
+                        className="h-full overflow-y-auto scrollbar-hide px-6 py-4"
+                        style={{ touchAction: 'pan-y', overscrollBehaviorY: 'contain' }}
+                        onScroll={updateStreamsScrollState}
                       >
                         {filteredStreams.length === 0 && streams.length > 0 ? (
-                          <div className="flex-1 flex items-center justify-center text-white/40">
+                          <div className="flex items-center justify-center h-full text-white/40">
                             No streams match the selected filters
                           </div>
                         ) : filteredStreams.length === 0 ? (
-                          <div className="flex-1 flex items-center justify-center text-white/40">
+                          <div className="flex items-center justify-center h-full text-white/40">
                             No streams found
                           </div>
                         ) : (
-                          <>
+                          <div className="flex flex-col gap-3">
                             {filteredStreams.map((stream, index) => {
                               const details = extractStreamDetails(stream);
                               const isCurrentlyResolving = resolvingStream === stream.url;
@@ -1294,21 +1286,21 @@ export function StreamSelectionDialog({
                                   onFocus={() => setFocusedIndex(index)}
                                   disabled={isResolving}
                                   className={cn(
-                                    "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
+                                    "w-full text-left p-4 rounded-xl transition-all duration-150 group",
                                     hasFailed
                                       ? "bg-red-500/10 border-2 border-red-500/30 opacity-60"
                                       : isCurrentlyResolving
-                                      ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
+                                      ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50"
                                       : isFocused
-                                      ? "bg-white/10 border-2 border-primary scale-105"
-                                      : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
-                                    "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
+                                      ? "bg-white/10 border-2 border-primary"
+                                      : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20",
+                                    "focus:outline-none focus:bg-white/10 focus:border-primary",
                                     isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
                                   )}
                                 >
-                                  {/* Top section - Provider icon and play button */}
-                                  <div className="flex items-center justify-between mb-3">
-                                    <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center">
+                                  <div className="flex items-center gap-4">
+                                    {/* Left: Provider icon */}
+                                    <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                                       {details.isDirectLink ? (
                                         <Zap className="w-6 h-6 text-green-400" />
                                       ) : (
@@ -1316,8 +1308,63 @@ export function StreamSelectionDialog({
                                       )}
                                     </div>
                                     
+                                    {/* Center: Stream info */}
+                                    <div className="flex-1 min-w-0">
+                                      {/* Quality badges row */}
+                                      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                        {details.quality && (
+                                          <span className={cn("px-2 py-0.5 rounded text-xs font-bold", getQualityColor(details.quality))}>
+                                            {details.quality}
+                                          </span>
+                                        )}
+                                        {details.hdr && (
+                                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/20 text-amber-400">
+                                            {details.hdr}
+                                          </span>
+                                        )}
+                                        {details.codec && (
+                                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
+                                            {details.codec}
+                                          </span>
+                                        )}
+                                        {details.audio && (
+                                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
+                                            {details.audio}
+                                          </span>
+                                        )}
+                                        {details.isDirectLink && (
+                                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-500/20 text-green-400 flex items-center gap-1">
+                                            <Zap className="w-3 h-3" />
+                                            Cached
+                                          </span>
+                                        )}
+                                        {hasFailed && (
+                                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-400">
+                                            Failed
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Title */}
+                                      <p className="text-sm text-white/80 leading-tight line-clamp-2">
+                                        {stream.title || stream.name}
+                                      </p>
+
+                                      {/* Bottom row - Size and provider */}
+                                      <div className="flex items-center gap-3 mt-1.5 text-xs text-white/40">
+                                        {details.size && (
+                                          <span className="flex items-center gap-1">
+                                            <HardDrive className="w-3.5 h-3.5" />
+                                            {details.size}
+                                          </span>
+                                        )}
+                                        <span className="truncate">{details.provider}</span>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Right: Play button */}
                                     {isCurrentlyResolving ? (
-                                      <div className="flex flex-col items-center gap-1">
+                                      <div className="flex flex-col items-center gap-1 shrink-0">
                                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                         {resolveStatus && (
                                           <span className="text-[10px] text-primary">{resolveStatus}</span>
@@ -1325,85 +1372,30 @@ export function StreamSelectionDialog({
                                       </div>
                                     ) : (
                                       <div className={cn(
-                                        "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                                        "w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0",
                                         isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
                                       )}>
                                         <Play className="w-6 h-6 ml-0.5" />
                                       </div>
                                     )}
                                   </div>
-
-                                  {/* Quality badges row */}
-                                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                    {details.quality && (
-                                      <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(details.quality))}>
-                                        {details.quality}
-                                      </span>
-                                    )}
-                                    {details.hdr && (
-                                      <span className="px-2 py-1 rounded text-xs font-semibold bg-amber-500/20 text-amber-400">
-                                        {details.hdr}
-                                      </span>
-                                    )}
-                                    {details.isDirectLink && (
-                                      <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400 flex items-center gap-1">
-                                        <Zap className="w-3 h-3" />
-                                        Cached
-                                      </span>
-                                    )}
-                                    {hasFailed && (
-                                      <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400">
-                                        Failed
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* Codec/Audio badges */}
-                                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                                    {details.codec && (
-                                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
-                                        {details.codec}
-                                      </span>
-                                    )}
-                                    {details.audio && (
-                                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
-                                        {details.audio}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* Title - truncated to 2 lines */}
-                                  <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
-                                    {stream.title || stream.name}
-                                  </p>
-
-                                  {/* Bottom row - Size and provider */}
-                                  <div className="flex items-center justify-between text-xs text-white/40">
-                                    {details.size && (
-                                      <span className="flex items-center gap-1">
-                                        <HardDrive className="w-3.5 h-3.5" />
-                                        {details.size}
-                                      </span>
-                                    )}
-                                    <span className="truncate max-w-[120px]">{details.provider}</span>
-                                  </div>
                                 </button>
                               );
                             })}
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
                     
                     {/* Scroll progress indicator */}
-                    {filteredStreams.length > 0 && (streamsCanScrollLeft || streamsCanScrollRight) && (
+                    {filteredStreams.length > 0 && (streamsCanScrollUp || streamsCanScrollDown) && (
                       <div className="px-6 pb-4">
                         <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-primary rounded-full transition-all duration-150"
                             style={{ 
-                              width: `${Math.max(20, 100 / Math.max(1, filteredStreams.length / 3))}%`,
-                              marginLeft: `${streamsScrollProgress * (100 - Math.max(20, 100 / Math.max(1, filteredStreams.length / 3))) / 100}%`
+                              width: `${Math.max(20, 100 / Math.max(1, filteredStreams.length / 5))}%`,
+                              marginLeft: `${streamsScrollProgress * (100 - Math.max(20, 100 / Math.max(1, filteredStreams.length / 5))) / 100}%`
                             }}
                           />
                         </div>
