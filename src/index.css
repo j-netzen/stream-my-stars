@@ -578,6 +578,18 @@
     display: none;
   }
 
+  /* Momentum/inertia scrolling for mobile */
+  .momentum-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+  }
+  
+  /* Disable smooth scroll for browsehere/TV - snappier D-pad response */
+  .browsehere-mode .momentum-scroll {
+    scroll-behavior: auto;
+  }
+
   /* Dialog/Modal with star shadow */
   [role="dialog"] {
     box-shadow: var(--shadow-xl), 0 0 80px -20px hsl(var(--star-purple) / 0.3);
