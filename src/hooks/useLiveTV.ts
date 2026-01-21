@@ -5,6 +5,7 @@ import { parseEPGXML, matchEPGToChannels, generateMockEPG } from '@/lib/epgParse
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { sanitizeUrl } from '@/lib/urlSanitizer';
 
 const PROGRAMS_STORAGE_KEY = 'livetv_programs';
 const EPG_REGION_KEY = 'livetv_epg_region';
@@ -80,12 +81,18 @@ export function useLiveTV() {
       if (channelList.length > 0) {
         for (let i = 0; i < channelList.length; i++) {
           const channel = channelList[i];
+          // Sanitize original_url to strip sensitive query params (token/key/auth)
+          // Keep url intact for playback compatibility
+          const sanitizedOriginalUrl = channel.originalUrl 
+            ? sanitizeUrl(channel.originalUrl) 
+            : null;
+          
           const dbChannel = {
             user_id: user.id,
             channel_id: channel.id,
             name: channel.name,
             url: channel.url,
-            original_url: channel.originalUrl || null,
+            original_url: sanitizedOriginalUrl,
             logo: channel.logo || '',
             channel_group: channel.group || 'My Channels',
             epg_id: channel.epgId || '',
