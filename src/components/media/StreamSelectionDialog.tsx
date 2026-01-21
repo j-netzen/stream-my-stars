@@ -1079,48 +1079,42 @@ export function StreamSelectionDialog({
                   </div>
                 )}
 
-                {/* Stream list - HORIZONTAL SCROLL with arrows */}
+                {/* Stream list - HORIZONTAL SCROLL with floating arrows */}
                 {!isSearching && !error && (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Header with title and arrows */}
+                    {/* Header with stream count */}
                     {filteredStreams.length > 0 && (
-                      <div className="flex items-center justify-between px-6 py-2">
+                      <div className="flex items-center px-6 py-2">
                         <span className="text-sm text-white/40">
                           {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
                         </span>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              if (streamsScrollRef.current) {
-                                streamsScrollRef.current.scrollBy({ left: -400, behavior: scrollBehavior });
-                              }
-                            }}
-                            disabled={!streamsCanScrollLeft}
-                            className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed border border-white/10"
-                          >
-                            <ChevronLeft className="w-5 h-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              if (streamsScrollRef.current) {
-                                streamsScrollRef.current.scrollBy({ left: 400, behavior: scrollBehavior });
-                              }
-                            }}
-                            disabled={!streamsCanScrollRight}
-                            className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed border border-white/10"
-                          >
-                            <ChevronRight className="w-5 h-5" />
-                          </Button>
-                        </div>
                       </div>
                     )}
 
-                    {/* Scrollable row */}
-                    <div className="flex-1 flex items-center">
+                    {/* Scrollable row with floating arrows */}
+                    <div className="flex-1 flex items-center relative group/arrows">
+                      {/* Left floating arrow - Netflix style */}
+                      {filteredStreams.length > 0 && (
+                        <button
+                          onClick={() => {
+                            if (streamsScrollRef.current) {
+                              streamsScrollRef.current.scrollBy({ left: -400, behavior: scrollBehavior });
+                            }
+                          }}
+                          disabled={!streamsCanScrollLeft}
+                          className={cn(
+                            "absolute left-0 top-0 bottom-0 z-20 w-12 flex items-center justify-center",
+                            "bg-gradient-to-r from-black/80 via-black/40 to-transparent",
+                            "text-white/80 hover:text-white transition-all duration-200",
+                            "opacity-0 group-hover/arrows:opacity-100",
+                            streamsCanScrollLeft ? "cursor-pointer" : "cursor-default opacity-0 pointer-events-none"
+                          )}
+                        >
+                          <ChevronLeft className="w-8 h-8" />
+                        </button>
+                      )}
+
+                      {/* Scrollable content */}
                       <div 
                         ref={streamsScrollRef}
                         className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-6 py-4 items-center w-full"
@@ -1250,6 +1244,27 @@ export function StreamSelectionDialog({
                           </>
                         )}
                       </div>
+
+                      {/* Right floating arrow - Netflix style */}
+                      {filteredStreams.length > 0 && (
+                        <button
+                          onClick={() => {
+                            if (streamsScrollRef.current) {
+                              streamsScrollRef.current.scrollBy({ left: 400, behavior: scrollBehavior });
+                            }
+                          }}
+                          disabled={!streamsCanScrollRight}
+                          className={cn(
+                            "absolute right-0 top-0 bottom-0 z-20 w-12 flex items-center justify-center",
+                            "bg-gradient-to-l from-black/80 via-black/40 to-transparent",
+                            "text-white/80 hover:text-white transition-all duration-200",
+                            "opacity-0 group-hover/arrows:opacity-100",
+                            streamsCanScrollRight ? "cursor-pointer" : "cursor-default opacity-0 pointer-events-none"
+                          )}
+                        >
+                          <ChevronRight className="w-8 h-8" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1302,46 +1317,38 @@ export function StreamSelectionDialog({
                   </div>
                 )}
 
-                {/* Downloads list - HORIZONTAL SCROLL with arrows */}
+                {/* Downloads list - HORIZONTAL SCROLL with floating arrows */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Header with count and arrows */}
-                    <div className="flex items-center justify-between px-6 py-2">
+                    {/* Header with count */}
+                    <div className="flex items-center px-6 py-2">
                       <span className="text-sm text-white/40">
                         {filteredDownloads.length} download{filteredDownloads.length !== 1 ? 's' : ''} available
                       </span>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (downloadsScrollRef.current) {
-                              downloadsScrollRef.current.scrollBy({ left: -400, behavior: scrollBehavior });
-                            }
-                          }}
-                          disabled={!downloadsCanScrollLeft}
-                          className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-30"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (downloadsScrollRef.current) {
-                              downloadsScrollRef.current.scrollBy({ left: 400, behavior: scrollBehavior });
-                            }
-                          }}
-                          disabled={!downloadsCanScrollRight}
-                          className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 text-white/60 hover:text-white disabled:opacity-30"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </Button>
-                      </div>
                     </div>
 
-                    {/* Scrollable row */}
-                    <div className="flex-1 flex items-center">
+                    {/* Scrollable row with floating arrows */}
+                    <div className="flex-1 flex items-center relative group/arrows">
+                      {/* Left floating arrow - Netflix style */}
+                      <button
+                        onClick={() => {
+                          if (downloadsScrollRef.current) {
+                            downloadsScrollRef.current.scrollBy({ left: -400, behavior: scrollBehavior });
+                          }
+                        }}
+                        disabled={!downloadsCanScrollLeft}
+                        className={cn(
+                          "absolute left-0 top-0 bottom-0 z-20 w-12 flex items-center justify-center",
+                          "bg-gradient-to-r from-black/80 via-black/40 to-transparent",
+                          "text-white/80 hover:text-white transition-all duration-200",
+                          "opacity-0 group-hover/arrows:opacity-100",
+                          downloadsCanScrollLeft ? "cursor-pointer" : "cursor-default opacity-0 pointer-events-none"
+                        )}
+                      >
+                        <ChevronLeft className="w-8 h-8" />
+                      </button>
+
+                      {/* Scrollable content */}
                       <div 
                         ref={downloadsScrollRef}
                         className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-6 py-4 items-center w-full"
@@ -1417,6 +1424,25 @@ export function StreamSelectionDialog({
                           );
                         })}
                       </div>
+
+                      {/* Right floating arrow - Netflix style */}
+                      <button
+                        onClick={() => {
+                          if (downloadsScrollRef.current) {
+                            downloadsScrollRef.current.scrollBy({ left: 400, behavior: scrollBehavior });
+                          }
+                        }}
+                        disabled={!downloadsCanScrollRight}
+                        className={cn(
+                          "absolute right-0 top-0 bottom-0 z-20 w-12 flex items-center justify-center",
+                          "bg-gradient-to-l from-black/80 via-black/40 to-transparent",
+                          "text-white/80 hover:text-white transition-all duration-200",
+                          "opacity-0 group-hover/arrows:opacity-100",
+                          downloadsCanScrollRight ? "cursor-pointer" : "cursor-default opacity-0 pointer-events-none"
+                        )}
+                      >
+                        <ChevronRight className="w-8 h-8" />
+                      </button>
                     </div>
                   </div>
                 )}
