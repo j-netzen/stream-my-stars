@@ -1099,10 +1099,11 @@ export function StreamSelectionDialog({
                       </button>
                     )}
 
-                    {/* Scrollable area */}
+                    {/* Scrollable area - horizontal row like home page */}
                     <div 
                       ref={streamsScrollRef}
-                      className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-12 py-4 scrollbar-hide snap-x snap-mandatory touch-pan-x momentum-scroll"
+                      className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-12 py-6 items-center h-full"
+                      style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
                     >
                       {filteredStreams.length === 0 && streams.length > 0 ? (
                         <div className="flex-1 flex items-center justify-center text-white/40">
@@ -1113,7 +1114,7 @@ export function StreamSelectionDialog({
                           No streams found
                         </div>
                       ) : (
-                        <div className="flex gap-4">
+                        <>
                           {filteredStreams.map((stream, index) => {
                             const details = extractStreamDetails(stream);
                             const isCurrentlyResolving = resolvingStream === stream.url;
@@ -1225,7 +1226,7 @@ export function StreamSelectionDialog({
                               </button>
                             );
                           })}
-                        </div>
+                        </>
                       )}
                     </div>
 
@@ -1314,82 +1315,81 @@ export function StreamSelectionDialog({
                       <ChevronLeft className="w-6 h-6" />
                     </button>
 
-                    {/* Scrollable area */}
+                    {/* Scrollable area - horizontal row like home page */}
                     <div 
                       ref={downloadsScrollRef}
-                      className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-12 py-4 scrollbar-hide snap-x snap-mandatory touch-pan-x momentum-scroll"
+                      className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-12 py-6 items-center h-full"
+                      style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
                     >
-                      <div className="flex gap-4">
-                        {filteredDownloads.map((download, index) => {
-                          const quality = extractQuality(download.filename);
-                          const isCurrentlyResolving = resolvingStream === download.download;
-                          const isFocused = downloadFocusedIndex === index;
-                          
-                          return (
-                            <button
-                              key={download.id}
-                              ref={(el) => (downloadButtonsRef.current[index] = el)}
-                              onClick={() => handleDownloadSelect(download)}
-                              onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
-                              onFocus={() => setDownloadFocusedIndex(index)}
-                              disabled={isResolving}
-                              className={cn(
-                                "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
-                                isCurrentlyResolving
-                                  ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
-                                  : isFocused
-                                  ? "bg-white/10 border-2 border-primary scale-105"
-                                  : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
-                                "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
-                                isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
-                              )}
-                            >
-                              {/* Top section - Icon and play button */}
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-                                  <HardDrive className="w-6 h-6 text-green-400" />
+                      {filteredDownloads.map((download, index) => {
+                        const quality = extractQuality(download.filename);
+                        const isCurrentlyResolving = resolvingStream === download.download;
+                        const isFocused = downloadFocusedIndex === index;
+                        
+                        return (
+                          <button
+                            key={download.id}
+                            ref={(el) => (downloadButtonsRef.current[index] = el)}
+                            onClick={() => handleDownloadSelect(download)}
+                            onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
+                            onFocus={() => setDownloadFocusedIndex(index)}
+                            disabled={isResolving}
+                            className={cn(
+                              "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
+                              isCurrentlyResolving
+                                ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
+                                : isFocused
+                                ? "bg-white/10 border-2 border-primary scale-105"
+                                : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
+                              "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
+                              isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
+                            )}
+                          >
+                            {/* Top section - Icon and play button */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                                <HardDrive className="w-6 h-6 text-green-400" />
+                              </div>
+                              
+                              {isCurrentlyResolving ? (
+                                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                              ) : (
+                                <div className={cn(
+                                  "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                                  isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
+                                )}>
+                                  <Play className="w-6 h-6 ml-0.5" />
                                 </div>
-                                
-                                {isCurrentlyResolving ? (
-                                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                ) : (
-                                  <div className={cn(
-                                    "w-12 h-12 rounded-full flex items-center justify-center transition-all",
-                                    isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
-                                  )}>
-                                    <Play className="w-6 h-6 ml-0.5" />
-                                  </div>
-                                )}
-                              </div>
+                              )}
+                            </div>
 
-                              {/* Quality badges */}
-                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                {quality && (
-                                  <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(quality))}>
-                                    {quality}
-                                  </span>
-                                )}
-                                <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400">
-                                  Downloaded
+                            {/* Quality badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              {quality && (
+                                <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(quality))}>
+                                  {quality}
                                 </span>
-                              </div>
+                              )}
+                              <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400">
+                                Downloaded
+                              </span>
+                            </div>
 
-                              {/* Filename - truncated to 2 lines */}
-                              <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
-                                {download.filename}
-                              </p>
+                            {/* Filename - truncated to 2 lines */}
+                            <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
+                              {download.filename}
+                            </p>
 
-                              {/* File size */}
-                              <div className="flex items-center text-xs text-white/40">
-                                <span className="flex items-center gap-1">
-                                  <HardDrive className="w-3.5 h-3.5" />
-                                  {formatFileSize(download.filesize)}
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                            {/* File size */}
+                            <div className="flex items-center text-xs text-white/40">
+                              <span className="flex items-center gap-1">
+                                <HardDrive className="w-3.5 h-3.5" />
+                                {formatFileSize(download.filesize)}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {/* Right Arrow Button - fades based on scroll position */}
