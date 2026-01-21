@@ -16,8 +16,11 @@ export function useKeyboardNavigation({
   onSelect,
   loop = false,
 }: UseKeyboardNavigationOptions) {
-  const { isTVMode } = useTVMode();
+  const { isTVMode, inputMode } = useTVMode();
   const currentIndexRef = useRef(0);
+  
+  // Only enable when in D-pad mode
+  const isKeyboardNavEnabled = isTVMode && inputMode === "dpad" && enabled;
 
   const getFocusableElements = useCallback(() => {
     if (!containerRef.current) return [];
@@ -60,7 +63,7 @@ export function useKeyboardNavigation({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (!enabled || !isTVMode) return;
+      if (!isKeyboardNavEnabled) return;
       
       // Don't interfere with inputs
       const activeElement = document.activeElement;
@@ -143,15 +146,15 @@ export function useKeyboardNavigation({
           break;
       }
     },
-    [enabled, isTVMode, getFocusableElements, getGridDimensions, focusElement, loop, onSelect]
+    [isKeyboardNavEnabled, getFocusableElements, getGridDimensions, focusElement, loop, onSelect]
   );
 
   useEffect(() => {
-    if (!enabled || !isTVMode) return;
+    if (!isKeyboardNavEnabled) return;
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [enabled, isTVMode, handleKeyDown]);
+  }, [isKeyboardNavEnabled, handleKeyDown]);
 
   // Focus first element when container becomes available
   const focusFirst = useCallback(() => {
@@ -166,10 +169,11 @@ export function useKeyboardNavigation({
 
 // Global keyboard navigation for sidebar
 export function useGlobalKeyboardNavigation() {
-  const { isTVMode } = useTVMode();
+  const { isTVMode, inputMode } = useTVMode();
+  const isKeyboardNavEnabled = isTVMode && inputMode === "dpad";
 
   useEffect(() => {
-    if (!isTVMode) return;
+    if (!isKeyboardNavEnabled) return;
 
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Escape key to focus sidebar
@@ -191,5 +195,5 @@ export function useGlobalKeyboardNavigation() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [isTVMode]);
+  }, [isKeyboardNavEnabled]);
 }
