@@ -1171,10 +1171,10 @@ export function StreamSelectionDialog({
                 {/* Stream list - HORIZONTAL SCROLL */}
                 {!isSearching && !error && (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Header with stream count and navigation arrows */}
+                    {/* Header with stream count and navigation arrows - Stremio style */}
                     {filteredStreams.length > 0 && (
-                      <div className="flex flex-col items-start gap-2 px-6 py-2">
-                        <span className="text-sm text-white/40">
+                      <div className="flex items-center justify-between px-6 py-3">
+                        <span className="text-lg font-semibold text-white">
                           {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
                         </span>
                         <div className="flex items-center gap-2">
@@ -1185,7 +1185,7 @@ export function StreamSelectionDialog({
                             onClick={() => scrollContainerBy(streamsScrollRef.current, -400)}
                             onKeyDown={(e) => handleStreamsNavKeyDown(e, true)}
                             disabled={!streamsCanScrollLeft}
-                            className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                            className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all"
                           >
                             <ChevronLeft className="w-5 h-5" />
                           </Button>
@@ -1196,7 +1196,7 @@ export function StreamSelectionDialog({
                             onClick={() => scrollContainerBy(streamsScrollRef.current, 400)}
                             onKeyDown={(e) => handleStreamsNavKeyDown(e, false)}
                             disabled={!streamsCanScrollRight}
-                            className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                            className="h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white disabled:opacity-20 disabled:bg-white/10 disabled:text-white/60 disabled:cursor-not-allowed border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                           >
                             <ChevronRight className="w-5 h-5" />
                           </Button>
@@ -1390,9 +1390,9 @@ export function StreamSelectionDialog({
                 {/* Downloads list - HORIZONTAL SCROLL */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Header with count and navigation arrows */}
-                    <div className="flex flex-col items-start gap-2 px-6 py-2">
-                      <span className="text-sm text-white/40">
+                    {/* Header with count and navigation arrows - Stremio style */}
+                    <div className="flex items-center justify-between px-6 py-3">
+                      <span className="text-lg font-semibold text-white">
                         {filteredDownloads.length} download{filteredDownloads.length !== 1 ? 's' : ''} available
                       </span>
                       <div className="flex items-center gap-2">
@@ -1403,7 +1403,7 @@ export function StreamSelectionDialog({
                           onClick={() => scrollContainerBy(downloadsScrollRef.current, -400)}
                           onKeyDown={(e) => handleDownloadsNavKeyDown(e, true)}
                           disabled={!downloadsCanScrollLeft}
-                          className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all"
                         >
                           <ChevronLeft className="w-5 h-5" />
                         </Button>
@@ -1414,7 +1414,7 @@ export function StreamSelectionDialog({
                           onClick={() => scrollContainerBy(downloadsScrollRef.current, 400)}
                           onKeyDown={(e) => handleDownloadsNavKeyDown(e, false)}
                           disabled={!downloadsCanScrollRight}
-                          className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-white/10 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          className="h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white disabled:opacity-20 disabled:bg-white/10 disabled:text-white/60 disabled:cursor-not-allowed border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                         >
                           <ChevronRight className="w-5 h-5" />
                         </Button>
