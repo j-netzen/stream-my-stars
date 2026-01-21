@@ -124,22 +124,6 @@ export function StreamSelectionDialog({
     [centerElementInScroll, streamsScrollRef],
   );
 
-  const focusDownloadAtIndex = useCallback(
-    (index: number) => {
-      const max = filteredDownloads.length - 1;
-      if (max < 0) return;
-      const clamped = Math.max(0, Math.min(index, max));
-      setDownloadFocusedIndex(clamped);
-      requestAnimationFrame(() => {
-        const btn = downloadButtonsRef.current[clamped];
-        if (!btn) return;
-        btn.focus();
-        centerElementInScroll(downloadsScrollRef.current, btn);
-      });
-    },
-    [centerElementInScroll, downloadsScrollRef, filteredDownloads.length],
-  );
-
   // Fail-Safe state
   const [myDownloads, setMyDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingDownloads, setIsLoadingDownloads] = useState(false);
@@ -264,6 +248,22 @@ export function StreamSelectionDialog({
     
     return true;
   });
+
+  const focusDownloadAtIndex = useCallback(
+    (index: number) => {
+      const max = filteredDownloads.length - 1;
+      if (max < 0) return;
+      const clamped = Math.max(0, Math.min(index, max));
+      setDownloadFocusedIndex(clamped);
+      requestAnimationFrame(() => {
+        const btn = downloadButtonsRef.current[clamped];
+        if (!btn) return;
+        btn.focus();
+        centerElementInScroll(downloadsScrollRef.current, btn);
+      });
+    },
+    [centerElementInScroll, downloadsScrollRef, filteredDownloads.length],
+  );
 
   // Update scroll state on mount and when content changes
   useEffect(() => {
