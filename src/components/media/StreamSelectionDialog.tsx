@@ -77,12 +77,20 @@ export function StreamSelectionDialog({
   const [downloadsCanScrollLeft, setDownloadsCanScrollLeft] = useState(false);
   const [downloadsCanScrollRight, setDownloadsCanScrollRight] = useState(false);
   
+  // Scroll progress percentage (0-100)
+  const [streamsScrollProgress, setStreamsScrollProgress] = useState(0);
+  const [downloadsScrollProgress, setDownloadsScrollProgress] = useState(0);
+  
   // Check scroll boundaries for streams
   const updateStreamsScrollState = useCallback(() => {
     const el = streamsScrollRef.current;
     if (!el) return;
     setStreamsCanScrollLeft(el.scrollLeft > 0);
     setStreamsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+    // Calculate scroll progress percentage
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const progress = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+    setStreamsScrollProgress(progress);
   }, []);
   
   // Check scroll boundaries for downloads
@@ -91,6 +99,10 @@ export function StreamSelectionDialog({
     if (!el) return;
     setDownloadsCanScrollLeft(el.scrollLeft > 0);
     setDownloadsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+    // Calculate scroll progress percentage
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const progress = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+    setDownloadsScrollProgress(progress);
   }, []);
   
   // Refs to track streams for auto-retry when player reports playback error
@@ -1373,6 +1385,21 @@ export function StreamSelectionDialog({
                         )}
                       </div>
                     </div>
+                    
+                    {/* Scroll progress indicator */}
+                    {filteredStreams.length > 0 && (streamsCanScrollLeft || streamsCanScrollRight) && (
+                      <div className="px-6 pb-4">
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all duration-150"
+                            style={{ 
+                              width: `${Math.max(20, 100 / Math.max(1, filteredStreams.length / 3))}%`,
+                              marginLeft: `${streamsScrollProgress * (100 - Math.max(20, 100 / Math.max(1, filteredStreams.length / 3))) / 100}%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
