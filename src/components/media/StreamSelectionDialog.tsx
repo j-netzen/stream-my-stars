@@ -1008,15 +1008,18 @@ export function StreamSelectionDialog({
                 {/* Stream list - HORIZONTAL SCROLL with arrows */}
                 {!isSearching && !error && (
                   <div className="flex-1 flex items-center relative group">
-                    {/* Left Arrow Button - hidden when can't scroll left */}
-                    {filteredStreams.length > 0 && streamsCanScrollLeft && (
+                    {/* Left Arrow Button - fades based on scroll position */}
+                    {filteredStreams.length > 0 && (
                       <button
                         onClick={() => {
                           if (streamsScrollRef.current) {
                             streamsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
                           }
                         }}
-                        className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
+                        className={cn(
+                          "absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
+                          streamsCanScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
+                        )}
                       >
                         <ChevronLeft className="w-6 h-6" />
                       </button>
@@ -1152,15 +1155,18 @@ export function StreamSelectionDialog({
                       )}
                     </div>
 
-                    {/* Right Arrow Button - hidden when can't scroll right */}
-                    {filteredStreams.length > 0 && streamsCanScrollRight && (
+                    {/* Right Arrow Button - fades based on scroll position */}
+                    {filteredStreams.length > 0 && (
                       <button
                         onClick={() => {
                           if (streamsScrollRef.current) {
                             streamsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
                           }
                         }}
-                        className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
+                        className={cn(
+                          "absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
+                          streamsCanScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
+                        )}
                       >
                         <ChevronRight className="w-6 h-6" />
                       </button>
@@ -1219,19 +1225,20 @@ export function StreamSelectionDialog({
                 {/* Downloads list - HORIZONTAL SCROLL with arrows */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
                   <div className="flex-1 flex items-center relative group">
-                    {/* Left Arrow Button - hidden when can't scroll left */}
-                    {downloadsCanScrollLeft && (
-                      <button
-                        onClick={() => {
-                          if (downloadsScrollRef.current) {
-                            downloadsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-                          }
-                        }}
-                        className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
-                      >
-                        <ChevronLeft className="w-6 h-6" />
-                      </button>
-                    )}
+                    {/* Left Arrow Button - fades based on scroll position */}
+                    <button
+                      onClick={() => {
+                        if (downloadsScrollRef.current) {
+                          downloadsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+                        }
+                      }}
+                      className={cn(
+                        "absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
+                        downloadsCanScrollLeft ? "opacity-100" : "opacity-0 pointer-events-none"
+                      )}
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
 
                     {/* Scrollable area */}
                     <div 
@@ -1311,19 +1318,20 @@ export function StreamSelectionDialog({
                       </div>
                     </div>
 
-                    {/* Right Arrow Button - hidden when can't scroll right */}
-                    {downloadsCanScrollRight && (
-                      <button
-                        onClick={() => {
-                          if (downloadsScrollRef.current) {
-                            downloadsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-                          }
-                        }}
-                        className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
-                      >
-                        <ChevronRight className="w-6 h-6" />
-                      </button>
-                    )}
+                    {/* Right Arrow Button - fades based on scroll position */}
+                    <button
+                      onClick={() => {
+                        if (downloadsScrollRef.current) {
+                          downloadsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+                        }
+                      }}
+                      className={cn(
+                        "absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-opacity duration-300",
+                        downloadsCanScrollRight ? "opacity-100" : "opacity-0 pointer-events-none"
+                      )}
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
                   </div>
                 )}
               </>
