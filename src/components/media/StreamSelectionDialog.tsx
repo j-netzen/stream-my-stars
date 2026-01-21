@@ -9,11 +9,8 @@ import { getImageUrl } from "@/lib/tmdb";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,14 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Filter, Download, Search, LayoutGrid, List, XCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface StreamQualityInfo {
@@ -54,7 +49,7 @@ export function StreamSelectionDialog({
   const { isTVMode } = useTVMode();
   const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
   const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
-  const [activeTab, setActiveTab] = useState<string>("downloads");
+  const [activeTab, setActiveTab] = useState<string>("streams");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -67,15 +62,6 @@ export function StreamSelectionDialog({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [qualityFilter, setQualityFilter] = useState<string>("best");
   const [languageFilter, setLanguageFilter] = useState<string>("english");
-  const [isCompactView, setIsCompactView] = useState(() => {
-    const saved = localStorage.getItem("streamDialog-compactView");
-    return saved !== null ? saved === "true" : true;
-  });
-  
-  // Persist compact view preference
-  useEffect(() => {
-    localStorage.setItem("streamDialog-compactView", String(isCompactView));
-  }, [isCompactView]);
   const streamButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
   
   // Refs to track streams for auto-retry when player reports playback error
@@ -100,13 +86,11 @@ export function StreamSelectionDialog({
     
     // Language filter
     if (languageFilter !== "all") {
-      // Check for language indicators in the stream title
       const hasEnglish = title.includes("english") || 
                          title.includes("eng") || 
                          title.includes("en ") ||
                          title.includes("[en]") ||
                          title.includes("(en)") ||
-                         // Exclude non-English indicators
                          (!title.includes("hindi") && 
                           !title.includes("spanish") && 
                           !title.includes("french") && 
@@ -130,19 +114,16 @@ export function StreamSelectionDialog({
     
     // "Best" filter: optimal file size based on duration, but always include ≤3GB files
     if (qualityFilter === "best") {
-      if (!info.size) return false; // Skip streams without size info
+      if (!info.size) return false;
       const sizeInMB = parseSizeToBytes(info.size);
       if (sizeInMB === 0) return false;
       
-      // Always include files 3GB or smaller regardless of runtime
       const universalMaxSize = 3072; // 3GB in MB
       if (sizeInMB <= universalMaxSize) return true;
       
-      // For larger files, apply duration-based rules
-      const durationMinutes = media?.runtime || 90; // Default to 90 min if unknown
+      const durationMinutes = media?.runtime || 90;
       const optimalMaxSize = calculateOptimalMaxSize(durationMinutes);
       
-      // Accept streams that are within the optimal size range
       return sizeInMB <= optimalMaxSize;
     }
     
@@ -180,14 +161,12 @@ export function StreamSelectionDialog({
     const filename = download.filename.toLowerCase();
     const mediaTitle = media.title.toLowerCase();
     
-    // Normalize title for matching (remove special characters, convert spaces)
     const normalizeForMatch = (str: string) => 
       str.replace(/[^\w\s]/g, '').replace(/\s+/g, '.').toLowerCase();
     
     const normalizedFilename = normalizeForMatch(download.filename);
     const normalizedTitle = normalizeForMatch(media.title);
     
-    // Check if filename contains the media title (with various formats)
     const titleWords = media.title.toLowerCase().split(/\s+/);
     const titleMatches = titleWords.every(word => 
       filename.includes(word.replace(/[^\w]/g, ''))
@@ -195,9 +174,7 @@ export function StreamSelectionDialog({
     
     if (!titleMatches) return false;
     
-    // For TV shows, also match season and episode
     if (media.media_type === "tv") {
-      // Common episode patterns: S01E01, S1E1, 1x01, Season 1 Episode 1
       const episodePatterns = [
         new RegExp(`s0?${selectedSeason}e0?${selectedEpisode}\\b`, 'i'),
         new RegExp(`${selectedSeason}x0?${selectedEpisode}\\b`, 'i'),
@@ -207,7 +184,6 @@ export function StreamSelectionDialog({
       return episodePatterns.some(pattern => pattern.test(download.filename));
     }
     
-    // Additional search query filter if provided
     if (downloadSearchQuery.trim()) {
       const query = downloadSearchQuery.toLowerCase();
       return filename.includes(query);
@@ -218,7 +194,7 @@ export function StreamSelectionDialog({
 
   // Auto-focus first stream when list loads or filter changes
   useEffect(() => {
-    if (filteredStreams.length > 0 && !isSearching && activeTab === "search") {
+    if (filteredStreams.length > 0 && !isSearching && activeTab === "streams") {
       setFocusedIndex(0);
       setTimeout(() => {
         streamButtonsRef.current[0]?.focus();
@@ -286,7 +262,7 @@ export function StreamSelectionDialog({
     }
   };
 
-  // Reset state when dialog opens with new media - start with streams search
+  // Reset state when dialog opens with new media
   useEffect(() => {
     if (open && media) {
       setStreams([]);
@@ -294,12 +270,10 @@ export function StreamSelectionDialog({
       setSelectedSeason(1);
       setSelectedEpisode(1);
       setQualityFilter("best");
-      setActiveTab("search"); // Start with streams tab
+      setActiveTab("streams");
       setDownloadSearchQuery("");
       setFailedStreams(new Set());
-      // Start stream search immediately
       handleSearch();
-      // Load downloads in background for the downloads tab
       loadDownloadsInBackground();
     }
   }, [open, media?.id]);
@@ -311,7 +285,6 @@ export function StreamSelectionDialog({
     
     try {
       const downloads = await listDownloads();
-      // Filter to only show streamable video files
       const videoDownloads = downloads.filter(d => 
         d.streamable === 1 && 
         (d.mimeType?.startsWith('video/') || 
@@ -326,7 +299,7 @@ export function StreamSelectionDialog({
     setIsLoadingDownloads(false);
   };
 
-  // Load downloads when manually switching to downloads tab (if not already loaded)
+  // Load downloads when manually switching to downloads tab
   useEffect(() => {
     if (activeTab === "downloads" && myDownloads.length === 0 && !isLoadingDownloads) {
       loadMyDownloads();
@@ -339,7 +312,6 @@ export function StreamSelectionDialog({
     
     try {
       const downloads = await listDownloads();
-      // Filter to only show streamable video files
       const videoDownloads = downloads.filter(d => 
         d.streamable === 1 && 
         (d.mimeType?.startsWith('video/') || 
@@ -364,7 +336,6 @@ export function StreamSelectionDialog({
     try {
       let imdbId: string | null = null;
       
-      // Try to get IMDB ID from TMDB if we have tmdb_id
       if (media.tmdb_id) {
         imdbId = await getImdbIdFromTmdb(media.tmdb_id, media.media_type as "movie" | "tv");
       }
@@ -397,11 +368,7 @@ export function StreamSelectionDialog({
     setIsSearching(false);
   };
 
-  // Helper to get streaming URL from an unrestricted file
-  // Falls back to download URL if streaming/transcoding is not supported
   const getStreamableUrl = async (fileId: string, downloadUrl: string): Promise<string> => {
-    // Skip streaming API for certain file types that don't support transcoding
-    // Just use the direct download URL which is already streamable
     if (!fileId || fileId.length < 5) {
       console.log("Invalid file ID, using direct download URL");
       return downloadUrl;
@@ -411,19 +378,16 @@ export function StreamSelectionDialog({
       setResolveStatus("Getting streaming URL...");
       const streamingLinks = await getStreamingLinks(fileId);
       
-      // Check if streaming is not supported (server returns this flag)
       if (streamingLinks?.streaming_not_supported) {
         console.log("Streaming not supported for this file, using download URL");
         return downloadUrl;
       }
       
-      // Check if we got valid streaming links
       if (!streamingLinks || typeof streamingLinks !== 'object') {
         console.log("No valid streaming response, using download URL");
         return downloadUrl;
       }
       
-      // Prefer highest quality streaming link
       const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
       for (const quality of qualityOrder) {
         if (streamingLinks[quality]?.full) {
@@ -432,7 +396,6 @@ export function StreamSelectionDialog({
         }
       }
       
-      // Try any available quality
       const availableQualities = Object.keys(streamingLinks).filter(k => k !== 'streaming_not_supported');
       if (availableQualities.length > 0) {
         const firstQuality = availableQualities[0];
@@ -442,12 +405,9 @@ export function StreamSelectionDialog({
         }
       }
       
-      // Fallback to the download URL (most video files are directly streamable)
       console.log("No streaming links available, using download URL");
       return downloadUrl;
     } catch (err: unknown) {
-      // Streaming/transcoding not supported for this file type - this is normal
-      // The direct download URL works fine for most video formats
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("wrong_parameter") || errorMessage.includes("invalid")) {
         console.log("File doesn't support transcoding, using direct download URL");
@@ -458,242 +418,232 @@ export function StreamSelectionDialog({
     }
   };
 
-  const resolveStream = async (stream: TorrentioStream, skipConfirmation = false): Promise<string> => {
-    let streamUrl: string;
+  const handleStreamSelect = async (stream: TorrentioStream) => {
+    if (!media || isResolving) return;
     
-    if (!stream.url) {
-      throw new Error("Stream URL is missing or invalid");
-    }
+    const streamIndex = filteredStreamsRef.current.findIndex(s => s.url === stream.url);
+    currentStreamIndexRef.current = streamIndex >= 0 ? streamIndex : 0;
     
-    const isTorrentioResolveUrl = stream.url.includes("torrentio.strem.fun/resolve/");
-    const needsRdDownload = isMagnetLink(stream.url) || isTorrentioResolveUrl;
-    
-    const handleProgress = (progress: number) => {
-      setResolveProgress(progress);
-      if (progress < 100) {
-        setResolveStatus(`Preparing: ${progress}%`);
-      } else {
-        setResolveStatus("Finalizing...");
-      }
-    };
-    
-    if (isDirectRdLink(stream.url)) {
-      // Already a direct link - use it directly as we can't get file ID
-      setResolveStatus("Using direct link...");
-      streamUrl = stream.url;
-    } else if (isMagnetLink(stream.url)) {
-      // Magnet link - add to RD and wait
-      setResolveStatus("Adding to Real-Debrid...");
-      const torrent = await addMagnetAndWait(stream.url, handleProgress);
-      if (torrent.links && torrent.links.length > 0) {
-        setResolveStatus("Generating streaming link...");
-        const unrestricted = await unrestrictLink(torrent.links[0]);
-        streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
-      } else {
-        throw new Error("No download links available from torrent");
-      }
-    } else if (isTorrentioResolveUrl) {
-      // Torrentio resolve URLs can't be unrestricted directly - extract magnet and use that
-      console.log("Torrentio resolve URL detected, extracting magnet...");
-      const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
-      if (magnetLink) {
-        setResolveStatus("Preparing stream...");
-        const torrent = await addMagnetAndWait(magnetLink, handleProgress);
-        if (torrent.links && torrent.links.length > 0) {
-          setResolveStatus("Generating streaming link...");
-          const unrestricted = await unrestrictLink(torrent.links[0]);
-          streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
+    const createTryNextStream = () => {
+      return () => {
+        const currentIdx = currentStreamIndexRef.current;
+        const streams = filteredStreamsRef.current;
+        
+        setFailedStreams(prev => {
+          const newSet = new Set(prev);
+          if (streams[currentIdx]) {
+            newSet.add(streams[currentIdx].url);
+          }
+          return newSet;
+        });
+        
+        const nextIndex = currentIdx + 1;
+        if (nextIndex < streams.length) {
+          currentStreamIndexRef.current = nextIndex;
+          const nextStream = streams[nextIndex];
+          toast.info(`Trying next stream (${nextIndex + 1}/${streams.length})...`);
+          handleStreamSelect(nextStream);
         } else {
-          throw new Error("No download links available from torrent");
-        }
-      } else {
-        throw new Error("Could not extract torrent hash from URL");
-      }
-    } else {
-      // Try to unrestrict the link directly
-      setResolveStatus("Unrestricting link...");
-      const unrestricted = await unrestrictLink(stream.url);
-      streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
-    }
-    
-    return streamUrl;
-  };
-
-  // Standalone function to resolve a stream without dialog state
-  // This is used by tryNextStream after the dialog is closed
-  const resolveStreamStandalone = async (
-    stream: TorrentioStream,
-    mediaForStream: Media,
-    remainingStreams: TorrentioStream[],
-    currentIdx: number
-  ): Promise<void> => {
-    try {
-      toast.info(`Resolving stream: ${parseStreamInfo(stream).quality || 'Unknown'}...`);
-      
-      const streamUrl = await resolveStream(stream);
-      const streamInfo = parseStreamInfo(stream);
-      
-      // Create a new tryNextStream for the remaining streams
-      const tryNextStream = () => {
-        const nextIdx = currentIdx + 1;
-        if (nextIdx < remainingStreams.length) {
-          const nextStream = remainingStreams[nextIdx];
-          toast.info(`Trying next stream: ${parseStreamInfo(nextStream).quality || 'Unknown'}...`);
-          resolveStreamStandalone(nextStream, mediaForStream, remainingStreams, nextIdx);
-        } else {
-          toast.error("No more streams available to try.");
+          toast.error("No more streams to try. Please select a different one manually.");
+          onOpenChange(true);
         }
       };
-      
-      toast.success(`Stream ready! (${streamInfo.quality})`);
-      
-      // Notify parent with new stream
-      onStreamSelected(
-        { ...mediaForStream, source_url: streamUrl },
-        streamUrl,
-        { quality: streamInfo.quality, size: streamInfo.size, qualityRank: streamInfo.qualityRank },
-        tryNextStream
-      );
-    } catch (err: any) {
-      console.error("Stream resolution error:", err);
-      
-      // Try next stream if available
-      const nextIdx = currentIdx + 1;
-      if (nextIdx < remainingStreams.length) {
-        const nextStream = remainingStreams[nextIdx];
-        toast.error(`Stream failed: ${err.message}`, {
-          description: `Trying next stream: ${parseStreamInfo(nextStream).quality || 'Unknown'}...`,
-          duration: 2000,
-        });
-        await new Promise(resolve => setTimeout(resolve, 500));
-        resolveStreamStandalone(nextStream, mediaForStream, remainingStreams, nextIdx);
-      } else {
-        toast.error(err.message || "Failed to resolve stream. No more streams to try.");
-      }
-    }
-  };
-
-  const handleStreamSelect = async (stream: TorrentioStream, autoRetry = true) => {
-    if (!media) return;
-    
-    // Find current stream index for fallback
-    const currentIndex = filteredStreams.findIndex(s => s.url === stream.url);
+    };
     
     setIsResolving(true);
     setResolvingStream(stream.url);
     setResolveProgress(0);
-    setResolveStatus("Starting...");
+    setResolveStatus("Resolving...");
+    
+    const info = parseStreamInfo(stream);
+    const qualityInfo: StreamQualityInfo = {
+      quality: info.quality || "Unknown",
+      size: info.size,
+      qualityRank: info.qualityRank
+    };
     
     try {
-      const streamUrl = await resolveStream(stream);
-      const streamInfo = parseStreamInfo(stream);
+      if (isDirectRdLink(stream.url)) {
+        setResolveProgress(100);
+        setResolveStatus("Ready!");
+        setTimeout(() => {
+          onOpenChange(false);
+          onStreamSelected(media, stream.url, qualityInfo, createTryNextStream());
+        }, 300);
+        return;
+      }
       
-      // Capture a snapshot of remaining streams for the tryNextStream closure
-      const remainingStreams = [...filteredStreams];
-      const mediaSnapshot = { ...media };
-      
-      // Create a tryNextStream function that works independently after dialog closes
-      const tryNextStream = () => {
-        const nextIndex = currentIndex + 1;
-        if (nextIndex < remainingStreams.length) {
-          const nextStream = remainingStreams[nextIndex];
-          toast.info(`Trying next stream: ${parseStreamInfo(nextStream).quality || 'Unknown quality'}...`);
-          // Use standalone resolver since dialog will be closed
-          resolveStreamStandalone(nextStream, mediaSnapshot, remainingStreams, nextIndex);
-        } else {
-          toast.error("No more streams available to try.");
+      if (isMagnetLink(stream.url)) {
+        setResolveStatus("Processing magnet...");
+        
+        const shouldAdd = await confirmAddToRealDebrid(stream.title || stream.name || "Unknown");
+        if (!shouldAdd) {
+          setIsResolving(false);
+          setResolvingStream(null);
+          setResolveProgress(0);
+          setResolveStatus("");
+          return;
         }
-      };
-      
-      // Don't save the URL to database - always prompt for stream selection
-      toast.success(`Stream ready! (${streamInfo.quality})`);
-      onOpenChange(false);
-      
-      // Pass the media with the stream URL, quality info, and tryNextStream callback
-      onStreamSelected(
-        { ...media, source_url: streamUrl }, 
-        streamUrl,
-        { quality: streamInfo.quality, size: streamInfo.size, qualityRank: streamInfo.qualityRank },
-        tryNextStream
-      );
-      
-    } catch (err: any) {
-      console.error("Stream resolution error:", err);
-      
-      // Check if there's a next stream to try
-      const hasNextStream = autoRetry && currentIndex >= 0 && currentIndex < filteredStreams.length - 1;
-      
-      // Mark current stream as failed
-      setFailedStreams(prev => new Set(prev).add(stream.url));
-      
-      if (hasNextStream) {
-        const nextStream = filteredStreams[currentIndex + 1];
-        const nextInfo = parseStreamInfo(nextStream);
-        toast.error(`Stream failed: ${err.message}`, {
-          description: `Trying next stream: ${nextInfo.quality || 'Unknown quality'}...`,
-          duration: 3000,
+        
+        setResolveProgress(20);
+        
+        const result = await addMagnetAndWait(stream.url, (progress) => {
+          setResolveProgress(20 + Math.floor(progress * 0.6));
+          setResolveStatus(status);
         });
         
-        // Small delay before trying next stream
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Reset state and try next stream
-        setIsResolving(false);
-        setResolvingStream(null);
-        setResolveProgress(0);
-        setResolveStatus("");
-        
-        // Update focused index to show which stream we're trying
-        setFocusedIndex(currentIndex + 1);
-        
-        // Recursively try the next stream
-        return handleStreamSelect(nextStream, true);
-      } else {
-        toast.error(err.message || "Failed to resolve stream. No more streams to try.");
+        if (result.status === "downloaded" && result.links && result.links.length > 0) {
+          setResolveProgress(85);
+          setResolveStatus("Unrestricting link...");
+          
+          const videoLink = result.links.find((l: string) => 
+            /\.(mp4|mkv|avi|m4v|webm)$/i.test(l)
+          ) || result.links[0];
+          
+          const unrestricted = await unrestrictLink(videoLink);
+          
+          setResolveProgress(95);
+          const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
+          
+          setResolveProgress(100);
+          setResolveStatus("Ready!");
+          
+          setTimeout(() => {
+            onOpenChange(false);
+            onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
+          }, 300);
+        } else {
+          throw new Error("Download not ready. Please try again later.");
+        }
+        return;
       }
+      
+      // Handle Torrentio URL with embedded magnet
+      const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
+      if (magnetLink) {
+        setResolveStatus("Processing stream...");
+        
+        const shouldAdd = await confirmAddToRealDebrid(stream.title || stream.name || "Unknown");
+        if (!shouldAdd) {
+          setIsResolving(false);
+          setResolvingStream(null);
+          setResolveProgress(0);
+          setResolveStatus("");
+          return;
+        }
+        
+        setResolveProgress(20);
+        
+        const result = await addMagnetAndWait(magnetLink, (progress) => {
+          setResolveProgress(20 + Math.floor(progress * 0.6));
+          setResolveStatus(status);
+        });
+        
+        if (result.status === "downloaded" && result.links && result.links.length > 0) {
+          setResolveProgress(85);
+          setResolveStatus("Unrestricting link...");
+          
+          const videoLink = result.links.find((l: string) => 
+            /\.(mp4|mkv|avi|m4v|webm)$/i.test(l)
+          ) || result.links[0];
+          
+          const unrestricted = await unrestrictLink(videoLink);
+          
+          setResolveProgress(95);
+          const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
+          
+          setResolveProgress(100);
+          setResolveStatus("Ready!");
+          
+          setTimeout(() => {
+            onOpenChange(false);
+            onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
+          }, 300);
+        } else {
+          throw new Error("Download not ready. Please try again later.");
+        }
+        return;
+      }
+      
+      // Handle as HTTP URL
+      setResolveStatus("Unrestricting link...");
+      setResolveProgress(40);
+      
+      const unrestricted = await unrestrictLink(stream.url);
+      
+      setResolveProgress(90);
+      const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
+      
+      setResolveProgress(100);
+      setResolveStatus("Ready!");
+      
+      setTimeout(() => {
+        onOpenChange(false);
+        onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
+      }, 300);
+      
+    } catch (err: any) {
+      console.error("Stream selection error:", err);
+      
+      setFailedStreams(prev => {
+        const newSet = new Set(prev);
+        newSet.add(stream.url);
+        return newSet;
+      });
+      
+      toast.error(err.message || "Failed to process stream");
+    } finally {
+      setIsResolving(false);
+      setResolvingStream(null);
+      setResolveProgress(0);
+      setResolveStatus("");
     }
-    
-    setIsResolving(false);
-    setResolvingStream(null);
-    setResolveProgress(0);
-    setResolveStatus("");
   };
 
   const handleDownloadSelect = async (download: RealDebridUnrestrictedLink) => {
-    if (!media) return;
+    if (!media || isResolving) return;
     
     setIsResolving(true);
     setResolvingStream(download.download);
-    setResolveStatus("Getting streaming URL...");
+    setResolveProgress(50);
+    setResolveStatus("Getting stream URL...");
+    
+    const quality = extractQuality(download.filename);
+    const qualityInfo: StreamQualityInfo = {
+      quality: quality || "Unknown",
+      size: formatFileSize(download.filesize),
+    };
     
     try {
       const streamUrl = await getStreamableUrl(download.id, download.download);
-      toast.success("Stream ready!");
-      onOpenChange(false);
-      onStreamSelected({ ...media, source_url: streamUrl }, streamUrl);
+      
+      setResolveProgress(100);
+      setResolveStatus("Ready!");
+      
+      setTimeout(() => {
+        onOpenChange(false);
+        onStreamSelected(media, streamUrl, qualityInfo);
+      }, 300);
+      
     } catch (err: any) {
       console.error("Download stream error:", err);
-      toast.warning("Download failed to play. Searching for streams...");
-      
-      // Switch to streams tab and auto-search
-      setActiveTab("search");
-      
-      // Wait a moment for tab switch, then search if not already searched
-      if (streams.length === 0) {
-        handleSearch();
-      }
+      toast.error(err.message || "Failed to get stream URL");
+    } finally {
+      setIsResolving(false);
+      setResolvingStream(null);
+      setResolveProgress(0);
+      setResolveStatus("");
     }
-    
-    setIsResolving(false);
-    setResolvingStream(null);
-    setResolveStatus("");
   };
 
-  const posterUrl = media?.poster_path
-    ? getImageUrl(media.poster_path, "w200")
+  const posterUrl = media?.poster_path 
+    ? (media.poster_path.startsWith('http') ? media.poster_path : getImageUrl(media.poster_path, "w200"))
     : null;
 
-  // Format file size
+  const backdropUrl = media?.backdrop_path
+    ? (media.backdrop_path.startsWith('http') ? media.backdrop_path : getImageUrl(media.backdrop_path, "w780"))
+    : null;
+
   const formatFileSize = (bytes: number): string => {
     if (bytes >= 1073741824) {
       return (bytes / 1073741824).toFixed(2) + " GB";
@@ -704,683 +654,578 @@ export function StreamSelectionDialog({
     }
   };
 
-  // Extract quality from filename
   const extractQuality = (filename: string): string => {
     const match = filename.match(/(\d{3,4}p|4K|2160p)/i);
     return match ? match[1].toUpperCase() : "";
   };
 
+  // Extract additional info from stream title
+  const extractStreamDetails = (stream: TorrentioStream) => {
+    const info = parseStreamInfo(stream);
+    const title = stream.title?.toLowerCase() || "";
+    
+    // Extract codec
+    let codec = "";
+    if (title.includes("hevc") || title.includes("x265") || title.includes("h.265") || title.includes("h265")) {
+      codec = "HEVC";
+    } else if (title.includes("x264") || title.includes("h.264") || title.includes("h264") || title.includes("avc")) {
+      codec = "H.264";
+    } else if (title.includes("av1")) {
+      codec = "AV1";
+    }
+    
+    // Extract audio
+    let audio = "";
+    if (title.includes("atmos")) {
+      audio = "Atmos";
+    } else if (title.includes("truehd")) {
+      audio = "TrueHD";
+    } else if (title.includes("dts-hd") || title.includes("dts hd")) {
+      audio = "DTS-HD";
+    } else if (title.includes("dts")) {
+      audio = "DTS";
+    } else if (title.includes("aac")) {
+      audio = "AAC";
+    } else if (title.includes("dd5.1") || title.includes("dd 5.1") || title.includes("dolby digital")) {
+      audio = "DD5.1";
+    }
+    
+    // Extract HDR info
+    let hdr = "";
+    if (title.includes("dolby vision") || title.includes("dv ") || title.includes("dovi")) {
+      hdr = "DV";
+    } else if (title.includes("hdr10+")) {
+      hdr = "HDR10+";
+    } else if (title.includes("hdr10") || title.includes("hdr")) {
+      hdr = "HDR";
+    }
+    
+    // Extract source/provider from stream name
+    const provider = stream.name?.split("\n")[0] || "Unknown";
+    
+    return { ...info, codec, audio, hdr, provider };
+  };
+
+  // Quality badge color based on resolution
+  const getQualityColor = (quality: string) => {
+    const q = quality?.toLowerCase() || "";
+    if (q.includes("2160") || q.includes("4k")) {
+      return "bg-purple-600 text-white";
+    } else if (q.includes("1080")) {
+      return "bg-blue-600 text-white";
+    } else if (q.includes("720")) {
+      return "bg-green-600 text-white";
+    }
+    return "bg-muted text-muted-foreground";
+  };
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none border-none overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-primary" />
-            Select Stream
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 rounded-none border-none overflow-hidden bg-[#0a0a0f]">
+        {/* Stremio-style layout */}
+        <div className="flex h-full">
+          {/* Left Panel - Media Info */}
+          <div className="w-[360px] shrink-0 flex flex-col bg-[#0d0d14] border-r border-white/5">
+            {/* Header with close button */}
+            <div className="flex items-center justify-between p-4 border-b border-white/5">
+              <h2 className="text-lg font-semibold text-white">Select Stream</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onOpenChange(false)}
+                className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
 
-        {/* Tabs wrapper - encompasses everything including the header */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          {media && (
-            <div className="flex gap-4 p-3 bg-secondary/30 rounded-lg items-center shrink-0">
-              {posterUrl ? (
-                <img
-                  src={posterUrl}
-                  alt={media.title}
-                  className="w-12 h-18 object-cover rounded-md shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-18 bg-muted rounded-md flex items-center justify-center shrink-0">
-                  {media.media_type === "movie" ? (
-                    <Film className="w-5 h-5 text-muted-foreground" />
+            {/* Media poster and info */}
+            {media && (
+              <div className="p-4 space-y-4">
+                {/* Poster with backdrop */}
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-black/50">
+                  {backdropUrl ? (
+                    <img
+                      src={backdropUrl}
+                      alt={media.title}
+                      className="w-full h-full object-cover opacity-60"
+                    />
+                  ) : posterUrl ? (
+                    <img
+                      src={posterUrl}
+                      alt={media.title}
+                      className="w-full h-full object-cover opacity-60"
+                    />
                   ) : (
-                    <Tv className="w-5 h-5 text-muted-foreground" />
+                    <div className="w-full h-full flex items-center justify-center">
+                      {media.media_type === "movie" ? (
+                        <Film className="w-12 h-12 text-white/20" />
+                      ) : (
+                        <Tv className="w-12 h-12 text-white/20" />
+                      )}
+                    </div>
                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <h3 className="text-white font-bold text-xl leading-tight">{media.title}</h3>
+                  </div>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-base leading-tight truncate">{media.title}</h3>
-                <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    {media.media_type === "movie" ? <Film className="w-3 h-3" /> : <Tv className="w-3 h-3" />}
-                    {media.media_type === "movie" ? "Movie" : "TV"}
+
+                {/* Meta info */}
+                <div className="flex flex-wrap items-center gap-3 text-sm text-white/60">
+                  <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
+                    {media.media_type === "movie" ? <Film className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5" />}
+                    {media.media_type === "movie" ? "Movie" : "TV Series"}
                   </span>
                   {media.release_date && (
-                    <span>{media.release_date.slice(0, 4)}</span>
+                    <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {media.release_date.slice(0, 4)}
+                    </span>
                   )}
                   {media.rating && media.rating > 0 && (
-                    <span className="flex items-center gap-1">
-                      <Star className="w-3 h-3 text-yellow-500" />
+                    <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
+                      <Star className="w-3.5 h-3.5 text-yellow-500" />
                       {media.rating.toFixed(1)}
                     </span>
                   )}
                   {media.runtime && media.runtime > 0 && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {media.media_type === "tv" ? (
-                        <>~{media.runtime} min/ep</>
-                      ) : (
-                        <>{Math.floor(media.runtime / 60)}h {media.runtime % 60}m</>
-                      )}
+                    <span className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded">
+                      <Clock className="w-3.5 h-3.5" />
+                      {media.media_type === "tv" ? `~${media.runtime}m` : `${Math.floor(media.runtime / 60)}h ${media.runtime % 60}m`}
                     </span>
                   )}
                 </div>
+
+                {/* Season/Episode picker for TV */}
+                {media.media_type === "tv" && (
+                  <div className="flex gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="flex-1 justify-between bg-white/5 border-white/10 hover:bg-white/10 text-white">
+                          <span>Season {selectedSeason}</span>
+                          <ChevronDown className="w-4 h-4 opacity-60" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="start">
+                        <div className="grid grid-cols-5 gap-1 max-h-[200px] overflow-y-auto">
+                          {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
+                            <Button
+                              key={s}
+                              variant={selectedSeason === s ? "default" : "ghost"}
+                              size="sm"
+                              className={cn("h-8 w-10", selectedSeason !== s && "text-white/70 hover:text-white hover:bg-white/10")}
+                              onClick={() => { setSelectedSeason(s); setSelectedEpisode(1); setStreams([]); }}
+                            >
+                              {s}
+                            </Button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="flex-1 justify-between bg-white/5 border-white/10 hover:bg-white/10 text-white">
+                          <span>Episode {selectedEpisode}</span>
+                          <ChevronDown className="w-4 h-4 opacity-60" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="start">
+                        <div className="grid grid-cols-5 gap-1 max-h-[200px] overflow-y-auto">
+                          {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
+                            <Button
+                              key={e}
+                              variant={selectedEpisode === e ? "default" : "ghost"}
+                              size="sm"
+                              className={cn("h-8 w-10", selectedEpisode !== e && "text-white/70 hover:text-white hover:bg-white/10")}
+                              onClick={() => { setSelectedEpisode(e); setStreams([]); }}
+                            >
+                              {e}
+                            </Button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="icon" className="bg-white/5 border-white/10 hover:bg-white/10 text-white">
+                      {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div className="px-4 border-b border-white/5">
+              <div className="flex">
+                <button
+                  onClick={() => setActiveTab("streams")}
+                  className={cn(
+                    "flex-1 py-3 text-sm font-medium transition-colors border-b-2 -mb-px",
+                    activeTab === "streams" 
+                      ? "text-white border-primary" 
+                      : "text-white/50 border-transparent hover:text-white/80"
+                  )}
+                >
+                  <Wifi className="w-4 h-4 inline-block mr-2" />
+                  Streams
+                </button>
+                <button
+                  onClick={() => setActiveTab("downloads")}
+                  className={cn(
+                    "flex-1 py-3 text-sm font-medium transition-colors border-b-2 -mb-px",
+                    activeTab === "downloads" 
+                      ? "text-white border-primary" 
+                      : "text-white/50 border-transparent hover:text-white/80"
+                  )}
+                >
+                  <HardDrive className="w-4 h-4 inline-block mr-2" />
+                  Downloads
+                </button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="p-4 space-y-3 border-b border-white/5">
+              <div className="flex gap-2">
+                <Select value={qualityFilter} onValueChange={setQualityFilter}>
+                  <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Quality" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a24] border-white/10">
+                    <SelectItem value="all">All Quality</SelectItem>
+                    <SelectItem value="best">Best</SelectItem>
+                    <SelectItem value="4k">4K</SelectItem>
+                    <SelectItem value="1080p">1080p</SelectItem>
+                    <SelectItem value="720p">720p</SelectItem>
+                    <SelectItem value="480p">480p/SD</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={languageFilter} onValueChange={setLanguageFilter}>
+                  <SelectTrigger className="flex-1 bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#1a1a24] border-white/10">
+                    <SelectItem value="all">All Languages</SelectItem>
+                    <SelectItem value="english">English</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
-              {/* Tabs moved here - next to show info */}
-              <TabsList className="grid grid-cols-2 shrink-0 h-9">
-                <TabsTrigger value="search" className="text-xs px-3">
-                  Streams
-                </TabsTrigger>
-                <TabsTrigger value="downloads" className="text-xs px-3">
-                  Downloaded
-                </TabsTrigger>
-              </TabsList>
+              {/* Stream count */}
+              <div className="text-xs text-white/40">
+                {activeTab === "streams" ? (
+                  isSearching ? "Searching..." : `${filteredStreams.length} streams available`
+                ) : (
+                  isLoadingDownloads ? "Loading..." : `${filteredDownloads.length} downloads`
+                )}
+              </div>
             </div>
-          )}
 
-          {/* Real-Debrid Service Warning Banner */}
-          {(rdStatus === "service_unavailable" || rdStatus === "error") && (
-            <Alert variant="destructive" className="shrink-0 mt-2">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="flex items-center justify-between gap-2">
-                <span className="text-sm">
-                  {rdError || "Real-Debrid service is temporarily unavailable"}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refreshRdStatus}
-                  className="shrink-0 h-7 px-2 text-xs"
-                >
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Retry
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Search Tab */}
-          <TabsContent value="search" className="flex-1 flex flex-col min-h-0 mt-2">
-            {/* Season/Episode picker for TV shows */}
-            {media?.media_type === "tv" && (
-              <div className="relative z-10 flex items-center gap-2 flex-wrap mb-2">
-              {/* Season Grid Selector */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-[130px] h-8 text-xs justify-between">
-                      <span>S{selectedSeason}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {selectedSeason} of {media.seasons || 10}
-                      </span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-3" align="start">
-                    <div className="flex flex-col gap-3">
-                      {/* Quick jump input */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Jump to:</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={media.seasons || 10}
-                          placeholder="Season #"
-                          className="w-20 h-7 text-xs"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const value = parseInt((e.target as HTMLInputElement).value);
-                              const maxSeasons = media.seasons || 10;
-                              if (value >= 1 && value <= maxSeasons) {
-                                setSelectedSeason(value);
-                                setSelectedEpisode(1);
-                                setStreams([]);
-                                (e.target as HTMLInputElement).value = '';
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      {/* 3-column season grid */}
-                      <div className="grid grid-cols-3 gap-1 max-h-[200px] overflow-y-auto">
-                        {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
-                          <Button
-                            key={s}
-                            variant={selectedSeason === s ? "default" : "outline"}
-                            size="sm"
-                            className={cn(
-                              "h-8 text-xs font-medium",
-                              selectedSeason === s && "ring-2 ring-primary"
-                            )}
-                            onClick={() => {
-                              setSelectedSeason(s);
-                              setSelectedEpisode(1);
-                              setStreams([]);
-                            }}
-                          >
-                            S{s}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                {/* Episode Grid Selector */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-[140px] h-8 text-xs justify-between">
-                      <span>E{selectedEpisode}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {selectedEpisode} of 30
-                      </span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-3" align="start">
-                    <div className="flex flex-col gap-3">
-                      {/* Quick jump input */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Jump to:</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={30}
-                          placeholder="Episode #"
-                          className="w-20 h-7 text-xs"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const value = parseInt((e.target as HTMLInputElement).value);
-                              if (value >= 1 && value <= 30) {
-                                setSelectedEpisode(value);
-                                setStreams([]);
-                                (e.target as HTMLInputElement).value = '';
-                              }
-                            }
-                          }}
-                        />
-                      </div>
-                      {/* 3-column episode grid showing 15 at a time */}
-                      <div className="grid grid-cols-3 gap-1 max-h-[200px] overflow-y-auto">
-                        {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
-                          <Button
-                            key={e}
-                            variant={selectedEpisode === e ? "default" : "outline"}
-                            size="sm"
-                            className={cn(
-                              "h-8 text-xs font-medium",
-                              selectedEpisode === e && "ring-2 ring-primary"
-                            )}
-                            onClick={() => {
-                              setSelectedEpisode(e);
-                              setStreams([]);
-                            }}
-                          >
-                            E{e}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-                <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="sm" className="gap-1">
-                  {isSearching ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3" />
-                  )}
-                  Search
-                </Button>
+            {/* Real-Debrid status */}
+            {(rdStatus === "service_unavailable" || rdStatus === "error") && (
+              <div className="p-4 bg-red-500/10 border-b border-red-500/20">
+                <p className="text-xs text-red-400 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {rdError || "Real-Debrid unavailable"}
+                </p>
               </div>
             )}
+          </div>
 
-            {/* Loading skeleton */}
-            {isSearching && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  <span className="text-sm text-muted-foreground">Searching for streams...</span>
-                </div>
-                <div className={cn(
-                  "grid gap-1",
-                  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-                )}>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "rounded border border-muted-foreground/20 bg-secondary/30",
-                        isTVMode ? "p-3" : "p-2"
-                      )}
-                    >
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Skeleton className={cn("rounded", isTVMode ? "h-5 w-14" : "h-4 w-12")} />
-                        <Skeleton className={cn("rounded", isTVMode ? "h-4 w-10" : "h-3 w-8")} />
-                      </div>
-                      <Skeleton className={cn("w-full rounded", isTVMode ? "h-4" : "h-3")} />
-                      <Skeleton className={cn("w-3/4 mt-1 rounded", isTVMode ? "h-3" : "h-2.5")} />
+          {/* Right Panel - Stream List */}
+          <div className="flex-1 flex flex-col min-w-0 bg-[#0a0a0f]">
+            {activeTab === "streams" ? (
+              <>
+                {/* Loading state */}
+                {isSearching && (
+                  <div className="flex-1 p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      <span className="text-white/60">Searching for streams...</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    <div className="space-y-2">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <Skeleton key={i} className="h-16 w-full bg-white/5" />
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {/* Error state */}
-            {error && !isSearching && (
-              <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
-                <div>
-                  <p className="text-sm text-destructive">{error}</p>
-                  <Button onClick={handleSearch} variant="ghost" size="sm" className="mt-2 h-7 gap-1">
-                    <RefreshCw className="w-3 h-3" />
-                    Try Again
-                  </Button>
-                </div>
-              </div>
-            )}
+                {/* Error state */}
+                {error && !isSearching && (
+                  <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                      <p className="text-white/80 mb-4">{error}</p>
+                      <Button onClick={handleSearch} variant="outline" className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Try Again
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
-            {/* Stream list */}
-            {streams.length > 0 && !isSearching && (
-              <div className="flex flex-col flex-1 min-h-0 overflow-hidden" style={{ minHeight: '150px' }}>
-                {/* Quality filter, compact toggle, and count */}
-                <div className="flex items-center justify-between gap-3 mb-2 px-1 shrink-0">
-                  <p className={cn(
-                    "text-muted-foreground",
-                    isTVMode ? "text-base" : "text-xs"
-                  )}>
-                    {filteredStreams.length} of {streams.length} stream(s)
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn("h-8 w-8", isTVMode && "h-10 w-10")}
-                      onClick={() => setIsCompactView(!isCompactView)}
-                      title={isCompactView ? "Normal view" : "Compact view"}
-                    >
-                      {isCompactView ? (
-                        <LayoutGrid className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+                {/* Stream list */}
+                {!isSearching && !error && (
+                  <ScrollAreaWithArrows className="flex-1" scrollStep={100} isTVMode={isTVMode}>
+                    <div className="p-2 space-y-1">
+                      {filteredStreams.length === 0 && streams.length > 0 ? (
+                        <div className="flex items-center justify-center py-12 text-white/40">
+                          No streams match the selected filters
+                        </div>
+                      ) : filteredStreams.length === 0 ? (
+                        <div className="flex items-center justify-center py-12 text-white/40">
+                          No streams found
+                        </div>
                       ) : (
-                        <List className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
-                      )}
-                    </Button>
-                    <Filter className="w-3 h-3 text-muted-foreground" />
-                    <Select value={languageFilter} onValueChange={setLanguageFilter}>
-                      <SelectTrigger className={cn("w-[90px]", isTVMode ? "h-10" : "h-8")}>
-                        <SelectValue placeholder="Language" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="english">English</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={qualityFilter} onValueChange={setQualityFilter}>
-                      <SelectTrigger className={cn("w-[100px]", isTVMode ? "h-10" : "h-8")}>
-                        <SelectValue placeholder="Quality" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="best">Best</SelectItem>
-                        <SelectItem value="4k">4K</SelectItem>
-                        <SelectItem value="1080p">1080p</SelectItem>
-                        <SelectItem value="720p">720p</SelectItem>
-                        <SelectItem value="480p">480p/SD</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                {filteredStreams.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    No streams match the selected quality filter.
-                  </p>
-                ) : (
-                <ScrollAreaWithArrows 
-                  scrollStep={70}
-                  isTVMode={isTVMode}
-                  className="flex-1 min-h-0"
-                  style={{ minHeight: '120px', maxHeight: '100%' }}
-                >
-                  <div className={cn(
-                    "p-0.5",
-                    "grid gap-1",
-                    // Responsive grid: more columns in landscape/wider screens
-                    "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-                  )}>
-                
-                {filteredStreams.map((stream, index) => {
-                  const info = parseStreamInfo(stream);
-                  const isCurrentlyResolving = resolvingStream === stream.url;
-                  const isFocused = focusedIndex === index;
-                  const hasFailed = failedStreams.has(stream.url);
-                  
-                  return (
-                    <button
-                      key={index}
-                      ref={(el) => (streamButtonsRef.current[index] = el)}
-                      onClick={() => handleStreamSelect(stream)}
-                      onKeyDown={(e) => handleKeyDown(e, index, stream)}
-                      onFocus={() => setFocusedIndex(index)}
-                      disabled={isResolving}
-                      className={cn(
-                        "w-full text-left rounded border transition-all duration-150",
-                        isCompactView
-                          ? (isTVMode ? "px-2 py-1.5" : "px-1.5 py-1")
-                          : (isTVMode ? "p-3" : "p-2"),
-                        hasFailed
-                          ? "border-destructive/50 bg-destructive/10 opacity-60"
-                          : isCurrentlyResolving
-                          ? "border-primary bg-primary/30 ring-1 ring-primary"
-                          : isFocused
-                          ? "border-primary bg-primary/20 ring-1 ring-primary"
-                          : "border-muted-foreground/20 bg-secondary/30 hover:border-primary/50 hover:bg-primary/5",
-                        "focus:outline-none focus:border-primary focus:bg-primary/20 focus:ring-1 focus:ring-primary",
-                        isResolving && !isCurrentlyResolving && "opacity-50"
-                      )}
-                    >
-                      <div className={cn(
-                        "flex items-center justify-between",
-                        isTVMode ? "gap-2" : "gap-1.5"
-                      )}>
-                        <div className="flex-1 min-w-0">
-                          <div className={cn(
-                            "flex flex-wrap items-center",
-                            isTVMode ? "gap-2" : "gap-1"
-                          )}>
-                            {info.quality && (
-                              <span className={cn(
-                                "font-semibold rounded",
-                                isTVMode ? "px-2 py-0.5 text-sm" : "px-1 py-0 text-[10px]",
-                                info.quality.includes("2160") || info.quality.includes("4K")
-                                  ? "bg-purple-500/20 text-purple-400"
-                                  : info.quality.includes("1080")
-                                  ? "bg-blue-500/20 text-blue-400"
-                                  : info.quality.includes("720")
-                                  ? "bg-green-500/20 text-green-400"
-                                  : "bg-muted text-muted-foreground"
-                              )}>
-                                {info.quality}
-                              </span>
-                            )}
-                            {info.size && (
-                              <span className={cn(
-                                "text-muted-foreground",
-                                isTVMode ? "text-sm" : "text-[10px]"
-                              )}>{info.size}</span>
-                            )}
-                            {info.isDirectLink && (
-                              <span className={cn(
-                                "bg-green-500/20 text-green-400 rounded flex items-center",
-                                isTVMode ? "px-1.5 py-0.5 text-xs gap-0.5" : "px-1 py-0 text-[10px] gap-0.5"
-                              )}>
-                                <Zap className={cn(isTVMode ? "w-3 h-3" : "w-2.5 h-2.5")} />
-                                Cached
-                              </span>
-                            )}
-                            {hasFailed && (
-                              <span className={cn(
-                                "bg-destructive/20 text-destructive rounded flex items-center",
-                                isTVMode ? "px-1.5 py-0.5 text-xs gap-0.5" : "px-1 py-0 text-[10px] gap-0.5"
-                              )}>
-                                <XCircle className={cn(isTVMode ? "w-3 h-3" : "w-2.5 h-2.5")} />
-                                Failed
-                              </span>
-                            )}
-                          </div>
-                          <p className={cn(
-                            "text-foreground/80 truncate font-medium leading-tight",
-                            isCompactView ? "mt-0.5" : "mt-1",
-                            isTVMode ? "text-sm" : "text-xs"
-                          )}>
-                            {stream.title || stream.name}
-                          </p>
-                        </div>
-                        <div className="shrink-0 flex flex-col items-end">
-                          {isCurrentlyResolving ? (
-                            <div className="flex flex-col items-end gap-0.5">
-                              <Loader2 className={cn(
-                                "animate-spin text-primary",
-                                isTVMode ? "w-5 h-5" : "w-4 h-4"
-                              )} />
-                              {resolveStatus && (
-                                <span className={cn(
-                                  "text-primary",
-                                  isTVMode ? "text-xs" : "text-[10px]"
-                                )}>{resolveStatus}</span>
+                        filteredStreams.map((stream, index) => {
+                          const details = extractStreamDetails(stream);
+                          const isCurrentlyResolving = resolvingStream === stream.url;
+                          const isFocused = focusedIndex === index;
+                          const hasFailed = failedStreams.has(stream.url);
+                          
+                          return (
+                            <button
+                              key={index}
+                              ref={(el) => (streamButtonsRef.current[index] = el)}
+                              onClick={() => handleStreamSelect(stream)}
+                              onKeyDown={(e) => handleKeyDown(e, index, stream)}
+                              onFocus={() => setFocusedIndex(index)}
+                              disabled={isResolving}
+                              className={cn(
+                                "w-full text-left p-3 rounded-lg transition-all duration-150 group",
+                                hasFailed
+                                  ? "bg-red-500/10 border border-red-500/30 opacity-60"
+                                  : isCurrentlyResolving
+                                  ? "bg-primary/20 border border-primary ring-1 ring-primary"
+                                  : isFocused
+                                  ? "bg-white/10 border border-primary"
+                                  : "bg-white/[0.02] border border-transparent hover:bg-white/[0.06] hover:border-white/10",
+                                "focus:outline-none focus:bg-white/10 focus:border-primary",
+                                isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
                               )}
-                              {resolveProgress > 0 && resolveProgress < 100 && (
-                                <div className={cn(
-                                  "bg-muted rounded-full overflow-hidden",
-                                  isTVMode ? "w-20 h-1.5" : "w-16 h-1"
-                                )}>
-                                  <div 
-                                    className="h-full bg-primary transition-all duration-300"
-                                    style={{ width: `${resolveProgress}%` }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <Play className={cn(
-                              isTVMode ? "w-5 h-5" : "w-4 h-4",
-                              isFocused ? "text-primary" : "text-muted-foreground/50"
-                            )} />
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-                  </div>
-                </ScrollAreaWithArrows>
-                )}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Downloaded Tab */}
-          <TabsContent value="downloads" className="flex-1 flex flex-col min-h-0 mt-4">
-            {/* Search box for downloads */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search your downloads..."
-                  value={downloadSearchQuery}
-                  onChange={(e) => setDownloadSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm bg-secondary/50 border border-muted-foreground/30 rounded-lg focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <Button onClick={loadMyDownloads} disabled={isLoadingDownloads} variant="outline" size="icon" className="shrink-0">
-                {isLoadingDownloads ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-
-            {/* Loading state */}
-            {isLoadingDownloads && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <span className="ml-3 text-muted-foreground">Loading your downloads...</span>
-              </div>
-            )}
-
-            {/* Error state */}
-            {downloadsError && !isLoadingDownloads && (
-              <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
-                <div>
-                  <p className="text-sm text-destructive">{downloadsError}</p>
-                  <Button onClick={loadMyDownloads} variant="ghost" size="sm" className="mt-2 h-7 gap-1">
-                    <RefreshCw className="w-3 h-3" />
-                    Try Again
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!isLoadingDownloads && !downloadsError && myDownloads.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Download className="w-12 h-12 mb-3 opacity-50" />
-                <p className="text-sm">No downloads found in your Real-Debrid account</p>
-                <Button onClick={loadMyDownloads} variant="ghost" size="sm" className="mt-2 gap-1">
-                  <RefreshCw className="w-3 h-3" />
-                  Refresh
-                </Button>
-              </div>
-            )}
-
-            {/* Downloads list */}
-            {!isLoadingDownloads && filteredDownloads.length > 0 && (
-              <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                {/* Compact toggle and count */}
-                <div className="flex items-center justify-between gap-3 mb-2 px-1 shrink-0">
-                  <p className={cn(
-                    "text-muted-foreground",
-                    isTVMode ? "text-base" : "text-xs"
-                  )}>
-                    {filteredDownloads.length} of {myDownloads.length} file(s)
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn("h-8 w-8", isTVMode && "h-10 w-10")}
-                    onClick={() => setIsCompactView(!isCompactView)}
-                    title={isCompactView ? "Normal view" : "Compact view"}
-                  >
-                    {isCompactView ? (
-                      <LayoutGrid className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
-                    ) : (
-                      <List className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
-                    )}
-                  </Button>
-                </div>
-                
-                <ScrollAreaWithArrows 
-                  scrollStep={150}
-                  isTVMode={isTVMode}
-                  className="flex-1 min-h-0"
-                >
-                  <div className={cn(
-                    "p-1",
-                    isCompactView 
-                      ? (isTVMode ? "space-y-2" : "space-y-1") 
-                      : (isTVMode ? "space-y-3" : "space-y-2")
-                  )}>
-                    {filteredDownloads.map((download, index) => {
-                      const quality = extractQuality(download.filename);
-                      const isCurrentlyResolving = resolvingStream === download.download;
-                      const isFocused = downloadFocusedIndex === index;
-                      
-                      return (
-                        <button
-                          key={download.id}
-                          ref={(el) => (downloadButtonsRef.current[index] = el)}
-                          onClick={() => handleDownloadSelect(download)}
-                          onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
-                          onFocus={() => setDownloadFocusedIndex(index)}
-                          disabled={isResolving}
-                          className={cn(
-                            "w-full text-left rounded-lg border transition-all duration-200",
-                            isCompactView
-                              ? (isTVMode ? "p-3" : "p-1.5")
-                              : (isTVMode ? "p-5" : "p-3"),
-                            isCurrentlyResolving
-                              ? "border-primary bg-primary/30 ring-2 ring-primary shadow-lg shadow-primary/20"
-                              : isFocused
-                              ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02] shadow-lg shadow-primary/20"
-                              : "border-muted-foreground/30 bg-secondary/50 hover:border-primary hover:bg-primary/10 hover:shadow-md",
-                            "focus:outline-none focus:border-primary focus:bg-primary/20 focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background focus:scale-[1.02] focus:shadow-lg focus:shadow-primary/20",
-                            isResolving && !isCurrentlyResolving && "opacity-50"
-                          )}
-                        >
-                          <div className={cn(
-                            "flex items-center justify-between",
-                            isTVMode ? "gap-4" : "gap-3"
-                          )}>
-                            <div className="flex-1 min-w-0">
-                              <div className={cn(
-                                "flex flex-wrap items-center",
-                                isTVMode ? "gap-3" : "gap-2"
-                              )}>
-                                {quality && (
-                                  <span className={cn(
-                                    "font-semibold rounded",
-                                    isTVMode ? "px-3 py-1 text-base" : "px-2 py-0.5 text-xs",
-                                    quality.includes("2160") || quality.includes("4K")
-                                      ? "bg-purple-500/20 text-purple-400"
-                                      : quality.includes("1080")
-                                      ? "bg-blue-500/20 text-blue-400"
-                                      : quality.includes("720")
-                                      ? "bg-green-500/20 text-green-400"
-                                      : "bg-muted text-muted-foreground"
-                                  )}>
-                                    {quality}
-                                  </span>
-                                )}
-                                <span className={cn(
-                                  "text-muted-foreground",
-                                  isTVMode ? "text-base" : "text-xs"
-                                )}>
-                                  {formatFileSize(download.filesize)}
-                                </span>
-                                <span className={cn(
-                                  "bg-green-500/20 text-green-400 rounded flex items-center gap-1",
-                                  isTVMode ? "px-2 py-1 text-sm" : "px-1.5 py-0.5 text-xs"
-                                )}>
-                                  <Zap className={cn(isTVMode ? "w-4 h-4" : "w-3 h-3")} />
-                                  Ready
-                                </span>
-                              </div>
-                              <p className={cn(
-                                "text-foreground/80 mt-1 truncate font-medium",
-                                isTVMode ? "text-base" : "text-sm"
-                              )}>
-                                {download.filename}
-                              </p>
-                            </div>
-                            <div className="shrink-0 flex flex-col items-end gap-1">
-                              {isCurrentlyResolving ? (
-                                <div className="flex flex-col items-end gap-1">
-                                  <Loader2 className={cn(
-                                    "animate-spin text-primary",
-                                    isTVMode ? "w-8 h-8" : "w-5 h-5"
-                                  )} />
-                                  {resolveStatus && (
-                                    <span className={cn(
-                                      "text-primary",
-                                      isTVMode ? "text-sm" : "text-xs"
-                                    )}>{resolveStatus}</span>
+                            >
+                              <div className="flex items-start gap-3">
+                                {/* Provider icon placeholder */}
+                                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                                  {details.isDirectLink ? (
+                                    <Zap className="w-5 h-5 text-green-400" />
+                                  ) : (
+                                    <Wifi className="w-5 h-5 text-white/40" />
                                   )}
                                 </div>
-                              ) : (
-                                <Play className={cn(
-                                  isTVMode ? "w-8 h-8" : "w-5 h-5",
-                                  isFocused ? "text-primary" : "text-muted-foreground"
-                                )} />
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </ScrollAreaWithArrows>
-              </div>
-            )}
 
-            {/* No results for search */}
-            {!isLoadingDownloads && myDownloads.length > 0 && filteredDownloads.length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No downloads match your search.
-              </p>
+                                {/* Stream info */}
+                                <div className="flex-1 min-w-0">
+                                  {/* Top row - Quality badges */}
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                    {details.quality && (
+                                      <span className={cn("px-2 py-0.5 rounded text-xs font-bold", getQualityColor(details.quality))}>
+                                        {details.quality}
+                                      </span>
+                                    )}
+                                    {details.hdr && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/20 text-amber-400">
+                                        {details.hdr}
+                                      </span>
+                                    )}
+                                    {details.codec && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
+                                        {details.codec}
+                                      </span>
+                                    )}
+                                    {details.audio && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-white/10 text-white/70">
+                                        {details.audio}
+                                      </span>
+                                    )}
+                                    {details.isDirectLink && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-500/20 text-green-400 flex items-center gap-1">
+                                        <Zap className="w-3 h-3" />
+                                        Cached
+                                      </span>
+                                    )}
+                                    {hasFailed && (
+                                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-400">
+                                        Failed
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Title */}
+                                  <p className="text-sm text-white/80 truncate leading-tight mb-1">
+                                    {stream.title || stream.name}
+                                  </p>
+
+                                  {/* Bottom row - Size and provider */}
+                                  <div className="flex items-center gap-3 text-xs text-white/40">
+                                    {details.size && (
+                                      <span className="flex items-center gap-1">
+                                        <HardDrive className="w-3 h-3" />
+                                        {details.size}
+                                      </span>
+                                    )}
+                                    <span>{details.provider}</span>
+                                  </div>
+                                </div>
+
+                                {/* Play button / Loading */}
+                                <div className="shrink-0 self-center">
+                                  {isCurrentlyResolving ? (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                      {resolveStatus && (
+                                        <span className="text-[10px] text-primary">{resolveStatus}</span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className={cn(
+                                      "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                                      isFocused ? "bg-primary text-white" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
+                                    )}>
+                                      <Play className="w-5 h-5 ml-0.5" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </ScrollAreaWithArrows>
+                )}
+              </>
+            ) : (
+              /* Downloads tab */
+              <>
+                {/* Search box */}
+                <div className="p-4 border-b border-white/5">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                    <input
+                      type="text"
+                      placeholder="Search downloads..."
+                      value={downloadSearchQuery}
+                      onChange={(e) => setDownloadSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 text-sm bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-white placeholder:text-white/40"
+                    />
+                  </div>
+                </div>
+
+                {/* Loading state */}
+                {isLoadingDownloads && (
+                  <div className="flex-1 flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  </div>
+                )}
+
+                {/* Error state */}
+                {downloadsError && !isLoadingDownloads && (
+                  <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                      <p className="text-white/80 mb-4">{downloadsError}</p>
+                      <Button onClick={loadMyDownloads} variant="outline" className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Try Again
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!isLoadingDownloads && !downloadsError && filteredDownloads.length === 0 && (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center text-white/40">
+                      <Download className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No downloads found</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Downloads list */}
+                {!isLoadingDownloads && filteredDownloads.length > 0 && (
+                  <ScrollAreaWithArrows className="flex-1" scrollStep={100} isTVMode={isTVMode}>
+                    <div className="p-2 space-y-1">
+                      {filteredDownloads.map((download, index) => {
+                        const quality = extractQuality(download.filename);
+                        const isCurrentlyResolving = resolvingStream === download.download;
+                        const isFocused = downloadFocusedIndex === index;
+                        
+                        return (
+                          <button
+                            key={download.id}
+                            ref={(el) => (downloadButtonsRef.current[index] = el)}
+                            onClick={() => handleDownloadSelect(download)}
+                            onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
+                            onFocus={() => setDownloadFocusedIndex(index)}
+                            disabled={isResolving}
+                            className={cn(
+                              "w-full text-left p-3 rounded-lg transition-all duration-150 group",
+                              isCurrentlyResolving
+                                ? "bg-primary/20 border border-primary ring-1 ring-primary"
+                                : isFocused
+                                ? "bg-white/10 border border-primary"
+                                : "bg-white/[0.02] border border-transparent hover:bg-white/[0.06] hover:border-white/10",
+                              "focus:outline-none focus:bg-white/10 focus:border-primary",
+                              isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Icon */}
+                              <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+                                <HardDrive className="w-5 h-5 text-green-400" />
+                              </div>
+
+                              {/* Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                  {quality && (
+                                    <span className={cn("px-2 py-0.5 rounded text-xs font-bold", getQualityColor(quality))}>
+                                      {quality}
+                                    </span>
+                                  )}
+                                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-500/20 text-green-400">
+                                    Downloaded
+                                  </span>
+                                </div>
+                                <p className="text-sm text-white/80 truncate leading-tight mb-1">
+                                  {download.filename}
+                                </p>
+                                <div className="flex items-center gap-3 text-xs text-white/40">
+                                  <span className="flex items-center gap-1">
+                                    <HardDrive className="w-3 h-3" />
+                                    {formatFileSize(download.filesize)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Play button */}
+                              <div className="shrink-0 self-center">
+                                {isCurrentlyResolving ? (
+                                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                ) : (
+                                  <div className={cn(
+                                    "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                                    isFocused ? "bg-primary text-white" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
+                                  )}>
+                                    <Play className="w-5 h-5 ml-0.5" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollAreaWithArrows>
+                )}
+              </>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
     <ConfirmationDialog />
