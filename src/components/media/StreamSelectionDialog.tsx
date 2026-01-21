@@ -1084,7 +1084,7 @@ export function StreamSelectionDialog({
                   <div className="flex-1 flex flex-col min-h-0">
                     {/* Header with stream count and navigation arrows */}
                     {filteredStreams.length > 0 && (
-                      <div className="flex items-center justify-between px-6 py-2">
+                      <div className="flex flex-col items-start gap-2 px-6 py-2">
                         <span className="text-sm text-white/40">
                           {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
                         </span>
