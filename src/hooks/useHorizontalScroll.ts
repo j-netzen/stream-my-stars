@@ -2,6 +2,8 @@ import { useRef, useEffect, useCallback } from "react";
 
 interface UseHorizontalScrollOptions {
   scrollSpeed?: number;
+  /** Skip custom touch handling and let native touch scroll work (recommended for mobile) */
+  useNativeTouch?: boolean;
 }
 
 export function useHorizontalScroll<T extends HTMLElement>(options?: UseHorizontalScrollOptions) {
@@ -14,7 +16,7 @@ export function useHorizontalScroll<T extends HTMLElement>(options?: UseHorizont
   const lastTime = useRef(0);
   const animationFrame = useRef<number>();
 
-  const { scrollSpeed = 1 } = options || {};
+  const { scrollSpeed = 1, useNativeTouch = true } = options || {};
 
   // Mouse wheel horizontal scroll
   const handleWheel = useCallback((e: WheelEvent) => {
@@ -143,32 +145,43 @@ export function useHorizontalScroll<T extends HTMLElement>(options?: UseHorizont
     const element = scrollRef.current;
     if (!element) return;
 
-    // Set initial cursor style
+    // Set initial cursor style for mouse drag
     element.style.cursor = 'grab';
+    
+    // Enable native horizontal touch scrolling
+    element.style.touchAction = 'pan-x';
+    element.style.overscrollBehaviorX = 'contain';
 
     // Add event listeners
     element.addEventListener('wheel', handleWheel, { passive: false });
     element.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-    element.addEventListener('touchstart', handleTouchStart, { passive: true });
-    element.addEventListener('touchmove', handleTouchMove, { passive: true });
-    element.addEventListener('touchend', handleTouchEnd);
+    
+    // Only add custom touch handling if not using native touch
+    if (!useNativeTouch) {
+      element.addEventListener('touchstart', handleTouchStart, { passive: true });
+      element.addEventListener('touchmove', handleTouchMove, { passive: true });
+      element.addEventListener('touchend', handleTouchEnd);
+    }
 
     return () => {
       element.removeEventListener('wheel', handleWheel);
       element.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      element.removeEventListener('touchstart', handleTouchStart);
-      element.removeEventListener('touchmove', handleTouchMove);
-      element.removeEventListener('touchend', handleTouchEnd);
+      
+      if (!useNativeTouch) {
+        element.removeEventListener('touchstart', handleTouchStart);
+        element.removeEventListener('touchmove', handleTouchMove);
+        element.removeEventListener('touchend', handleTouchEnd);
+      }
       
       if (animationFrame.current) {
         cancelAnimationFrame(animationFrame.current);
       }
     };
-  }, [handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, handleTouchStart, handleTouchMove, handleTouchEnd]);
+  }, [handleWheel, handleMouseDown, handleMouseMove, handleMouseUp, handleTouchStart, handleTouchMove, handleTouchEnd, useNativeTouch]);
 
   return scrollRef;
 }

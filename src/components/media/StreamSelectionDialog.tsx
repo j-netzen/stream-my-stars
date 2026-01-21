@@ -1102,7 +1102,7 @@ export function StreamSelectionDialog({
                     {/* Scrollable area */}
                     <div 
                       ref={streamsScrollRef}
-                      className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-12 py-4 scrollbar-hide snap-x snap-mandatory"
+                      className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-12 py-4 scrollbar-hide snap-x snap-mandatory touch-pan-x"
                     >
                       {filteredStreams.length === 0 && streams.length > 0 ? (
                         <div className="flex-1 flex items-center justify-center text-white/40">
@@ -1317,7 +1317,7 @@ export function StreamSelectionDialog({
                     {/* Scrollable area */}
                     <div 
                       ref={downloadsScrollRef}
-                      className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-12 py-4 scrollbar-hide snap-x snap-mandatory"
+                      className="flex-1 flex items-center overflow-x-auto overflow-y-hidden px-12 py-4 scrollbar-hide snap-x snap-mandatory touch-pan-x"
                     >
                       <div className="flex gap-4">
                         {filteredDownloads.map((download, index) => {
