@@ -1193,15 +1193,18 @@ export function StreamSelectionDialog({
                   <div className="flex-1 flex flex-col min-h-0">
                     {/* Header with stream count and navigation arrows - Stremio style */}
                     {filteredStreams.length > 0 && (
-                      <div className="flex items-center justify-between px-6 py-3">
-                        <span className="text-lg font-semibold text-white">
-                          {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
-                        </span>
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col px-6 py-3 gap-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-semibold text-white">
+                            {filteredStreams.length} stream{filteredStreams.length !== 1 ? 's' : ''} available
+                          </span>
+                        </div>
+                        {/* Navigation arrows row */}
+                        <div className="flex items-center justify-center gap-6">
                           <Button
                             ref={streamsNavLeftRef}
-                            variant="ghost"
-                            size="icon"
+                            variant="outline"
+                            size="lg"
                             aria-disabled={!streamsCanScrollLeft}
                             onClick={() => {
                               if (!streamsCanScrollLeft) return;
@@ -1209,16 +1212,17 @@ export function StreamSelectionDialog({
                             }}
                             onKeyDown={(e) => handleStreamsNavKeyDown(e, true)}
                             className={cn(
-                              "h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all",
-                              !streamsCanScrollLeft && "opacity-30"
+                              "h-12 w-24 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-primary transition-all flex items-center justify-center gap-2",
+                              !streamsCanScrollLeft && "opacity-30 cursor-not-allowed"
                             )}
                           >
-                            <ChevronLeft className="w-5 h-5" />
+                            <ChevronLeft className="w-6 h-6" />
+                            <span className="text-sm font-medium">Prev</span>
                           </Button>
                           <Button
                             ref={streamsNavRightRef}
-                            variant="ghost"
-                            size="icon"
+                            variant="default"
+                            size="lg"
                             aria-disabled={!streamsCanScrollRight}
                             onClick={() => {
                               if (!streamsCanScrollRight) return;
@@ -1226,11 +1230,12 @@ export function StreamSelectionDialog({
                             }}
                             onKeyDown={(e) => handleStreamsNavKeyDown(e, false)}
                             className={cn(
-                              "h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
-                              !streamsCanScrollRight && "opacity-30"
+                              "h-12 w-24 rounded-lg bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all flex items-center justify-center gap-2",
+                              !streamsCanScrollRight && "opacity-30 cursor-not-allowed"
                             )}
                           >
-                            <ChevronRight className="w-5 h-5" />
+                            <span className="text-sm font-medium">Next</span>
+                            <ChevronRight className="w-6 h-6" />
                           </Button>
                         </div>
                       </div>
