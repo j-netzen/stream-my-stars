@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Media, useMedia } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
+import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
 import { useHorizontalScroll } from "@/hooks/useHorizontalScroll";
@@ -48,6 +49,7 @@ export function StreamSelectionDialog({
 }: StreamSelectionDialogProps) {
   const { updateMedia } = useMedia();
   const { isTVMode } = useTVMode();
+  const { isBrowseHere } = useBrowseHere();
   const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
   const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
   const [activeTab, setActiveTab] = useState<string>("streams");
@@ -94,6 +96,49 @@ export function StreamSelectionDialog({
   // Refs to track streams for auto-retry when player reports playback error
   const filteredStreamsRef = useRef<TorrentioStream[]>([]);
   const currentStreamIndexRef = useRef<number>(0);
+
+  const scrollBehavior: ScrollBehavior = isBrowseHere ? "auto" : "smooth";
+
+  const centerElementInScroll = useCallback(
+    (container: HTMLElement | null, el: HTMLElement | null) => {
+      if (!container || !el) return;
+      const left = el.offsetLeft - (container.clientWidth - el.clientWidth) / 2;
+      container.scrollTo({ left, behavior: scrollBehavior });
+    },
+    [scrollBehavior],
+  );
+
+  const focusStreamAtIndex = useCallback(
+    (index: number) => {
+      const max = filteredStreamsRef.current.length - 1;
+      if (max < 0) return;
+      const clamped = Math.max(0, Math.min(index, max));
+      setFocusedIndex(clamped);
+      requestAnimationFrame(() => {
+        const btn = streamButtonsRef.current[clamped];
+        if (!btn) return;
+        btn.focus();
+        centerElementInScroll(streamsScrollRef.current, btn);
+      });
+    },
+    [centerElementInScroll, streamsScrollRef],
+  );
+
+  const focusDownloadAtIndex = useCallback(
+    (index: number) => {
+      const max = filteredDownloads.length - 1;
+      if (max < 0) return;
+      const clamped = Math.max(0, Math.min(index, max));
+      setDownloadFocusedIndex(clamped);
+      requestAnimationFrame(() => {
+        const btn = downloadButtonsRef.current[clamped];
+        if (!btn) return;
+        btn.focus();
+        centerElementInScroll(downloadsScrollRef.current, btn);
+      });
+    },
+    [centerElementInScroll, downloadsScrollRef, filteredDownloads.length],
+  );
 
   // Fail-Safe state
   const [myDownloads, setMyDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
@@ -226,12 +271,22 @@ export function StreamSelectionDialog({
     const el = streamsScrollRef.current;
     if (el) {
       el.addEventListener('scroll', updateStreamsScrollState);
-      // Also update on resize
-      const resizeObserver = new ResizeObserver(updateStreamsScrollState);
-      resizeObserver.observe(el);
+      // Also update on resize (fallback for TV browsers that may not support ResizeObserver)
+      let resizeObserver: ResizeObserver | null = null;
+      const handleResize = () => updateStreamsScrollState();
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(updateStreamsScrollState);
+        resizeObserver.observe(el);
+      } else {
+        window.addEventListener("resize", handleResize);
+      }
+
+      const raf = requestAnimationFrame(updateStreamsScrollState);
       return () => {
         el.removeEventListener('scroll', updateStreamsScrollState);
-        resizeObserver.disconnect();
+        if (resizeObserver) resizeObserver.disconnect();
+        else window.removeEventListener("resize", handleResize);
+        cancelAnimationFrame(raf);
       };
     }
   }, [updateStreamsScrollState, filteredStreams.length]);
@@ -241,11 +296,21 @@ export function StreamSelectionDialog({
     const el = downloadsScrollRef.current;
     if (el) {
       el.addEventListener('scroll', updateDownloadsScrollState);
-      const resizeObserver = new ResizeObserver(updateDownloadsScrollState);
-      resizeObserver.observe(el);
+      let resizeObserver: ResizeObserver | null = null;
+      const handleResize = () => updateDownloadsScrollState();
+      if (typeof ResizeObserver !== "undefined") {
+        resizeObserver = new ResizeObserver(updateDownloadsScrollState);
+        resizeObserver.observe(el);
+      } else {
+        window.addEventListener("resize", handleResize);
+      }
+
+      const raf = requestAnimationFrame(updateDownloadsScrollState);
       return () => {
         el.removeEventListener('scroll', updateDownloadsScrollState);
-        resizeObserver.disconnect();
+        if (resizeObserver) resizeObserver.disconnect();
+        else window.removeEventListener("resize", handleResize);
+        cancelAnimationFrame(raf);
       };
     }
   }, [updateDownloadsScrollState, filteredDownloads.length]);
@@ -253,22 +318,16 @@ export function StreamSelectionDialog({
   // Auto-focus first stream when list loads or filter changes
   useEffect(() => {
     if (filteredStreams.length > 0 && !isSearching && activeTab === "streams") {
-      setFocusedIndex(0);
-      setTimeout(() => {
-        streamButtonsRef.current[0]?.focus();
-      }, 100);
+      focusStreamAtIndex(0);
     }
-  }, [filteredStreams.length, isSearching, qualityFilter, activeTab]);
+  }, [filteredStreams.length, isSearching, qualityFilter, activeTab, focusStreamAtIndex]);
 
   // Auto-focus first download when list loads
   useEffect(() => {
     if (filteredDownloads.length > 0 && !isLoadingDownloads && activeTab === "downloads") {
-      setDownloadFocusedIndex(0);
-      setTimeout(() => {
-        downloadButtonsRef.current[0]?.focus();
-      }, 100);
+      focusDownloadAtIndex(0);
     }
-  }, [filteredDownloads.length, isLoadingDownloads, activeTab]);
+  }, [filteredDownloads.length, isLoadingDownloads, activeTab, focusDownloadAtIndex]);
 
   // Keyboard navigation for TV remotes - horizontal scrolling
   const handleKeyDown = (e: React.KeyboardEvent, index: number, stream: TorrentioStream) => {
@@ -277,17 +336,11 @@ export function StreamSelectionDialog({
     switch (e.key) {
       case 'ArrowRight':
         e.preventDefault();
-        const nextIndex = Math.min(index + 1, filteredStreams.length - 1);
-        setFocusedIndex(nextIndex);
-        streamButtonsRef.current[nextIndex]?.focus();
-        streamButtonsRef.current[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        focusStreamAtIndex(index + 1);
         break;
       case 'ArrowLeft':
         e.preventDefault();
-        const prevIndex = Math.max(index - 1, 0);
-        setFocusedIndex(prevIndex);
-        streamButtonsRef.current[prevIndex]?.focus();
-        streamButtonsRef.current[prevIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        focusStreamAtIndex(index - 1);
         break;
       case 'Enter':
       case ' ':
@@ -304,17 +357,11 @@ export function StreamSelectionDialog({
     switch (e.key) {
       case 'ArrowRight':
         e.preventDefault();
-        const nextIndex = Math.min(index + 1, filteredDownloads.length - 1);
-        setDownloadFocusedIndex(nextIndex);
-        downloadButtonsRef.current[nextIndex]?.focus();
-        downloadButtonsRef.current[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        focusDownloadAtIndex(index + 1);
         break;
       case 'ArrowLeft':
         e.preventDefault();
-        const prevIndex = Math.max(index - 1, 0);
-        setDownloadFocusedIndex(prevIndex);
-        downloadButtonsRef.current[prevIndex]?.focus();
-        downloadButtonsRef.current[prevIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        focusDownloadAtIndex(index - 1);
         break;
       case 'Enter':
       case ' ':
@@ -784,7 +831,34 @@ export function StreamSelectionDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 rounded-none border-none overflow-hidden bg-[#0a0a0f]">
+      <DialogContent
+        className="w-screen h-screen max-w-none max-h-none p-0 rounded-none border-none overflow-hidden bg-[#0a0a0f]"
+        onKeyDown={(e) => {
+          if (isResolving) return;
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+
+          const target = e.target as HTMLElement | null;
+          const tag = target?.tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+          const active = document.activeElement;
+          if (activeTab === "streams" && filteredStreamsRef.current.length > 0) {
+            const isOnCard = streamButtonsRef.current.some((b) => b && b === active);
+            if (isOnCard) return;
+            e.preventDefault();
+            const delta = e.key === "ArrowRight" ? 1 : -1;
+            focusStreamAtIndex(focusedIndex + delta);
+          }
+
+          if (activeTab === "downloads" && filteredDownloads.length > 0) {
+            const isOnCard = downloadButtonsRef.current.some((b) => b && b === active);
+            if (isOnCard) return;
+            e.preventDefault();
+            const delta = e.key === "ArrowRight" ? 1 : -1;
+            focusDownloadAtIndex(downloadFocusedIndex + delta);
+          }
+        }}
+      >
         {/* Stremio-style layout - Horizontal navigation */}
         <div className="flex flex-col h-full">
           {/* Top Header Bar */}
@@ -1013,7 +1087,7 @@ export function StreamSelectionDialog({
                       <button
                         onClick={() => {
                           if (streamsScrollRef.current) {
-                            streamsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+                            streamsScrollRef.current.scrollBy({ left: -300, behavior: scrollBehavior });
                           }
                         }}
                         className={cn(
@@ -1160,7 +1234,7 @@ export function StreamSelectionDialog({
                       <button
                         onClick={() => {
                           if (streamsScrollRef.current) {
-                            streamsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+                            streamsScrollRef.current.scrollBy({ left: 300, behavior: scrollBehavior });
                           }
                         }}
                         className={cn(
@@ -1229,7 +1303,7 @@ export function StreamSelectionDialog({
                     <button
                       onClick={() => {
                         if (downloadsScrollRef.current) {
-                          downloadsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+                          downloadsScrollRef.current.scrollBy({ left: -300, behavior: scrollBehavior });
                         }
                       }}
                       className={cn(
@@ -1322,7 +1396,7 @@ export function StreamSelectionDialog({
                     <button
                       onClick={() => {
                         if (downloadsScrollRef.current) {
-                          downloadsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+                          downloadsScrollRef.current.scrollBy({ left: 300, behavior: scrollBehavior });
                         }
                       }}
                       className={cn(
