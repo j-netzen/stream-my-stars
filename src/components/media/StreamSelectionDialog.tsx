@@ -23,7 +23,7 @@ import {
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,13 +69,15 @@ export function StreamSelectionDialog({
   
   // Horizontal scroll refs for touch/mouse drag
   const streamsScrollRef = useHorizontalScroll<HTMLDivElement>();
-  const downloadsScrollRef = useHorizontalScroll<HTMLDivElement>();
+  const downloadsScrollRef = useRef<HTMLDivElement>(null);
   
-  // Scroll boundary state for hiding arrow buttons
+  // Scroll boundary state for hiding arrow buttons (horizontal for streams)
   const [streamsCanScrollLeft, setStreamsCanScrollLeft] = useState(false);
   const [streamsCanScrollRight, setStreamsCanScrollRight] = useState(false);
-  const [downloadsCanScrollLeft, setDownloadsCanScrollLeft] = useState(false);
-  const [downloadsCanScrollRight, setDownloadsCanScrollRight] = useState(false);
+  
+  // Scroll boundary state for downloads (vertical)
+  const [downloadsCanScrollUp, setDownloadsCanScrollUp] = useState(false);
+  const [downloadsCanScrollDown, setDownloadsCanScrollDown] = useState(false);
   
   // Scroll progress percentage (0-100)
   const [streamsScrollProgress, setStreamsScrollProgress] = useState(0);
@@ -93,15 +95,15 @@ export function StreamSelectionDialog({
     setStreamsScrollProgress(progress);
   }, []);
   
-  // Check scroll boundaries for downloads
+  // Check scroll boundaries for downloads (vertical)
   const updateDownloadsScrollState = useCallback(() => {
     const el = downloadsScrollRef.current;
     if (!el) return;
-    setDownloadsCanScrollLeft(el.scrollLeft > 0);
-    setDownloadsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
-    // Calculate scroll progress percentage
-    const maxScroll = el.scrollWidth - el.clientWidth;
-    const progress = maxScroll > 0 ? (el.scrollLeft / maxScroll) * 100 : 0;
+    setDownloadsCanScrollUp(el.scrollTop > 0);
+    setDownloadsCanScrollDown(el.scrollTop < el.scrollHeight - el.clientHeight - 1);
+    // Calculate scroll progress percentage (vertical)
+    const maxScroll = el.scrollHeight - el.clientHeight;
+    const progress = maxScroll > 0 ? (el.scrollTop / maxScroll) * 100 : 0;
     setDownloadsScrollProgress(progress);
   }, []);
   
@@ -450,8 +452,7 @@ export function StreamSelectionDialog({
         break;
       case 'ArrowUp':
         e.preventDefault();
-        // Focus header navigation arrows
-        (downloadsCanScrollRight ? downloadsNavRightRef : downloadsNavLeftRef).current?.focus();
+        // Focus header navigation arrows (vertical scroll: down button takes priority)
         break;
       case 'Enter':
       case ' ':
@@ -1459,130 +1460,156 @@ export function StreamSelectionDialog({
                   </div>
                 )}
 
-                {/* Downloads list - HORIZONTAL SCROLL */}
+                {/* Downloads list - VERTICAL SCROLL */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Header with count and navigation arrows - Stremio style */}
-                    <div className="flex items-center justify-between px-6 py-3">
+                    {/* Header with count and scroll down button */}
+                    <div className="flex flex-col items-center gap-3 px-6 py-3">
                       <span className="text-lg font-semibold text-white">
                         {filteredDownloads.length} download{filteredDownloads.length !== 1 ? 's' : ''} available
                       </span>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          ref={downloadsNavLeftRef}
-                          variant="ghost"
-                          size="icon"
-                          aria-disabled={!downloadsCanScrollLeft}
-                          onClick={() => {
-                            if (!downloadsCanScrollLeft) return;
-                            scrollContainerBy(downloadsScrollRef.current, -400);
-                          }}
-                          onKeyDown={(e) => handleDownloadsNavKeyDown(e, true)}
-                          className={cn(
-                            "h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all",
-                            !downloadsCanScrollLeft && "opacity-30"
-                          )}
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </Button>
-                        <Button
-                          ref={downloadsNavRightRef}
-                          variant="ghost"
-                          size="icon"
-                          aria-disabled={!downloadsCanScrollRight}
-                          onClick={() => {
-                            if (!downloadsCanScrollRight) return;
-                            scrollContainerBy(downloadsScrollRef.current, 400);
-                          }}
-                          onKeyDown={(e) => handleDownloadsNavKeyDown(e, false)}
-                          className={cn(
-                            "h-10 w-10 rounded-full bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all",
-                            !downloadsCanScrollRight && "opacity-30"
-                          )}
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </Button>
-                      </div>
+                      
+                      {/* Scroll Up/Down buttons */}
+                      {(downloadsCanScrollUp || downloadsCanScrollDown) && (
+                        <div className="flex items-center justify-center gap-4">
+                          <Button
+                            variant="default"
+                            size="lg"
+                            onClick={() => {
+                              if (!downloadsCanScrollUp) return;
+                              downloadsScrollRef.current?.scrollBy({ top: -300, behavior: 'smooth' });
+                            }}
+                            className={cn(
+                              "h-12 w-28 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary transition-all flex items-center justify-center gap-2",
+                              !downloadsCanScrollUp && "opacity-30 cursor-not-allowed"
+                            )}
+                          >
+                            <span className="text-sm font-medium">Up</span>
+                            <ChevronUp className="w-5 h-5" />
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="lg"
+                            onClick={() => {
+                              if (!downloadsCanScrollDown) return;
+                              downloadsScrollRef.current?.scrollBy({ top: 300, behavior: 'smooth' });
+                            }}
+                            className={cn(
+                              "h-12 w-28 rounded-lg bg-primary hover:bg-primary/80 text-white border border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all flex items-center justify-center gap-2",
+                              !downloadsCanScrollDown && "opacity-30 cursor-not-allowed"
+                            )}
+                          >
+                            <span className="text-sm font-medium">Down</span>
+                            <ChevronDown className="w-5 h-5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Scrollable content */}
-                    <div className="flex-1 flex items-center">
+                    {/* Scrollable content with edge fades */}
+                    <div className="flex-1 relative min-h-0">
+                      {/* Top edge fade */}
+                      {downloadsCanScrollUp && (
+                        <div className="absolute left-0 right-0 top-0 h-12 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
+                      )}
+                      {/* Bottom edge fade */}
+                      {downloadsCanScrollDown && (
+                        <div className="absolute left-0 right-0 bottom-0 h-12 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none" />
+                      )}
+                      
                       <div 
                         ref={downloadsScrollRef}
-                        className="flex flex-row overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-4 px-6 py-4 items-center w-full"
-                        style={{ touchAction: 'pan-x', overscrollBehaviorX: 'contain' }}
+                        className="h-full overflow-y-auto scrollbar-hide px-6 py-4"
+                        style={{ overscrollBehaviorY: 'contain' }}
                       >
-                        {filteredDownloads.map((download, index) => {
-                          const quality = extractQuality(download.filename);
-                          const isCurrentlyResolving = resolvingStream === download.download;
-                          const isFocused = downloadFocusedIndex === index;
-                          
-                          return (
-                            <button
-                              key={download.id}
-                              ref={(el) => (downloadButtonsRef.current[index] = el)}
-                              onClick={() => handleDownloadSelect(download)}
-                              onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
-                              onFocus={() => setDownloadFocusedIndex(index)}
-                              disabled={isResolving}
-                              className={cn(
-                                "flex-shrink-0 w-[280px] text-left p-4 rounded-xl transition-all duration-150 group snap-center",
-                                isCurrentlyResolving
-                                  ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
-                                  : isFocused
-                                  ? "bg-white/10 border-2 border-primary scale-105"
-                                  : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
-                                "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
-                                isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
-                              )}
-                            >
-                              {/* Top section - Icon and play button */}
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-                                  <HardDrive className="w-6 h-6 text-green-400" />
-                                </div>
-                                
-                                {isCurrentlyResolving ? (
-                                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                ) : (
-                                  <div className={cn(
-                                    "w-12 h-12 rounded-full flex items-center justify-center transition-all",
-                                    isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
-                                  )}>
-                                    <Play className="w-6 h-6 ml-0.5" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {filteredDownloads.map((download, index) => {
+                            const quality = extractQuality(download.filename);
+                            const isCurrentlyResolving = resolvingStream === download.download;
+                            const isFocused = downloadFocusedIndex === index;
+                            
+                            return (
+                              <button
+                                key={download.id}
+                                ref={(el) => (downloadButtonsRef.current[index] = el)}
+                                onClick={() => handleDownloadSelect(download)}
+                                onKeyDown={(e) => handleDownloadKeyDown(e, index, download)}
+                                onFocus={() => setDownloadFocusedIndex(index)}
+                                disabled={isResolving}
+                                className={cn(
+                                  "w-full text-left p-4 rounded-xl transition-all duration-150 group",
+                                  isCurrentlyResolving
+                                    ? "bg-primary/20 border-2 border-primary ring-2 ring-primary/50 scale-105"
+                                    : isFocused
+                                    ? "bg-white/10 border-2 border-primary scale-105"
+                                    : "bg-white/[0.03] border-2 border-transparent hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02]",
+                                  "focus:outline-none focus:bg-white/10 focus:border-primary focus:scale-105",
+                                  isResolving && !isCurrentlyResolving && "opacity-40 pointer-events-none"
+                                )}
+                              >
+                                {/* Top section - Icon and play button */}
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                                    <HardDrive className="w-6 h-6 text-green-400" />
                                   </div>
-                                )}
-                              </div>
+                                  
+                                  {isCurrentlyResolving ? (
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                  ) : (
+                                    <div className={cn(
+                                      "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                                      isFocused ? "bg-primary text-white scale-110" : "bg-white/5 text-white/40 group-hover:bg-white/10 group-hover:text-white/60"
+                                    )}>
+                                      <Play className="w-6 h-6 ml-0.5" />
+                                    </div>
+                                  )}
+                                </div>
 
-                              {/* Quality badges */}
-                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                {quality && (
-                                  <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(quality))}>
-                                    {quality}
+                                {/* Quality badges */}
+                                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                  {quality && (
+                                    <span className={cn("px-2.5 py-1 rounded text-xs font-bold", getQualityColor(quality))}>
+                                      {quality}
+                                    </span>
+                                  )}
+                                  <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400">
+                                    Downloaded
                                   </span>
-                                )}
-                                <span className="px-2 py-1 rounded text-xs font-semibold bg-green-500/20 text-green-400">
-                                  Downloaded
-                                </span>
-                              </div>
+                                </div>
 
-                              {/* Filename - truncated to 2 lines */}
-                              <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
-                                {download.filename}
-                              </p>
+                                {/* Filename - truncated to 2 lines */}
+                                <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
+                                  {download.filename}
+                                </p>
 
-                              {/* File size */}
-                              <div className="flex items-center text-xs text-white/40">
-                                <span className="flex items-center gap-1">
-                                  <HardDrive className="w-3.5 h-3.5" />
-                                  {formatFileSize(download.filesize)}
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })}
+                                {/* File size */}
+                                <div className="flex items-center text-xs text-white/40">
+                                  <span className="flex items-center gap-1">
+                                    <HardDrive className="w-3.5 h-3.5" />
+                                    {formatFileSize(download.filesize)}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* Vertical scroll progress indicator */}
+                    {(downloadsCanScrollUp || downloadsCanScrollDown) && (
+                      <div className="px-6 pb-4">
+                        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all duration-150"
+                            style={{ 
+                              width: `${Math.max(20, 100 / Math.max(1, Math.ceil(filteredDownloads.length / 3)))}%`,
+                              marginLeft: `${downloadsScrollProgress * (100 - Math.max(20, 100 / Math.max(1, Math.ceil(filteredDownloads.length / 3)))) / 100}%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
