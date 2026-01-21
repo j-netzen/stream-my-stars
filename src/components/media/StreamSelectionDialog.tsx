@@ -69,6 +69,28 @@ export function StreamSelectionDialog({
   const streamsScrollRef = useHorizontalScroll<HTMLDivElement>();
   const downloadsScrollRef = useHorizontalScroll<HTMLDivElement>();
   
+  // Scroll boundary state for hiding arrow buttons
+  const [streamsCanScrollLeft, setStreamsCanScrollLeft] = useState(false);
+  const [streamsCanScrollRight, setStreamsCanScrollRight] = useState(false);
+  const [downloadsCanScrollLeft, setDownloadsCanScrollLeft] = useState(false);
+  const [downloadsCanScrollRight, setDownloadsCanScrollRight] = useState(false);
+  
+  // Check scroll boundaries for streams
+  const updateStreamsScrollState = useCallback(() => {
+    const el = streamsScrollRef.current;
+    if (!el) return;
+    setStreamsCanScrollLeft(el.scrollLeft > 0);
+    setStreamsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  }, []);
+  
+  // Check scroll boundaries for downloads
+  const updateDownloadsScrollState = useCallback(() => {
+    const el = downloadsScrollRef.current;
+    if (!el) return;
+    setDownloadsCanScrollLeft(el.scrollLeft > 0);
+    setDownloadsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  }, []);
+  
   // Refs to track streams for auto-retry when player reports playback error
   const filteredStreamsRef = useRef<TorrentioStream[]>([]);
   const currentStreamIndexRef = useRef<number>(0);
@@ -197,6 +219,36 @@ export function StreamSelectionDialog({
     
     return true;
   });
+
+  // Update scroll state on mount and when content changes
+  useEffect(() => {
+    updateStreamsScrollState();
+    const el = streamsScrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', updateStreamsScrollState);
+      // Also update on resize
+      const resizeObserver = new ResizeObserver(updateStreamsScrollState);
+      resizeObserver.observe(el);
+      return () => {
+        el.removeEventListener('scroll', updateStreamsScrollState);
+        resizeObserver.disconnect();
+      };
+    }
+  }, [updateStreamsScrollState, filteredStreams.length]);
+  
+  useEffect(() => {
+    updateDownloadsScrollState();
+    const el = downloadsScrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', updateDownloadsScrollState);
+      const resizeObserver = new ResizeObserver(updateDownloadsScrollState);
+      resizeObserver.observe(el);
+      return () => {
+        el.removeEventListener('scroll', updateDownloadsScrollState);
+        resizeObserver.disconnect();
+      };
+    }
+  }, [updateDownloadsScrollState, filteredDownloads.length]);
 
   // Auto-focus first stream when list loads or filter changes
   useEffect(() => {
@@ -955,17 +1007,16 @@ export function StreamSelectionDialog({
 
                 {/* Stream list - HORIZONTAL SCROLL with arrows */}
                 {!isSearching && !error && (
-                  <div className="flex-1 flex items-center relative">
-                    {/* Left Arrow Button */}
-                    {filteredStreams.length > 0 && (
+                  <div className="flex-1 flex items-center relative group">
+                    {/* Left Arrow Button - hidden when can't scroll left */}
+                    {filteredStreams.length > 0 && streamsCanScrollLeft && (
                       <button
                         onClick={() => {
                           if (streamsScrollRef.current) {
                             streamsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
                           }
                         }}
-                        className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 backdrop-blur-sm border border-white/10"
-                        style={{ opacity: 0.7 }}
+                        className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
                       >
                         <ChevronLeft className="w-6 h-6" />
                       </button>
@@ -1101,16 +1152,15 @@ export function StreamSelectionDialog({
                       )}
                     </div>
 
-                    {/* Right Arrow Button */}
-                    {filteredStreams.length > 0 && (
+                    {/* Right Arrow Button - hidden when can't scroll right */}
+                    {filteredStreams.length > 0 && streamsCanScrollRight && (
                       <button
                         onClick={() => {
                           if (streamsScrollRef.current) {
                             streamsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
                           }
                         }}
-                        className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 backdrop-blur-sm border border-white/10"
-                        style={{ opacity: 0.7 }}
+                        className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
                       >
                         <ChevronRight className="w-6 h-6" />
                       </button>
@@ -1168,19 +1218,20 @@ export function StreamSelectionDialog({
 
                 {/* Downloads list - HORIZONTAL SCROLL with arrows */}
                 {!isLoadingDownloads && filteredDownloads.length > 0 && (
-                  <div className="flex-1 flex items-center relative">
-                    {/* Left Arrow Button */}
-                    <button
-                      onClick={() => {
-                        if (downloadsScrollRef.current) {
-                          downloadsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-                        }
-                      }}
-                      className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
-                      style={{ opacity: 0.7 }}
-                    >
-                      <ChevronLeft className="w-6 h-6" />
-                    </button>
+                  <div className="flex-1 flex items-center relative group">
+                    {/* Left Arrow Button - hidden when can't scroll left */}
+                    {downloadsCanScrollLeft && (
+                      <button
+                        onClick={() => {
+                          if (downloadsScrollRef.current) {
+                            downloadsScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+                          }
+                        }}
+                        className="absolute left-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                    )}
 
                     {/* Scrollable area */}
                     <div 
@@ -1260,18 +1311,19 @@ export function StreamSelectionDialog({
                       </div>
                     </div>
 
-                    {/* Right Arrow Button */}
-                    <button
-                      onClick={() => {
-                        if (downloadsScrollRef.current) {
-                          downloadsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-                        }
-                      }}
-                      className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
-                      style={{ opacity: 0.7 }}
-                    >
-                      <ChevronRight className="w-6 h-6" />
-                    </button>
+                    {/* Right Arrow Button - hidden when can't scroll right */}
+                    {downloadsCanScrollRight && (
+                      <button
+                        onClick={() => {
+                          if (downloadsScrollRef.current) {
+                            downloadsScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+                          }
+                        }}
+                        className="absolute right-2 z-10 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white/70 hover:text-white flex items-center justify-center transition-all backdrop-blur-sm border border-white/10"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    )}
                   </div>
                 )}
               </>
