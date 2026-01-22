@@ -1,10 +1,13 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { getImageUrl, getMovieDetails, getTVDetails } from '@/lib/tmdb';
+import { getImdbIdFromTmdb, searchTorrentio, TorrentioStream } from '@/lib/torrentio';
 
 interface PrefetchedData {
   metadata?: any;
   posterUrl?: string;
   backdropUrl?: string;
+  streams?: TorrentioStream[];
+  imdbId?: string;
   timestamp: number;
 }
 
@@ -58,7 +61,7 @@ export function usePredictivePrefetch() {
     return () => clearInterval(cleanup);
   }, []);
 
-  // Prefetch media metadata
+  // Prefetch media metadata and streams in parallel
   const prefetchMetadata = useCallback(async (tmdbId: number, mediaType: 'movie' | 'tv') => {
     const cacheKey = `${mediaType}-${tmdbId}`;
     
@@ -74,14 +77,19 @@ export function usePredictivePrefetch() {
     pendingRequests.add(cacheKey);
 
     try {
-      const metadata = mediaType === 'movie' 
-        ? await getMovieDetails(tmdbId)
-        : await getTVDetails(tmdbId);
+      // Fetch metadata and streams in parallel for faster loading
+      const [metadata, imdbId] = await Promise.all([
+        mediaType === 'movie' 
+          ? getMovieDetails(tmdbId)
+          : getTVDetails(tmdbId),
+        getImdbIdFromTmdb(tmdbId, mediaType).catch(() => null)
+      ]);
 
       const data: PrefetchedData = {
         metadata,
         posterUrl: getImageUrl(metadata.poster_path, 'w500') || undefined,
         backdropUrl: getImageUrl(metadata.backdrop_path, 'w780') || undefined,
+        imdbId: imdbId || undefined,
         timestamp: Date.now(),
       };
 
@@ -92,12 +100,72 @@ export function usePredictivePrefetch() {
       if (data.backdropUrl) imagePreloadQueue.push(data.backdropUrl);
       processImageQueue();
 
+      // Prefetch streams in background if we have IMDB ID (for movies only - TV needs episode selection)
+      if (imdbId && mediaType === 'movie') {
+        prefetchStreams(tmdbId, mediaType, imdbId);
+      }
+
       return data;
     } catch (error) {
       console.warn('Prefetch failed:', error);
       return null;
     } finally {
       pendingRequests.delete(cacheKey);
+    }
+  }, []);
+
+  // Prefetch streams for a media item
+  const prefetchStreams = useCallback(async (
+    tmdbId: number, 
+    mediaType: 'movie' | 'tv', 
+    imdbId?: string,
+    season?: number,
+    episode?: number
+  ) => {
+    const streamCacheKey = `streams-${mediaType}-${tmdbId}-${season || 0}-${episode || 0}`;
+    
+    // Skip if already cached or fetching
+    if (prefetchCache.has(streamCacheKey) || pendingRequests.has(streamCacheKey)) {
+      return;
+    }
+
+    pendingRequests.add(streamCacheKey);
+
+    try {
+      // Get IMDB ID if not provided
+      let finalImdbId = imdbId;
+      if (!finalImdbId) {
+        const cached = prefetchCache.get(`${mediaType}-${tmdbId}`);
+        finalImdbId = cached?.imdbId;
+        if (!finalImdbId) {
+          finalImdbId = await getImdbIdFromTmdb(tmdbId, mediaType) || undefined;
+        }
+      }
+
+      if (!finalImdbId) return;
+
+      // Fetch streams
+      const type = mediaType === 'movie' ? 'movie' : 'series';
+      const streams = await searchTorrentio(
+        finalImdbId,
+        type,
+        type === 'series' ? season : undefined,
+        type === 'series' ? episode : undefined
+      );
+
+      // Cache the streams
+      const streamData: PrefetchedData = {
+        streams,
+        imdbId: finalImdbId,
+        timestamp: Date.now(),
+      };
+
+      prefetchCache.set(streamCacheKey, streamData);
+      console.log(`[Prefetch] Cached ${streams.length} streams for ${mediaType}-${tmdbId}`);
+    } catch (error) {
+      console.warn('Stream prefetch failed:', error);
+    } finally {
+      pendingRequests.delete(streamCacheKey);
     }
   }, []);
 
@@ -186,13 +254,30 @@ export function usePredictivePrefetch() {
     return null;
   }, []);
 
+  // Get cached streams
+  const getCachedStreams = useCallback((
+    tmdbId: number, 
+    mediaType: 'movie' | 'tv',
+    season?: number,
+    episode?: number
+  ): TorrentioStream[] | null => {
+    const streamCacheKey = `streams-${mediaType}-${tmdbId}-${season || 0}-${episode || 0}`;
+    const cached = prefetchCache.get(streamCacheKey);
+    if (cached && cached.streams && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.streams;
+    }
+    return null;
+  }, []);
+
   return {
     handleHoverIntent,
     handleHoverEnd,
     prefetchNearbyItems,
     prefetchMetadata,
     prefetchImages,
+    prefetchStreams,
     getCachedData,
+    getCachedStreams,
   };
 }
 

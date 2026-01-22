@@ -55,12 +55,12 @@ export function MediaCard({
     }
   };
 
-  // Optimistic UI: Update immediately on play click
+  // Optimistic UI: Update immediately on play click with very short timeout
   const handleOptimisticPlay = useCallback(() => {
     setIsOptimisticPlaying(true);
     onPlay?.(media);
-    // Reset after short delay (actual player will take over)
-    setTimeout(() => setIsOptimisticPlaying(false), 2000);
+    // Reset quickly - the dialog will take over instantly
+    setTimeout(() => setIsOptimisticPlaying(false), 300);
   }, [media, onPlay]);
 
   // Predictive prefetch on hover
