@@ -242,7 +242,7 @@ function isBrowserCompatible(stream: TorrentioStream): boolean {
   return true; // Assume compatible if unknown
 }
 
-// Sort streams by browser compatibility first, then file size (largest to smallest)
+// Sort streams by browser compatibility first, then by seeders (popularity), then file size
 export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   return [...streams].sort((a, b) => {
     const infoA = parseStreamInfo(a);
@@ -255,10 +255,41 @@ export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
       return compatA ? -1 : 1; // Compatible streams first
     }
     
-    // Then sort by file size (largest to smallest)
+    // Then sort by seeders (popularity) - higher seeders first
+    const seedsA = infoA.seeds ?? 0;
+    const seedsB = infoB.seeds ?? 0;
+    if (seedsA !== seedsB) {
+      return seedsB - seedsA; // Higher seeds first
+    }
+    
+    // Finally sort by file size (largest to smallest)
     const sizeA = parseSizeToBytes(infoA.size);
     const sizeB = parseSizeToBytes(infoB.size);
     
+    return sizeB - sizeA;
+  });
+}
+
+/**
+ * Sort streams by seeders/popularity only
+ * Used as fallback when cache checking is unavailable
+ */
+export function sortStreamsByPopularity(streams: TorrentioStream[]): TorrentioStream[] {
+  return [...streams].sort((a, b) => {
+    const infoA = parseStreamInfo(a);
+    const infoB = parseStreamInfo(b);
+    
+    // Sort by seeders (popularity) - higher seeders first
+    const seedsA = infoA.seeds ?? 0;
+    const seedsB = infoB.seeds ?? 0;
+    
+    if (seedsA !== seedsB) {
+      return seedsB - seedsA;
+    }
+    
+    // Tiebreaker: file size (larger = likely better quality)
+    const sizeA = parseSizeToBytes(infoA.size);
+    const sizeB = parseSizeToBytes(infoB.size);
     return sizeB - sizeA;
   });
 }

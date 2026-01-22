@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
 import { toast } from "sonner";
 
@@ -242,26 +242,41 @@ export function useQuickPlay() {
 
       // Check which streams are cached on Real-Debrid
       let cachedHashes = new Set<string>();
+      let cacheCheckFailed = false;
       if (hashes.length > 0) {
         try {
           toast.info("Checking cached streams...", { duration: 1500 });
           const availabilityData = await checkInstantAvailability(hashes);
-          cachedHashes = new Set(
-            hashes.filter(hash => isHashCached(hash, availabilityData))
-          );
-          console.log(`[Quick Play] ${cachedHashes.size}/${hashes.length} streams are cached on RD`);
+          
+          // If availabilityData is empty, the endpoint might be disabled
+          if (Object.keys(availabilityData).length === 0 && hashes.length > 0) {
+            console.log("[Quick Play] Cache check returned empty - endpoint may be disabled, using popularity sort");
+            cacheCheckFailed = true;
+          } else {
+            cachedHashes = new Set(
+              hashes.filter(hash => isHashCached(hash, availabilityData))
+            );
+            console.log(`[Quick Play] ${cachedHashes.size}/${hashes.length} streams are cached on RD`);
+          }
         } catch (err) {
-          console.warn("[Quick Play] Cache check failed, continuing without cache info:", err);
+          console.warn("[Quick Play] Cache check failed, using popularity sort as fallback:", err);
+          cacheCheckFailed = true;
         }
       }
 
       // Create a mutable index for auto-fallback
       let currentIndex = 0;
-      const allStreams = [...streams];
+      let allStreams = [...streams];
       
-      // Filter for best quality, prioritizing cached streams
+      // If cache check failed, sort by popularity (seeders) as fallback
+      if (cacheCheckFailed) {
+        console.log("[Quick Play] Using popularity sort (seeders) as fallback");
+        allStreams = sortStreamsByPopularity(allStreams);
+      }
+      
+      // Filter for best quality, prioritizing cached streams (if available)
       const durationMinutes = media.runtime || 90;
-      const bestStream = findBestStream(allStreams, durationMinutes, cachedHashes);
+      const bestStream = findBestStream(allStreams, durationMinutes, cacheCheckFailed ? undefined : cachedHashes);
       
       if (bestStream) {
         // Move best stream to front if not already
@@ -272,20 +287,22 @@ export function useQuickPlay() {
         }
       }
       
-      // Reorder remaining streams: cached first, then uncached
-      const sortedStreams = allStreams.slice(1).sort((a, b) => {
-        const hashA = extractHash(a);
-        const hashB = extractHash(b);
-        const cachedA = hashA && cachedHashes.has(hashA);
-        const cachedB = hashB && cachedHashes.has(hashB);
-        if (cachedA && !cachedB) return -1;
-        if (!cachedA && cachedB) return 1;
-        return 0;
-      });
-      
-      // Replace allStreams with best first, then sorted remaining
-      if (bestStream) {
-        allStreams.splice(1, allStreams.length - 1, ...sortedStreams);
+      // If cache info is available, reorder remaining streams: cached first, then uncached
+      if (!cacheCheckFailed && cachedHashes.size > 0) {
+        const sortedStreams = allStreams.slice(1).sort((a, b) => {
+          const hashA = extractHash(a);
+          const hashB = extractHash(b);
+          const cachedA = hashA && cachedHashes.has(hashA);
+          const cachedB = hashB && cachedHashes.has(hashB);
+          if (cachedA && !cachedB) return -1;
+          if (!cachedA && cachedB) return 1;
+          return 0;
+        });
+        
+        // Replace allStreams with best first, then sorted remaining
+        if (bestStream) {
+          allStreams.splice(1, allStreams.length - 1, ...sortedStreams);
+        }
       }
 
       // Try streams with auto-fallback

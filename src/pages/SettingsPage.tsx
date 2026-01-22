@@ -274,6 +274,37 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Only Show Cached Streams Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="cached-only" className={cn("font-medium", isTVMode && "text-lg")}>
+                  Only show cached streams
+                </Label>
+                <Badge 
+                  variant={playbackSettings.onlyShowCachedStreams ? "default" : "secondary"}
+                  className={cn(
+                    "text-xs",
+                    playbackSettings.onlyShowCachedStreams && "bg-green-500/20 text-green-500 border-green-500/30"
+                  )}
+                >
+                  {playbackSettings.onlyShowCachedStreams ? "Enabled" : "Off"}
+                </Badge>
+              </div>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                {playbackSettings.onlyShowCachedStreams 
+                  ? "Only streams already cached on Real-Debrid are shown for instant playback" 
+                  : "All available streams are shown, including uncached ones"}
+              </p>
+            </div>
+            <Switch
+              id="cached-only"
+              checked={playbackSettings.onlyShowCachedStreams}
+              onCheckedChange={(checked) => updatePlaybackSetting('onlyShowCachedStreams', checked)}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+
           {/* 30fps or Best Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
