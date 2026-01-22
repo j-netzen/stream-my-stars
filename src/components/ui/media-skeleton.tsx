@@ -96,14 +96,18 @@ export function HeroSkeleton({ className }: HeroSkeletonProps) {
 
 interface StreamCardSkeletonProps {
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function StreamCardSkeleton({ className }: StreamCardSkeletonProps) {
+export function StreamCardSkeleton({ className, style }: StreamCardSkeletonProps) {
   return (
-    <div className={cn(
-      "p-4 rounded-lg border border-border bg-card/50",
-      className
-    )}>
+    <div 
+      className={cn(
+        "p-4 rounded-lg border border-border bg-card/50",
+        className
+      )}
+      style={style}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Skeleton className="h-6 w-16 rounded" />

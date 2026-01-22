@@ -4,6 +4,7 @@ import { useTVMode } from "@/hooks/useTVMode";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
+import { usePredictivePrefetch } from "@/hooks/usePredictivePrefetch";
 
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
@@ -52,6 +53,7 @@ export function StreamSelectionDialog({
   const { isBrowseHere } = useBrowseHere();
   const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
   const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
+  const { getCachedStreams, prefetchStreams } = usePredictivePrefetch();
   const [activeTab, setActiveTab] = useState<string>("streams");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
@@ -551,6 +553,24 @@ export function StreamSelectionDialog({
 
   const handleSearch = async () => {
     if (!media) return;
+    
+    // Check for cached streams first (instant load)
+    if (media.tmdb_id) {
+      const cachedStreams = getCachedStreams(
+        media.tmdb_id, 
+        media.media_type as 'movie' | 'tv',
+        media.media_type === 'tv' ? selectedSeason : undefined,
+        media.media_type === 'tv' ? selectedEpisode : undefined
+      );
+      
+      if (cachedStreams && cachedStreams.length > 0) {
+        console.log(`[StreamDialog] Using ${cachedStreams.length} cached streams`);
+        setStreams(cachedStreams);
+        setIsSearching(false);
+        toast.success(`Found ${cachedStreams.length} stream(s) (cached)`);
+        return;
+      }
+    }
     
     setIsSearching(true);
     setError(null);
@@ -1169,17 +1189,28 @@ export function StreamSelectionDialog({
           <div className="flex-1 flex flex-col min-h-0 bg-[#0a0a0f]">
             {activeTab === "streams" ? (
               <>
-                {/* Loading state with skeleton cards */}
+                {/* Loading state with skeleton cards - no spinner, just skeletons for instant feel */}
                 {isSearching && (
-                  <div className="flex-1 flex flex-col p-6 gap-4 overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                      <span className="text-white/60 text-sm">Searching for streams...</span>
+                  <div className="flex-1 flex flex-col p-6 gap-3 overflow-hidden">
+                    {/* Subtle loading indicator at top */}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        <span className="text-white/40 text-xs">Finding best streams...</span>
+                      </div>
+                      <div className="h-1 w-24 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary/60 rounded-full animate-[loading_1.5s_ease-in-out_infinite]" 
+                             style={{ width: '60%' }} />
+                      </div>
                     </div>
-                    {/* Skeleton stream cards */}
+                    {/* Skeleton stream cards - staggered animation for visual polish */}
                     <div className="flex flex-col gap-3">
                       {Array.from({ length: 6 }).map((_, i) => (
-                        <StreamCardSkeleton key={i} className="animate-pulse" />
+                        <StreamCardSkeleton 
+                          key={i} 
+                          className="animate-pulse"
+                          style={{ animationDelay: `${i * 100}ms` } as React.CSSProperties}
+                        />
                       ))}
                     </div>
                   </div>
@@ -1427,17 +1458,24 @@ export function StreamSelectionDialog({
                   </div>
                 </div>
 
-                {/* Loading state with skeleton cards */}
+                {/* Loading state with skeleton cards - no spinner, just skeletons for instant feel */}
                 {isLoadingDownloads && (
-                  <div className="flex-1 flex flex-col p-6 gap-4 overflow-hidden">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                      <span className="text-white/60 text-sm">Loading downloads...</span>
+                  <div className="flex-1 flex flex-col p-6 gap-3 overflow-hidden">
+                    {/* Subtle loading indicator at top */}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        <span className="text-white/40 text-xs">Loading your downloads...</span>
+                      </div>
                     </div>
-                    {/* Skeleton download cards */}
+                    {/* Skeleton download cards - staggered animation */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {Array.from({ length: 6 }).map((_, i) => (
-                        <StreamCardSkeleton key={i} className="animate-pulse" />
+                        <StreamCardSkeleton 
+                          key={i} 
+                          className="animate-pulse"
+                          style={{ animationDelay: `${i * 80}ms` }}
+                        />
                       ))}
                     </div>
                   </div>
