@@ -2,7 +2,7 @@ import { Media } from "@/hooks/useMedia";
 import { WatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
-import { Play, MoreVertical, Info } from "lucide-react";
+import { Play, MoreVertical, Info, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useTVMode } from "@/hooks/useTVMode";
+import { usePredictivePrefetch } from "@/hooks/usePredictivePrefetch";
+import { useState, useCallback } from "react";
 
 interface MediaCardProps {
   media: Media;
@@ -32,6 +34,9 @@ export function MediaCard({
   onMoreInfo,
 }: MediaCardProps) {
   const { isTVMode } = useTVMode();
+  const { handleHoverIntent, handleHoverEnd } = usePredictivePrefetch();
+  const [isOptimisticPlaying, setIsOptimisticPlaying] = useState(false);
+  
   const posterUrl = media.poster_path
     ? getImageUrl(media.poster_path, isTVMode ? "w500" : "w300")
     : null;
@@ -45,25 +50,49 @@ export function MediaCard({
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       e.stopPropagation();
-      onPlay?.(media);
+      handleOptimisticPlay();
       return;
     }
-    
-    // Let the global TV navigation handler manage arrow keys
-    // Just handle navigation within the card overlay if needed
   };
+
+  // Optimistic UI: Update immediately on play click
+  const handleOptimisticPlay = useCallback(() => {
+    setIsOptimisticPlaying(true);
+    onPlay?.(media);
+    // Reset after short delay (actual player will take over)
+    setTimeout(() => setIsOptimisticPlaying(false), 2000);
+  }, [media, onPlay]);
+
+  // Predictive prefetch on hover
+  const handleMouseEnter = useCallback(() => {
+    handleHoverIntent(
+      media.tmdb_id,
+      media.media_type as 'movie' | 'tv',
+      media.poster_path,
+      media.backdrop_path
+    );
+  }, [media, handleHoverIntent]);
+
+  const handleMouseLeave = useCallback(() => {
+    handleHoverEnd();
+  }, [handleHoverEnd]);
 
   return (
     <div 
       className={cn(
         "media-card group cosmic-border rounded-lg transition-all duration-200",
         "hover:shadow-star-glow",
-        isTVMode ? "hover:scale-105 focus-within:scale-108" : "hover:scale-[1.02]"
+        isTVMode ? "hover:scale-105 focus-within:scale-108" : "hover:scale-[1.02]",
+        isOptimisticPlaying && "ring-2 ring-primary animate-pulse"
       )}
       tabIndex={0}
       role="button"
       aria-label={`Play ${media.title}`}
       onKeyDown={handleKeyDown}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
     >
       {/* Poster */}
       <div className={cn(
@@ -94,15 +123,20 @@ export function MediaCard({
           {/* Button container - flexbox layout */}
           <div className={cn("flex flex-row gap-2", isTVMode && "gap-4")}>
             <Button
-              onClick={() => onPlay?.(media)}
+              onClick={handleOptimisticPlay}
               className={cn(
                 "flex-1 gap-2",
                 isTVMode && "h-16 text-lg"
               )}
               size={isTVMode ? "lg" : "sm"}
               tabIndex={-1}
+              disabled={isOptimisticPlaying}
             >
-              <Play className={cn("w-4 h-4", isTVMode && "w-7 h-7")} />
+              {isOptimisticPlaying ? (
+                <Loader2 className={cn("w-4 h-4 animate-spin", isTVMode && "w-7 h-7")} />
+              ) : (
+                <Play className={cn("w-4 h-4", isTVMode && "w-7 h-7")} />
+              )}
               {showContinue && progress && progressPercent > 0 ? "Continue" : "Play"}
             </Button>
             <Button
