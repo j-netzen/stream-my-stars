@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
-import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError } from "@/lib/realDebrid";
+import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
 import { toast } from "sonner";
 
 export interface StreamQualityInfo {
@@ -58,8 +58,22 @@ export function useQuickPlay() {
     }
   };
 
-  // Filter and find best stream
-  const findBestStream = (streams: TorrentioStream[], durationMinutes: number = 90): TorrentioStream | null => {
+  // Extract hash from stream URL or infoHash
+  const extractHash = (stream: TorrentioStream): string | null => {
+    if (stream.infoHash) return stream.infoHash.toLowerCase();
+    
+    // Try to extract from URL
+    const url = stream.url || "";
+    const hashMatch = url.match(/\/([a-f0-9]{40})\//i) || url.match(/btih:([a-f0-9]{40})/i);
+    return hashMatch ? hashMatch[1].toLowerCase() : null;
+  };
+
+  // Filter and find best stream, with optional cache prioritization
+  const findBestStream = (
+    streams: TorrentioStream[], 
+    durationMinutes: number = 90,
+    cachedHashes?: Set<string>
+  ): TorrentioStream | null => {
     // Filter by English language
     const englishStreams = streams.filter(stream => {
       const title = stream.title?.toLowerCase() || "";
@@ -98,7 +112,22 @@ export function useQuickPlay() {
     });
 
     // If no streams match filters, fallback to all English streams
-    const streamsToUse = filteredStreams.length > 0 ? filteredStreams : englishStreams.length > 0 ? englishStreams : streams;
+    let streamsToUse = filteredStreams.length > 0 ? filteredStreams : englishStreams.length > 0 ? englishStreams : streams;
+    
+    // If we have cache info, prioritize cached streams
+    if (cachedHashes && cachedHashes.size > 0) {
+      const cachedStreams = streamsToUse.filter(stream => {
+        const hash = extractHash(stream);
+        return hash && cachedHashes.has(hash);
+      });
+      
+      if (cachedStreams.length > 0) {
+        console.log(`[Quick Play] Found ${cachedStreams.length} cached streams out of ${streamsToUse.length}`);
+        streamsToUse = cachedStreams;
+      } else {
+        console.log("[Quick Play] No cached streams found, using all filtered streams");
+      }
+    }
     
     return streamsToUse.length > 0 ? streamsToUse[0] : null;
   };
@@ -200,13 +229,39 @@ export function useQuickPlay() {
         return false;
       }
 
+      // Extract hashes from streams for instant availability check
+      const hashToStream = new Map<string, TorrentioStream>();
+      const hashes: string[] = [];
+      for (const stream of streams) {
+        const hash = extractHash(stream);
+        if (hash && !hashToStream.has(hash)) {
+          hashToStream.set(hash, stream);
+          hashes.push(hash);
+        }
+      }
+
+      // Check which streams are cached on Real-Debrid
+      let cachedHashes = new Set<string>();
+      if (hashes.length > 0) {
+        try {
+          toast.info("Checking cached streams...", { duration: 1500 });
+          const availabilityData = await checkInstantAvailability(hashes);
+          cachedHashes = new Set(
+            hashes.filter(hash => isHashCached(hash, availabilityData))
+          );
+          console.log(`[Quick Play] ${cachedHashes.size}/${hashes.length} streams are cached on RD`);
+        } catch (err) {
+          console.warn("[Quick Play] Cache check failed, continuing without cache info:", err);
+        }
+      }
+
       // Create a mutable index for auto-fallback
       let currentIndex = 0;
       const allStreams = [...streams];
       
-      // Filter for best quality first
+      // Filter for best quality, prioritizing cached streams
       const durationMinutes = media.runtime || 90;
-      const bestStream = findBestStream(allStreams, durationMinutes);
+      const bestStream = findBestStream(allStreams, durationMinutes, cachedHashes);
       
       if (bestStream) {
         // Move best stream to front if not already
@@ -215,6 +270,22 @@ export function useQuickPlay() {
           allStreams.splice(bestIdx, 1);
           allStreams.unshift(bestStream);
         }
+      }
+      
+      // Reorder remaining streams: cached first, then uncached
+      const sortedStreams = allStreams.slice(1).sort((a, b) => {
+        const hashA = extractHash(a);
+        const hashB = extractHash(b);
+        const cachedA = hashA && cachedHashes.has(hashA);
+        const cachedB = hashB && cachedHashes.has(hashB);
+        if (cachedA && !cachedB) return -1;
+        if (!cachedA && cachedB) return 1;
+        return 0;
+      });
+      
+      // Replace allStreams with best first, then sorted remaining
+      if (bestStream) {
+        allStreams.splice(1, allStreams.length - 1, ...sortedStreams);
       }
 
       // Try streams with auto-fallback

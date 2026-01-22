@@ -263,6 +263,42 @@ export async function getSupportedHosts(): Promise<Record<string, unknown>> {
   return invokeRealDebrid({ action: "hosts" }) as Promise<Record<string, unknown>>;
 }
 
+/**
+ * Check instant availability for multiple torrent hashes
+ * Returns a map of hash -> cached file info (empty object if not cached)
+ * This allows pre-filtering streams to only show cached ones
+ */
+export async function checkInstantAvailability(hashes: string[]): Promise<Record<string, unknown>> {
+  if (hashes.length === 0) return {};
+  // RD API has a limit, batch if needed
+  const batchSize = 50;
+  const results: Record<string, unknown> = {};
+  
+  for (let i = 0; i < hashes.length; i += batchSize) {
+    const batch = hashes.slice(i, i + batchSize);
+    try {
+      const data = await invokeRealDebrid({ action: "instant_availability", hashes: batch }) as Record<string, unknown>;
+      Object.assign(results, data);
+    } catch (err) {
+      console.warn("Instant availability check failed for batch:", err);
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Check if a hash is cached based on instant availability response
+ */
+export function isHashCached(hash: string, availabilityData: Record<string, unknown>): boolean {
+  const hashData = availabilityData[hash.toLowerCase()];
+  if (!hashData || typeof hashData !== 'object') return false;
+  
+  // RD returns { rd: [...] } for cached torrents, empty {} for uncached
+  const rdData = (hashData as Record<string, unknown>).rd;
+  return Array.isArray(rdData) && rdData.length > 0;
+}
+
 // Helper to add a magnet and wait for links to be available (not full download)
 export async function addMagnetAndWait(
   magnet: string,
