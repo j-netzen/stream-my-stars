@@ -8,6 +8,9 @@ export interface PlaybackSettings {
   // Playback
   limitFps30: boolean; // optional 30 fps limit for slower devices
   
+  // Stream filtering
+  onlyShowCachedStreams: boolean; // hide uncached streams in selection dialog
+  
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
   isSlowConnection: boolean;
@@ -17,6 +20,7 @@ const DEFAULT_SETTINGS: PlaybackSettings = {
   bufferAhead: 30,
   autoQualityDowngrade: true,
   limitFps30: false,
+  onlyShowCachedStreams: false,
   connectionSpeedMbps: null,
   isSlowConnection: false,
 };

@@ -6,9 +6,10 @@ import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
 import { usePredictivePrefetch } from "@/hooks/usePredictivePrefetch";
 import { useQuickPlay } from "@/hooks/useQuickPlay";
+import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
-import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink, StreamUnavailableError } from "@/lib/realDebrid";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
+import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
 import {
   Dialog,
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StreamCardSkeleton } from "@/components/ui/media-skeleton";
@@ -55,6 +56,7 @@ export function StreamSelectionDialog({
   const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
   const { getCachedStreams, prefetchStreams } = usePredictivePrefetch();
   const { quickPlay, isQuickPlaying } = useQuickPlay();
+  const { settings: playbackSettings } = usePlaybackSettings();
   const [activeTab, setActiveTab] = useState<string>("streams");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
@@ -168,69 +170,146 @@ export function StreamSelectionDialog({
   
   // Track failed streams for visual indicator
   const [failedStreams, setFailedStreams] = useState<Set<string>>(new Set());
+  
+  // Cache checking state for "only show cached" filter
+  const [cachedHashes, setCachedHashes] = useState<Set<string>>(new Set());
+  const [isCheckingCache, setIsCheckingCache] = useState(false);
+  const [cacheCheckFailed, setCacheCheckFailed] = useState(false);
 
+  // Extract hash from stream URL or infoHash
+  const extractHash = useCallback((stream: TorrentioStream): string | null => {
+    if (stream.infoHash) return stream.infoHash.toLowerCase();
+    const url = stream.url || "";
+    const hashMatch = url.match(/\/([a-f0-9]{40})\//i) || url.match(/btih:([a-f0-9]{40})/i);
+    return hashMatch ? hashMatch[1].toLowerCase() : null;
+  }, []);
 
-  // Filter streams based on quality and language selection
-  const filteredStreams = streams.filter((stream) => {
-    const info = parseStreamInfo(stream);
-    const title = stream.title?.toLowerCase() || "";
-    
-    // Language filter
-    if (languageFilter !== "all") {
-      const hasEnglish = title.includes("english") || 
-                         title.includes("eng") || 
-                         title.includes("en ") ||
-                         title.includes("[en]") ||
-                         title.includes("(en)") ||
-                         (!title.includes("hindi") && 
-                          !title.includes("spanish") && 
-                          !title.includes("french") && 
-                          !title.includes("german") &&
-                          !title.includes("italian") &&
-                          !title.includes("portuguese") &&
-                          !title.includes("russian") &&
-                          !title.includes("chinese") &&
-                          !title.includes("japanese") &&
-                          !title.includes("korean") &&
-                          !title.includes("tamil") &&
-                          !title.includes("telugu") &&
-                          !title.includes("dual audio"));
+  // Check cache availability when streams are loaded
+  useEffect(() => {
+    if (streams.length === 0 || !playbackSettings.onlyShowCachedStreams) {
+      setCachedHashes(new Set());
+      setCacheCheckFailed(false);
+      return;
+    }
+
+    const checkCache = async () => {
+      setIsCheckingCache(true);
+      setCacheCheckFailed(false);
       
-      if (languageFilter === "english" && !hasEnglish) return false;
+      const hashes: string[] = [];
+      for (const stream of streams) {
+        const hash = extractHash(stream);
+        if (hash && !hashes.includes(hash)) {
+          hashes.push(hash);
+        }
+      }
+
+      if (hashes.length === 0) {
+        setIsCheckingCache(false);
+        return;
+      }
+
+      try {
+        const availabilityData = await checkInstantAvailability(hashes);
+        
+        // If empty result with hashes, endpoint is disabled
+        if (Object.keys(availabilityData).length === 0 && hashes.length > 0) {
+          console.log("[StreamDialog] Cache check returned empty - endpoint may be disabled");
+          setCacheCheckFailed(true);
+          setCachedHashes(new Set());
+        } else {
+          const cached = new Set(hashes.filter(hash => isHashCached(hash, availabilityData)));
+          setCachedHashes(cached);
+          console.log(`[StreamDialog] ${cached.size}/${hashes.length} streams cached on RD`);
+        }
+      } catch (err) {
+        console.warn("[StreamDialog] Cache check failed:", err);
+        setCacheCheckFailed(true);
+        setCachedHashes(new Set());
+      }
+      
+      setIsCheckingCache(false);
+    };
+
+    checkCache();
+  }, [streams, playbackSettings.onlyShowCachedStreams, extractHash]);
+
+  // Filter streams based on quality, language, and cache status
+  const filteredStreams = (() => {
+    let result = streams.filter((stream) => {
+      const info = parseStreamInfo(stream);
+      const title = stream.title?.toLowerCase() || "";
+      
+      // "Only show cached" filter (when enabled and cache data is available)
+      if (playbackSettings.onlyShowCachedStreams && !cacheCheckFailed && cachedHashes.size > 0) {
+        const hash = extractHash(stream);
+        if (!hash || !cachedHashes.has(hash)) return false;
+      }
+      
+      // Language filter
+      if (languageFilter !== "all") {
+        const hasEnglish = title.includes("english") || 
+                           title.includes("eng") || 
+                           title.includes("en ") ||
+                           title.includes("[en]") ||
+                           title.includes("(en)") ||
+                           (!title.includes("hindi") && 
+                            !title.includes("spanish") && 
+                            !title.includes("french") && 
+                            !title.includes("german") &&
+                            !title.includes("italian") &&
+                            !title.includes("portuguese") &&
+                            !title.includes("russian") &&
+                            !title.includes("chinese") &&
+                            !title.includes("japanese") &&
+                            !title.includes("korean") &&
+                            !title.includes("tamil") &&
+                            !title.includes("telugu") &&
+                            !title.includes("dual audio"));
+        
+        if (languageFilter === "english" && !hasEnglish) return false;
+      }
+      
+      // Quality filter
+      if (qualityFilter === "all") return true;
+      const quality = info.quality?.toLowerCase() || "";
+      
+      // "Best" filter: optimal file size based on duration, but always include ≤3GB files
+      if (qualityFilter === "best") {
+        if (!info.size) return false;
+        const sizeInMB = parseSizeToBytes(info.size);
+        if (sizeInMB === 0) return false;
+        
+        const universalMaxSize = 3072; // 3GB in MB
+        if (sizeInMB <= universalMaxSize) return true;
+        
+        const durationMinutes = media?.runtime || 90;
+        const optimalMaxSize = calculateOptimalMaxSize(durationMinutes);
+        
+        return sizeInMB <= optimalMaxSize;
+      }
+      
+      switch (qualityFilter) {
+        case "4k":
+          return quality.includes("2160") || quality.includes("4k");
+        case "1080p":
+          return quality.includes("1080");
+        case "720p":
+          return quality.includes("720");
+        case "480p":
+          return quality.includes("480") || quality.includes("sd");
+        default:
+          return true;
+      }
+    });
+    
+    // When cache check failed (endpoint disabled), sort by popularity (seeders) as fallback
+    if (cacheCheckFailed || (playbackSettings.onlyShowCachedStreams && cachedHashes.size === 0)) {
+      result = sortStreamsByPopularity(result);
     }
     
-    // Quality filter
-    if (qualityFilter === "all") return true;
-    const quality = info.quality?.toLowerCase() || "";
-    
-    // "Best" filter: optimal file size based on duration, but always include ≤3GB files
-    if (qualityFilter === "best") {
-      if (!info.size) return false;
-      const sizeInMB = parseSizeToBytes(info.size);
-      if (sizeInMB === 0) return false;
-      
-      const universalMaxSize = 3072; // 3GB in MB
-      if (sizeInMB <= universalMaxSize) return true;
-      
-      const durationMinutes = media?.runtime || 90;
-      const optimalMaxSize = calculateOptimalMaxSize(durationMinutes);
-      
-      return sizeInMB <= optimalMaxSize;
-    }
-    
-    switch (qualityFilter) {
-      case "4k":
-        return quality.includes("2160") || quality.includes("4k");
-      case "1080p":
-        return quality.includes("1080");
-      case "720p":
-        return quality.includes("720");
-      case "480p":
-        return quality.includes("480") || quality.includes("sd");
-      default:
-        return true;
-    }
-  });
+    return result;
+  })();
   
   // Keep ref in sync with filteredStreams for auto-retry functionality
   useEffect(() => {
