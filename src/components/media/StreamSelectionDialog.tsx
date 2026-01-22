@@ -8,7 +8,7 @@ import { usePredictivePrefetch } from "@/hooks/usePredictivePrefetch";
 import { useQuickPlay } from "@/hooks/useQuickPlay";
 
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
-import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
+import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink, StreamUnavailableError } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
 import {
   Dialog,
@@ -840,15 +840,19 @@ export function StreamSelectionDialog({
       
       // Check if this is a recoverable error that should trigger auto-fallback
       const errorMsg = err.message || "";
+      const isStreamUnavailable = err instanceof StreamUnavailableError;
       const isRecoverableError = 
+        isStreamUnavailable ||
         errorMsg.includes("Not cached") ||
         errorMsg.includes("trying next") ||
         errorMsg.includes("unavailable") ||
         errorMsg.includes("copyright") ||
+        errorMsg.includes("blocked") ||
         errorMsg.includes("dead") ||
         errorMsg.includes("error") ||
         errorMsg.includes("virus") ||
-        errorMsg.includes("infringing");
+        errorMsg.includes("infringing") ||
+        errorMsg.includes("451");
       
       if (isRecoverableError) {
         // Auto-try next stream

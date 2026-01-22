@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
-import { unrestrictLink, addMagnetAndWait, getStreamingLinks } from "@/lib/realDebrid";
+import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError } from "@/lib/realDebrid";
 import { toast } from "sonner";
 
 export interface StreamQualityInfo {
@@ -243,13 +243,24 @@ export function useQuickPlay() {
           onStreamReady(url, qualityInfo, tryNextStream);
           return true;
         } catch (err: any) {
-          console.log(`Quick Play: Stream ${index + 1} failed, trying next...`, err.message);
+          const isStreamError = err instanceof StreamUnavailableError || 
+            err.message?.includes("blocked") || 
+            err.message?.includes("copyright") ||
+            err.message?.includes("unavailable") ||
+            err.message?.includes("Not cached");
+          
+          if (isStreamError) {
+            console.log(`Quick Play: Stream ${index + 1} blocked/unavailable, trying next...`);
+            toast.info(`Stream ${index + 1} unavailable, trying next...`, { duration: 1500 });
+          } else {
+            console.log(`Quick Play: Stream ${index + 1} failed, trying next...`, err.message);
+          }
           // Auto-fallback to next stream
           return tryStream(index + 1);
         }
       };
 
-      toast.success("Resolving stream...", { duration: 1500 });
+      toast.info("Resolving stream...", { duration: 1500 });
       return await tryStream(0);
       
     } catch (err: any) {
