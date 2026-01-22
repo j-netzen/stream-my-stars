@@ -370,7 +370,23 @@ export async function searchTorrentio(
     return sortStreams(streams);
   }
   
-  // Otherwise, try edge function first
+  // Try client-side first as it's faster and more reliable
+  // Edge functions often get blocked by Torrentio's Cloudflare protection
+  try {
+    console.log("[Torrentio] Trying client-side search first (faster)...");
+    const rdApiKey = getRdApiKeyFromStorage();
+    const streams = await searchTorrentioClientSide(imdbId, type, season, episode, rdApiKey || undefined);
+    if (streams.length > 0) {
+      console.log(`[Torrentio] Client-side found ${streams.length} streams`);
+      return sortStreams(streams);
+    }
+    // If no streams found, try edge function as fallback
+    console.log("[Torrentio] Client-side returned 0 streams, trying edge function...");
+  } catch (clientError: any) {
+    console.log("[Torrentio] Client-side failed, trying edge function...", clientError.message);
+  }
+  
+  // Fallback to edge function
   try {
     const { data, error } = await supabase.functions.invoke("torrentio", {
       body: { action: "search", imdbId, type, season, episode },
@@ -380,15 +396,16 @@ export async function searchTorrentio(
 
     const payload = (data || {}) as any;
     if (payload.error) {
-      // Check if it's a Torrentio blocking error - if so, try client-side
+      // Check if it's a Torrentio blocking error
       const errorMsg = payload.message || payload.error;
       if (errorMsg.includes("403") || 
           errorMsg.includes("blocked") || 
           errorMsg.includes("Cloudflare") ||
           errorMsg.includes("Access denied") ||
           errorMsg.includes("STREAM_FETCH_FAILED")) {
-        console.log("[Torrentio] Edge function blocked, falling back to client-side");
-        throw new Error("FALLBACK_TO_CLIENT");
+        console.log("[Torrentio] Edge function blocked, no streams available");
+        // Return empty array - the UI will show "no streams found"
+        return [];
       }
       throw new Error(errorMsg);
     }
@@ -398,20 +415,9 @@ export async function searchTorrentio(
     const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
     return sortStreams(streams);
   } catch (err: any) {
-    // If edge function fails with blocking error, try client-side
-    if (err.message === "FALLBACK_TO_CLIENT" || 
-        err.message?.includes("403") || 
-        err.message?.includes("blocked") ||
-        err.message?.includes("exhausted") ||
-        err.message?.includes("Access denied")) {
-      console.log("[Torrentio] Attempting client-side fallback...");
-      
-      const rdApiKey = getRdApiKeyFromStorage();
-      const streams = await searchTorrentioClientSide(imdbId, type, season, episode, rdApiKey || undefined);
-      return sortStreams(streams);
-    }
-    
-    throw err;
+    console.error("[Torrentio] Edge function also failed:", err.message);
+    // Return empty array rather than throwing - let UI handle gracefully
+    return [];
   }
 }
 

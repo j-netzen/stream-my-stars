@@ -735,7 +735,8 @@ export function StreamSelectionDialog({
           setResolveStatus(status);
         });
         
-        if (result.status === "downloaded" && result.links && result.links.length > 0) {
+        // Links are available once RD starts processing, even if not fully downloaded
+        if (result.links && result.links.length > 0) {
           setResolveProgress(85);
           setResolveStatus("Unrestricting link...");
           
@@ -756,7 +757,7 @@ export function StreamSelectionDialog({
             onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
           }, 300);
         } else {
-          throw new Error("Download not ready. Please try again later.");
+          throw new Error("Not cached - trying next stream");
         }
         return;
       }
@@ -782,7 +783,8 @@ export function StreamSelectionDialog({
           setResolveStatus(status);
         });
         
-        if (result.status === "downloaded" && result.links && result.links.length > 0) {
+        // Links are available once RD starts processing, even if not fully downloaded
+        if (result.links && result.links.length > 0) {
           setResolveProgress(85);
           setResolveStatus("Unrestricting link...");
           
@@ -803,7 +805,7 @@ export function StreamSelectionDialog({
             onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
           }, 300);
         } else {
-          throw new Error("Download not ready. Please try again later.");
+          throw new Error("Not cached - trying next stream");
         }
         return;
       }
@@ -828,12 +830,36 @@ export function StreamSelectionDialog({
     } catch (err: any) {
       console.error("Stream selection error:", err);
       
+      // Mark this stream as failed
       setFailedStreams(prev => {
         const newSet = new Set(prev);
         newSet.add(stream.url);
         return newSet;
       });
       
+      // Check if this is a recoverable error that should trigger auto-fallback
+      const errorMsg = err.message || "";
+      const isRecoverableError = 
+        errorMsg.includes("Not cached") ||
+        errorMsg.includes("trying next") ||
+        errorMsg.includes("unavailable") ||
+        errorMsg.includes("copyright") ||
+        errorMsg.includes("dead") ||
+        errorMsg.includes("error") ||
+        errorMsg.includes("virus") ||
+        errorMsg.includes("infringing");
+      
+      if (isRecoverableError) {
+        // Auto-try next stream
+        const tryNext = createTryNextStream();
+        if (tryNext) {
+          toast.info("Stream unavailable, trying next...");
+          setTimeout(() => tryNext(), 100);
+          return;
+        }
+      }
+      
+      // No more streams or non-recoverable error
       toast.error(err.message || "Failed to process stream");
     } finally {
       setIsResolving(false);
