@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
+import { useQuickPlay } from "@/hooks/useQuickPlay";
 import { MediaCard } from "@/components/media/MediaCard";
 import { MediaHero } from "@/components/media/MediaHero";
 import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
@@ -17,6 +18,7 @@ export default function TVShowsPage() {
   const { media, isLoading, deleteMedia, refetch } = useMedia();
   const { progress } = useWatchProgress();
   const { isTVMode } = useTVMode();
+  const { quickPlay, isQuickPlaying, quickPlayMedia } = useQuickPlay();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
@@ -78,6 +80,21 @@ export default function TVShowsPage() {
     setActiveTryNextStream(() => tryNextStream);
     setActiveMedia(updatedMedia);
   };
+
+  const handleQuickPlay = useCallback((item: Media) => {
+    if (!item.tmdb_id) {
+      setActiveMedia(item);
+      return;
+    }
+    
+    // For TV shows, quick play defaults to S1E1
+    quickPlay(item, (streamUrl, qualityInfo, tryNextStream) => {
+      setActiveStreamQuality(qualityInfo);
+      setActiveTryNextStream(() => tryNextStream);
+      const updatedMedia = { ...item, source_url: streamUrl };
+      setActiveMedia(updatedMedia);
+    }, 1, 1);
+  }, [quickPlay]);
 
   const handleRefresh = useCallback(async () => {
     await refetch();
@@ -145,9 +162,11 @@ export default function TVShowsPage() {
                 media={show}
                 progress={progress.find((p) => p.media_id === show.id)}
                 onPlay={handlePlay}
+                onQuickPlay={handleQuickPlay}
                 onDelete={(m) => deleteMedia.mutate(m.id)}
                 onMoreInfo={setDetailsMedia}
                 onAddToPlaylist={setPlaylistMedia}
+                isQuickPlaying={quickPlayMedia?.id === show.id}
               />
             ))}
           </div>

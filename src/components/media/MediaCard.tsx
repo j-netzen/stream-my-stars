@@ -2,7 +2,7 @@ import { Media } from "@/hooks/useMedia";
 import { WatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { cn } from "@/lib/utils";
-import { Play, MoreVertical, Info, Loader2 } from "lucide-react";
+import { Play, MoreVertical, Info, Loader2, Zap } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +19,11 @@ interface MediaCardProps {
   progress?: WatchProgress;
   showContinue?: boolean;
   onPlay?: (media: Media) => void;
+  onQuickPlay?: (media: Media) => void;
   onDelete?: (media: Media) => void;
   onAddToPlaylist?: (media: Media) => void;
   onMoreInfo?: (media: Media) => void;
+  isQuickPlaying?: boolean;
 }
 
 export function MediaCard({
@@ -29,9 +31,11 @@ export function MediaCard({
   progress,
   showContinue = true,
   onPlay,
+  onQuickPlay,
   onDelete,
   onAddToPlaylist,
   onMoreInfo,
+  isQuickPlaying = false,
 }: MediaCardProps) {
   const { isTVMode } = useTVMode();
   const { handleHoverIntent, handleHoverEnd } = usePredictivePrefetch();
@@ -83,7 +87,7 @@ export function MediaCard({
         "media-card group cosmic-border rounded-lg transition-all duration-200",
         "hover:shadow-star-glow",
         isTVMode ? "hover:scale-105 focus-within:scale-108" : "hover:scale-[1.02]",
-        isOptimisticPlaying && "ring-2 ring-primary animate-pulse"
+        (isOptimisticPlaying || isQuickPlaying) && "ring-2 ring-primary animate-pulse"
       )}
       tabIndex={0}
       role="button"
@@ -121,34 +125,62 @@ export function MediaCard({
             : "opacity-0 group-hover:opacity-100 p-4"
         )}>
           {/* Button container - flexbox layout */}
-          <div className={cn("flex flex-row gap-2", isTVMode && "gap-4")}>
-            <Button
-              onClick={handleOptimisticPlay}
-              className={cn(
-                "flex-1 gap-2",
-                isTVMode && "h-16 text-lg"
-              )}
-              size={isTVMode ? "lg" : "sm"}
-              tabIndex={-1}
-              disabled={isOptimisticPlaying}
-            >
-              {isOptimisticPlaying ? (
-                <Loader2 className={cn("w-4 h-4 animate-spin", isTVMode && "w-7 h-7")} />
-              ) : (
-                <Play className={cn("w-4 h-4", isTVMode && "w-7 h-7")} />
-              )}
-              {showContinue && progress && progressPercent > 0 ? "Continue" : "Play"}
-            </Button>
-            <Button
-              onClick={() => onMoreInfo?.(media)}
-              variant="secondary"
-              size={isTVMode ? "lg" : "sm"}
-              className={cn(isTVMode && "h-16 w-16")}
-              title="More Info"
-              tabIndex={-1}
-            >
-              <Info className={cn("w-4 h-4", isTVMode && "w-7 h-7")} />
-            </Button>
+          <div className={cn("flex flex-col gap-2", isTVMode && "gap-3")}>
+            {/* Quick Play - instant best stream */}
+            {onQuickPlay && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuickPlay(media);
+                }}
+                className={cn(
+                  "w-full gap-2 bg-gradient-to-r from-primary to-primary/80",
+                  isTVMode && "h-14 text-lg"
+                )}
+                size={isTVMode ? "lg" : "sm"}
+                tabIndex={-1}
+                disabled={isQuickPlaying || isOptimisticPlaying}
+              >
+                {isQuickPlaying ? (
+                  <Loader2 className={cn("w-4 h-4 animate-spin", isTVMode && "w-6 h-6")} />
+                ) : (
+                  <Zap className={cn("w-4 h-4", isTVMode && "w-6 h-6")} />
+                )}
+                Quick Play
+              </Button>
+            )}
+            
+            {/* Regular buttons row */}
+            <div className={cn("flex flex-row gap-2", isTVMode && "gap-3")}>
+              <Button
+                onClick={handleOptimisticPlay}
+                variant="secondary"
+                className={cn(
+                  "flex-1 gap-2",
+                  isTVMode && "h-12 text-base"
+                )}
+                size={isTVMode ? "default" : "sm"}
+                tabIndex={-1}
+                disabled={isOptimisticPlaying || isQuickPlaying}
+              >
+                {isOptimisticPlaying ? (
+                  <Loader2 className={cn("w-4 h-4 animate-spin", isTVMode && "w-5 h-5")} />
+                ) : (
+                  <Play className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+                )}
+                {showContinue && progress && progressPercent > 0 ? "Continue" : "Select"}
+              </Button>
+              <Button
+                onClick={() => onMoreInfo?.(media)}
+                variant="secondary"
+                size={isTVMode ? "default" : "sm"}
+                className={cn(isTVMode && "h-12 w-12")}
+                title="More Info"
+                tabIndex={-1}
+              >
+                <Info className={cn("w-4 h-4", isTVMode && "w-5 h-5")} />
+              </Button>
+            </div>
           </div>
         </div>
 

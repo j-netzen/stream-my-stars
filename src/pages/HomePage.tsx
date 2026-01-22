@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
+import { useQuickPlay } from "@/hooks/useQuickPlay";
 import { MediaRow } from "@/components/media/MediaRow";
 import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
@@ -11,13 +12,14 @@ import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { PageSkeleton } from "@/components/ui/media-skeleton";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Play, Info } from "lucide-react";
+import { Play, Info, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const { media, isLoading: mediaLoading, deleteMedia, refetch } = useMedia();
   const { progress, getContinueWatching } = useWatchProgress();
   const { isTVMode } = useTVMode();
+  const { quickPlay, isQuickPlaying, quickPlayMedia } = useQuickPlay();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
   const [activeTryNextStream, setActiveTryNextStream] = useState<(() => void) | undefined>(undefined);
@@ -54,6 +56,22 @@ export default function HomePage() {
     setActiveTryNextStream(() => tryNextStream);
     setActiveMedia(updatedMedia);
   };
+
+  const handleQuickPlay = useCallback((item: Media) => {
+    if (!item.tmdb_id) {
+      // No TMDB ID, just play directly
+      setActiveMedia(item);
+      return;
+    }
+    
+    quickPlay(item, (streamUrl, qualityInfo, tryNextStream) => {
+      setActiveStreamQuality(qualityInfo);
+      setActiveTryNextStream(() => tryNextStream);
+      // Set source URL and start playback
+      const updatedMedia = { ...item, source_url: streamUrl };
+      setActiveMedia(updatedMedia);
+    });
+  }, [quickPlay]);
 
   const handleDelete = (item: Media) => {
     deleteMedia.mutate(item.id);
@@ -119,12 +137,23 @@ export default function HomePage() {
               <div className={cn("flex flex-row", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
                 <Button
                   size={isTVMode ? "tv" : "lg"}
+                  className={cn("gap-1.5 bg-gradient-to-r from-primary to-primary/80", isTVMode && "h-10 px-4 text-sm")}
+                  onClick={() => handleQuickPlay(featured)}
+                  disabled={isQuickPlaying}
+                  tabIndex={0}
+                >
+                  <Zap className={cn("fill-current", isTVMode ? "w-4 h-4" : "w-5 h-5")} />
+                  Quick Play
+                </Button>
+                <Button
+                  size={isTVMode ? "tv" : "lg"}
+                  variant="secondary"
                   className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
                   onClick={() => handlePlay(featured)}
                   tabIndex={0}
                 >
                   <Play className={cn("fill-current", isTVMode ? "w-4 h-4" : "w-5 h-5")} />
-                  Play
+                  Select Stream
                 </Button>
                 <Button 
                   size={isTVMode ? "tv" : "lg"}
@@ -156,9 +185,11 @@ export default function HomePage() {
             progress={progress}
             showContinue={false}
             onPlay={handlePlay}
+            onQuickPlay={handleQuickPlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
             onAddToPlaylist={setPlaylistMedia}
+            quickPlayingMediaId={quickPlayMedia?.id}
           />
         )}
 
@@ -168,9 +199,11 @@ export default function HomePage() {
             media={continueWatchingMedia}
             progress={progress}
             onPlay={handlePlay}
+            onQuickPlay={handleQuickPlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
             onAddToPlaylist={setPlaylistMedia}
+            quickPlayingMediaId={quickPlayMedia?.id}
           />
         )}
 
@@ -181,9 +214,11 @@ export default function HomePage() {
             progress={progress}
             showContinue={false}
             onPlay={handlePlay}
+            onQuickPlay={handleQuickPlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
             onAddToPlaylist={setPlaylistMedia}
+            quickPlayingMediaId={quickPlayMedia?.id}
           />
         )}
 
@@ -194,9 +229,11 @@ export default function HomePage() {
             progress={progress}
             showContinue={false}
             onPlay={handlePlay}
+            onQuickPlay={handleQuickPlay}
             onDelete={handleDelete}
             onMoreInfo={setDetailsMedia}
             onAddToPlaylist={setPlaylistMedia}
+            quickPlayingMediaId={quickPlayMedia?.id}
           />
         )}
 
