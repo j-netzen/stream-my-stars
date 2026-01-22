@@ -13,9 +13,11 @@ interface MediaRowProps {
   progress?: WatchProgress[];
   showContinue?: boolean;
   onPlay?: (media: Media) => void;
+  onQuickPlay?: (media: Media) => void;
   onDelete?: (media: Media) => void;
   onAddToPlaylist?: (media: Media) => void;
   onMoreInfo?: (media: Media) => void;
+  quickPlayingMediaId?: string | null;
 }
 
 export function MediaRow({
@@ -24,9 +26,11 @@ export function MediaRow({
   progress = [],
   showContinue = true,
   onPlay,
+  onQuickPlay,
   onDelete,
   onAddToPlaylist,
   onMoreInfo,
+  quickPlayingMediaId,
 }: MediaRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -141,9 +145,11 @@ export function MediaRow({
               progress={progress.find((p) => p.media_id === item.id)}
               showContinue={showContinue}
               onPlay={onPlay}
+              onQuickPlay={onQuickPlay}
               onDelete={onDelete}
               onAddToPlaylist={onAddToPlaylist}
               onMoreInfo={onMoreInfo}
+              isQuickPlaying={quickPlayingMediaId === item.id}
             />
           </div>
         ))}
