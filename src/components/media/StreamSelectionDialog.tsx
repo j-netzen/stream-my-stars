@@ -5,6 +5,7 @@ import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
 import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
 import { usePredictivePrefetch } from "@/hooks/usePredictivePrefetch";
+import { useQuickPlay } from "@/hooks/useQuickPlay";
 
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
@@ -22,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ export function StreamSelectionDialog({
   const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
   const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
   const { getCachedStreams, prefetchStreams } = usePredictivePrefetch();
+  const { quickPlay, isQuickPlaying } = useQuickPlay();
   const [activeTab, setActiveTab] = useState<string>("streams");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
@@ -1076,60 +1077,90 @@ export function StreamSelectionDialog({
                   </div>
                 </div>
 
-                {/* Season/Episode picker for TV - inline */}
+                {/* Season/Episode picker for TV - inline with Select dropdowns */}
                 {media.media_type === "tv" && (
                   <div className="flex items-center gap-2 shrink-0">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="bg-white/5 border-white/10 hover:bg-white/10 text-white gap-1">
-                          <span>S{selectedSeason}</span>
-                          <ChevronDown className="w-3 h-3 opacity-60" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="end">
-                        <div className="grid grid-cols-5 gap-1 max-h-[200px] overflow-y-auto">
+                    {/* Season Select */}
+                    <Select 
+                      value={selectedSeason.toString()} 
+                      onValueChange={(val) => { setSelectedSeason(Number(val)); setSelectedEpisode(1); setStreams([]); }}
+                    >
+                      <SelectTrigger className="w-[80px] h-9 bg-white/5 border-white/10 text-white text-sm">
+                        <SelectValue placeholder="Season" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a24] border-white/10 max-h-[300px]">
+                        <div className="grid grid-cols-3 gap-1 p-1">
                           {Array.from({ length: media.seasons || 10 }, (_, i) => i + 1).map((s) => (
-                            <Button
-                              key={s}
-                              variant={selectedSeason === s ? "default" : "ghost"}
-                              size="sm"
-                              className={cn("h-8 w-10", selectedSeason !== s && "text-white/70 hover:text-white hover:bg-white/10")}
-                              onClick={() => { setSelectedSeason(s); setSelectedEpisode(1); setStreams([]); }}
+                            <SelectItem 
+                              key={s} 
+                              value={s.toString()}
+                              className={cn(
+                                "text-center justify-center cursor-pointer",
+                                selectedSeason === s && "bg-primary text-white"
+                              )}
                             >
-                              {s}
-                            </Button>
+                              S{s}
+                            </SelectItem>
                           ))}
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="bg-white/5 border-white/10 hover:bg-white/10 text-white gap-1">
-                          <span>E{selectedEpisode}</span>
-                          <ChevronDown className="w-3 h-3 opacity-60" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-2 bg-[#1a1a24] border-white/10" align="end">
-                        <div className="grid grid-cols-5 gap-1 max-h-[200px] overflow-y-auto">
+                      </SelectContent>
+                    </Select>
+
+                    {/* Episode Select */}
+                    <Select 
+                      value={selectedEpisode.toString()} 
+                      onValueChange={(val) => { setSelectedEpisode(Number(val)); setStreams([]); }}
+                    >
+                      <SelectTrigger className="w-[80px] h-9 bg-white/5 border-white/10 text-white text-sm">
+                        <SelectValue placeholder="Episode" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a24] border-white/10 max-h-[300px]">
+                        <div className="grid grid-cols-3 gap-1 p-1">
                           {Array.from({ length: 30 }, (_, i) => i + 1).map((e) => (
-                            <Button
-                              key={e}
-                              variant={selectedEpisode === e ? "default" : "ghost"}
-                              size="sm"
-                              className={cn("h-8 w-10", selectedEpisode !== e && "text-white/70 hover:text-white hover:bg-white/10")}
-                              onClick={() => { setSelectedEpisode(e); setStreams([]); }}
+                            <SelectItem 
+                              key={e} 
+                              value={e.toString()}
+                              className={cn(
+                                "text-center justify-center cursor-pointer",
+                                selectedEpisode === e && "bg-primary text-white"
+                              )}
                             >
-                              {e}
-                            </Button>
+                              E{e}
+                            </SelectItem>
                           ))}
                         </div>
-                      </PopoverContent>
-                    </Popover>
-                    <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="icon" className="h-8 w-8 bg-white/5 border-white/10 hover:bg-white/10 text-white">
+                      </SelectContent>
+                    </Select>
+
+                    <Button onClick={handleSearch} disabled={isSearching} variant="outline" size="icon" className="h-9 w-9 bg-white/5 border-white/10 hover:bg-white/10 text-white">
                       {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                     </Button>
                   </div>
                 )}
+
+                {/* Quick Play Button */}
+                <Button
+                  onClick={() => {
+                    if (!media) return;
+                    const season = media.media_type === "tv" ? selectedSeason : undefined;
+                    const episode = media.media_type === "tv" ? selectedEpisode : undefined;
+                    quickPlay(media, (streamUrl, qualityInfo, tryNextStream) => {
+                      const updatedMedia = { ...media, source_url: streamUrl };
+                      onStreamSelected(updatedMedia, streamUrl, qualityInfo, tryNextStream);
+                      onOpenChange(false);
+                    }, season, episode);
+                  }}
+                  disabled={isQuickPlaying || isResolving}
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/80 shrink-0"
+                  size="sm"
+                >
+                  {isQuickPlaying ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Zap className="w-4 h-4" />
+                  )}
+                  Quick Play
+                </Button>
               </div>
             )}
           </div>
