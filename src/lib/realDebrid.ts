@@ -264,9 +264,24 @@ async function waitForTorrentLinks(
     return torrent;
   }
   
+  // Check for immediate errors
+  if (torrent.status === "error" || torrent.status === "dead" || torrent.status === "virus") {
+    // These are non-recoverable errors - trigger fallback
+    const errorMsg = torrent.status === "virus" 
+      ? "Stream blocked (copyright)" 
+      : "Stream unavailable";
+    throw new Error(errorMsg);
+  }
+  
+  // If status is "waiting_files_selection" or "magnet_conversion", give it more time
+  if (torrent.status === "waiting_files_selection" || torrent.status === "magnet_conversion") {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    torrent = await getTorrentInfo(torrentId);
+  }
+  
   // Poll for links to become available (not full download)
   let attempts = 0;
-  const maxAttempts = 30; // 30 seconds max wait for links
+  const maxAttempts = 20; // 20 seconds max wait for links (reduced from 30)
   
   do {
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
@@ -278,8 +293,9 @@ async function waitForTorrentLinks(
     
     attempts++;
     
-    if (torrent.status === "error" || torrent.status === "dead") {
-      throw new Error(`Torrent failed with status: ${torrent.status}`);
+    // Check for error states that should trigger fallback
+    if (torrent.status === "error" || torrent.status === "dead" || torrent.status === "virus") {
+      throw new Error("Stream unavailable - trying next");
     }
     
     // Links become available once downloading starts, not when complete
@@ -288,9 +304,9 @@ async function waitForTorrentLinks(
     }
   } while (attempts < maxAttempts);
   
-  // If still no links after waiting, throw error
+  // If still no links after waiting, throw error to trigger fallback
   if (!torrent.links || torrent.links.length === 0) {
-    throw new Error("Could not get streaming links. The torrent may not be cached. Try a different stream.");
+    throw new Error("Not cached - trying next stream");
   }
   
   return torrent;
