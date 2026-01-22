@@ -8,9 +8,10 @@ import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { PageSkeleton } from "@/components/ui/media-skeleton";
 import { getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
-import { Play, Info, Loader2 } from "lucide-react";
+import { Play, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function HomePage() {
@@ -62,12 +63,9 @@ export default function HomePage() {
     await refetch();
   }, [refetch]);
 
+  // Show skeleton screens during loading for instant feel
   if (mediaLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className={cn("animate-spin text-primary", isTVMode ? "w-12 h-12" : "w-8 h-8")} />
-      </div>
-    );
+    return <PageSkeleton rows={4} />;
   }
 
   return (

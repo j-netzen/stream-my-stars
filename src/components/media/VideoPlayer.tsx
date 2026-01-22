@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Wifi, WifiOff, AlertTriangle } from "lucide-react";
+import { X, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Wifi, WifiOff, AlertTriangle, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
+import { useSmartBuffer, BufferState } from "@/hooks/useSmartBuffer";
 
 interface Media {
   id: string;
@@ -39,6 +40,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const bufferStallCountRef = useRef<number>(0);
 
   const { settings } = usePlaybackSettings();
+  
+  // Smart 128MB buffer system
+  const { bufferState, startAggressiveBuffer, targetBufferMB } = useSmartBuffer(videoRef, {
+    aggressiveFill: true,
+  });
   
   // BrowseHere / Android TV browser detection
   const { useNativePlayer } = useBrowseHere();
@@ -199,6 +205,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     video.volume = volume;
     setIsMuted(false);
 
+    // Start aggressive buffer fill
+    startAggressiveBuffer();
+
     // Always auto-play and enter fullscreen
     if (!hasAutoPlayedRef.current) {
       video.play().then(() => {
@@ -222,7 +231,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         });
       });
     }
-  }, [volume, enterFullscreen]);
+  }, [volume, enterFullscreen, startAggressiveBuffer]);
 
   // Reset auto-play/fullscreen refs when media changes
   useEffect(() => {
@@ -669,15 +678,39 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         </div>
       )}
 
-      {/* Buffer health indicator (shown with controls) */}
+      {/* Smart buffer indicator (shown with controls) */}
       {showControls && (
-        <div className="absolute top-4 right-16 flex items-center gap-2 text-white/60 text-sm">
-          <div className={cn(
-            "w-2 h-2 rounded-full",
-            bufferHealth === 'good' && "bg-green-500",
-            bufferHealth === 'warning' && "bg-yellow-500",
-            bufferHealth === 'poor' && "bg-red-500"
-          )} />
+        <div className="absolute top-4 right-16 flex items-center gap-3 text-white/60 text-sm">
+          {/* 128MB Buffer progress */}
+          <div className="flex items-center gap-2 bg-black/40 rounded-full px-3 py-1">
+            <HardDrive className="w-3 h-3" />
+            <div className="w-16 h-1.5 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className={cn(
+                  "h-full transition-all duration-300",
+                  bufferState.bufferHealth === 'healthy' && "bg-green-500",
+                  bufferState.bufferHealth === 'filling' && "bg-yellow-500",
+                  bufferState.bufferHealth === 'critical' && "bg-red-500"
+                )}
+                style={{ width: `${Math.min(100, bufferState.bufferProgress)}%` }}
+              />
+            </div>
+            <span className="text-xs tabular-nums">
+              {Math.round(bufferState.bufferedBytes / (1024 * 1024))}MB
+            </span>
+          </div>
+          
+          {/* Quality indicator */}
+          <span className={cn(
+            "px-2 py-0.5 rounded text-xs font-medium uppercase",
+            bufferState.adaptiveQuality === 'high' && "bg-green-500/80 text-white",
+            bufferState.adaptiveQuality === 'medium' && "bg-yellow-500/80 text-black",
+            bufferState.adaptiveQuality === 'low' && "bg-orange-500/80 text-white"
+          )}>
+            {bufferState.adaptiveQuality}
+          </span>
+          
+          {/* Connection speed */}
           {settings.connectionSpeedMbps !== null && (
             <span className="flex items-center gap-1">
               <Wifi className="w-3 h-3" />
