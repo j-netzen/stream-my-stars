@@ -413,12 +413,6 @@ serve(async (req) => {
     }
 
     if (action === "search") {
-      // Get Real-Debrid API key - prefer client-provided, fall back to env
-      const rdApiKey = clientRdKey || Deno.env.get('REAL_DEBRID_API_KEY');
-      
-      // Log secret status (not the actual values!)
-      console.log(`[SECRETS] Real-Debrid API key: ${rdApiKey ? 'configured (' + rdApiKey.length + ' chars)' : 'NOT configured'}`);
-      
       // Build the stream ID - for series, include season:episode
       let streamId = imdbId;
       if (type === "series" && season !== undefined && episode !== undefined) {
@@ -427,162 +421,113 @@ serve(async (req) => {
       
       console.log(`[SEARCH] Type: ${type}, StreamID: ${streamId}`);
       
-      // Build Torrentio URLs
-      // IMPORTANT: Torrentio expects a full config string BEFORE /stream/
-      // Format: /[config]/stream/[type]/[id].json
-      // Config format: providers=yts,eztv,rarbg,1337x,thepiratebay,kickasstorrents,torrentgalaxy,magnetdl,horriblesubs,nyaasi,tokyotosho,anidex|sort=qualitysize|qualityfilter=brremux,hdrall,dolbyvision,4k,1080p,720p,480p,scr,cam,unknown
-      const torrentioUrls: Array<{ label: string; url: string }> = [];
-      
-      // Real-Debrid endpoint - Torrentio uses the API key directly in the path (NOT URL encoded)
-      // Format: /realdebrid=APIKEY/stream/type/id.json
-      if (rdApiKey) {
-        const rdUrl = `${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`;
-        torrentioUrls.push({ label: "realdebrid", url: rdUrl });
-      }
-      
-      // Standard public endpoint (no config needed for basic search)
-      const standardUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
-      torrentioUrls.push({ label: "standard", url: standardUrl });
+      // Only use public endpoint - embedding API keys can trigger blocking
+      const torrentioUrl = `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
+      console.log(`[TORRENTIO] Using public endpoint only to avoid blocking`);
 
       // Retry logic with exponential backoff
-      const MAX_RETRIES = 3;
-      const RETRY_DELAYS = [1000, 2000, 4000];
+      const MAX_RETRIES = 2;
+      const RETRY_DELAY = 1000;
       
-      const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       let lastStatus = 0;
       let lastError: string | null = null;
 
-      for (const candidate of torrentioUrls) {
-        console.log(`[TORRENTIO] Trying: ${candidate.label}`);
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          console.log(`[TORRENTIO] Attempt ${attempt + 1}/${MAX_RETRIES}`);
 
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-          try {
-            console.log(`[TORRENTIO] Attempt ${attempt + 1}/${MAX_RETRIES} (${candidate.label})`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+          const response = await fetch(torrentioUrl, {
+            headers: {
+              Accept: "application/json",
+            },
+            signal: controller.signal,
+          });
 
-            const response = await fetch(candidate.url, {
-              headers: {
-                Accept: "application/json",
-                "User-Agent": "MediaHub/1.0 (Android; iOS; Web)",
-              },
-              signal: controller.signal,
-            });
+          clearTimeout(timeoutId);
+          lastStatus = response.status;
 
-            clearTimeout(timeoutId);
-            lastStatus = response.status;
+          // Success
+          if (response.ok) {
+            const data = await response.json();
+            const streamCount = data.streams?.length || 0;
+            console.log(`[SUCCESS] Torrentio returned ${streamCount} streams`);
 
-            // Success
-            if (response.ok) {
-              const data = await response.json();
-
-              // SECURITY: Sanitize response to remove any API keys from URLs
-              if (data.streams && Array.isArray(data.streams) && rdApiKey) {
-                const keyRegex = new RegExp(escapeRegExp(rdApiKey), "g");
-                data.streams = data.streams.map((stream: { url?: string; [key: string]: unknown }) => {
-                  if (stream.url && typeof stream.url === "string") {
-                    stream.url = stream.url.replace(keyRegex, "[REDACTED]");
-                  }
-                  return stream;
-                });
+            return new Response(JSON.stringify({
+              ...data,
+              _meta: {
+                streamCount,
+                timestamp: new Date().toISOString(),
               }
-
-              const streamCount = data.streams?.length || 0;
-              console.log(`[SUCCESS] Torrentio returned ${streamCount} streams via ${candidate.label}`);
-
-              return new Response(JSON.stringify({
-                ...data,
-                _meta: {
-                  provider: candidate.label,
-                  streamCount,
-                  timestamp: new Date().toISOString(),
-                }
-              }), {
-                status: 200,
-                headers: {
-                  ...corsHeaders,
-                  "Content-Type": "application/json",
-                  "X-RateLimit-Remaining": String(rateLimit.remaining),
-                  "Cache-Control": "private, max-age=300", // 5 min cache
-                },
-              });
-            }
-
-            // Handle specific error codes
-            if (response.status === 403) {
-              lastError = "Access denied by Torrentio - API key may be invalid or expired";
-              console.error(`[ERROR] 403 Forbidden from ${candidate.label} - checking next provider`);
-              // Don't retry 403, move to next provider
-              break;
-            }
-
-            if (response.status === 404) {
-              lastError = "Content not found on Torrentio";
-              console.warn(`[WARN] 404 Not Found for ${streamId}`);
-              // Return empty streams for 404
-              return new Response(JSON.stringify({
-                streams: [],
-                _meta: {
-                  provider: candidate.label,
-                  streamCount: 0,
-                  message: "No streams found for this content",
-                  timestamp: new Date().toISOString(),
-                }
-              }), {
-                status: 200,
-                headers: {
-                  ...corsHeaders,
-                  "Content-Type": "application/json",
-                  "X-RateLimit-Remaining": String(rateLimit.remaining),
-                },
-              });
-            }
-
-            // Non-retryable client errors (4xx except 429)
-            if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-              lastError = `Torrentio returned error ${response.status}`;
-              console.error(`[ERROR] ${response.status} from ${candidate.label}`);
-              break; // Move to next provider
-            }
-
-            // Retryable errors (5xx, 429)
-            lastError = `Torrentio temporarily unavailable (${response.status})`;
-            console.warn(`[RETRY] ${response.status} from ${candidate.label}`);
-          } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') {
-              lastError = "Request timed out";
-              console.warn(`[TIMEOUT] Request to ${candidate.label} timed out`);
-            } else {
-              lastError = err instanceof Error ? err.message : "Network error";
-              console.error(`[FETCH_ERROR] ${candidate.label}:`, err);
-            }
+            }), {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+                "X-RateLimit-Remaining": String(rateLimit.remaining),
+                "Cache-Control": "private, max-age=300",
+              },
+            });
           }
 
-          // Wait before retry (except on last attempt)
-          if (attempt < MAX_RETRIES - 1) {
-            const delay = RETRY_DELAYS[attempt];
-            console.log(`[WAIT] ${delay}ms before retry`);
-            await new Promise((resolve) => setTimeout(resolve, delay));
+          // Handle specific error codes
+          if (response.status === 403) {
+            lastError = "Access denied by Torrentio";
+            console.error(`[ERROR] 403 Forbidden`);
+            break; // Don't retry 403
+          }
+
+          if (response.status === 404) {
+            // Return empty streams for 404
+            return new Response(JSON.stringify({
+              streams: [],
+              _meta: {
+                streamCount: 0,
+                message: "No streams found for this content",
+                timestamp: new Date().toISOString(),
+              }
+            }), {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+                "X-RateLimit-Remaining": String(rateLimit.remaining),
+              },
+            });
+          }
+
+          lastError = `Torrentio returned ${response.status}`;
+          console.warn(`[RETRY] ${response.status}`);
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            lastError = "Request timed out";
+            console.warn(`[TIMEOUT] Request timed out`);
+          } else {
+            lastError = err instanceof Error ? err.message : "Network error";
+            console.error(`[FETCH_ERROR]`, err);
           }
         }
 
-        console.warn(`[FAILED] Provider ${candidate.label} exhausted (status: ${lastStatus})`);
+        // Wait before retry (except on last attempt)
+        if (attempt < MAX_RETRIES - 1) {
+          console.log(`[WAIT] ${RETRY_DELAY}ms before retry`);
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        }
       }
 
-      // All providers failed - return graceful error with empty streams
-      console.error(`[EXHAUSTED] All providers failed. Last status: ${lastStatus}, Last error: ${lastError}`);
+      // All attempts failed - return empty streams
+      console.error(`[EXHAUSTED] All attempts failed. Last status: ${lastStatus}, Last error: ${lastError}`);
       
       return new Response(
         JSON.stringify({
           streams: [],
           error: "STREAM_FETCH_FAILED",
           message: lastError || "Unable to fetch streams. Please try again later.",
-          status: lastStatus || 503,
           retryable: true,
           _meta: {
             timestamp: new Date().toISOString(),
-            secretsConfigured: secretsStatus.realDebridConfigured,
           }
         }),
         {
