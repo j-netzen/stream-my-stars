@@ -263,13 +263,12 @@ export function sortStreams(streams: TorrentioStream[]): TorrentioStream[] {
   });
 }
 
-// Client-side direct Torrentio search (fallback when edge function is blocked)
+// Client-side direct Torrentio search (simpler approach to avoid blocking)
 async function searchTorrentioClientSide(
   imdbId: string,
   type: "movie" | "series",
   season?: number,
-  episode?: number,
-  rdApiKey?: string
+  episode?: number
 ): Promise<TorrentioStream[]> {
   // Build the stream ID
   const streamId = type === "series" && season && episode
@@ -280,75 +279,30 @@ async function searchTorrentioClientSide(
   const customBase = getTorrentioBaseUrl();
   const hasCustomUrl = customBase !== TORRENTIO_BASE;
 
-  const urls: string[] = [];
+  // Only use the custom URL or public endpoint - no RD key embedding
+  // This reduces blocking from Torrentio's anti-abuse systems
+  const url = hasCustomUrl 
+    ? `${customBase}/stream/${type}/${streamId}.json`
+    : `${TORRENTIO_BASE}/stream/${type}/${streamId}.json`;
+
+  console.log("[Torrentio Client] Fetching:", url);
   
-  // If custom addon URL is set, use it first (it already has RD key baked in)
-  if (hasCustomUrl) {
-    urls.push(`${customBase}/stream/${type}/${streamId}.json`);
-  }
-  
-  // Then try Real-Debrid configured endpoint if we have an API key
-  if (rdApiKey && !hasCustomUrl) {
-    urls.push(`${TORRENTIO_BASE}/realdebrid=${rdApiKey}/stream/${type}/${streamId}.json`);
-  }
-  
-  // Fallback to public endpoint
-  urls.push(`${TORRENTIO_BASE}/stream/${type}/${streamId}.json`);
+  const response = await fetch(url, {
+    headers: {
+      "Accept": "application/json",
+    },
+  });
 
-  let lastError: Error | null = null;
-
-  for (const url of urls) {
-    try {
-      console.log("[Torrentio Client] Trying:", url.replace(rdApiKey || "", "***"));
-      
-      const response = await fetch(url, {
-        headers: {
-          "Accept": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          console.warn("[Torrentio Client] 403 Forbidden, trying next URL");
-          continue;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const rawStreams: TorrentioStream[] = data.streams || [];
-      // Normalize streams to ensure they have usable URLs
-      const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
-      console.log(`[Torrentio Client] Found ${rawStreams.length} streams, ${streams.length} with valid URLs`);
-      return streams;
-    } catch (err: any) {
-      console.error("[Torrentio Client] Error:", err.message);
-      lastError = err;
-    }
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
-  throw lastError || new Error("All Torrentio endpoints failed");
-}
-
-// Get Real-Debrid API key from localStorage (OAuth tokens or manual key)
-function getRdApiKeyFromStorage(): string | null {
-  try {
-    // First check for OAuth access token
-    const oauthToken = localStorage.getItem("rd_access_token");
-    if (oauthToken) {
-      // Check if token is expired
-      const expiry = localStorage.getItem("rd_token_expiry");
-      if (expiry && Date.now() < parseInt(expiry, 10)) {
-        return oauthToken;
-      }
-    }
-    
-    // Fall back to manual API key
-    const stored = localStorage.getItem("realDebridApiKey");
-    return stored || null;
-  } catch {
-    return null;
-  }
+  const data = await response.json();
+  const rawStreams: TorrentioStream[] = data.streams || [];
+  // Normalize streams to ensure they have usable URLs
+  const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
+  console.log(`[Torrentio Client] Found ${rawStreams.length} streams, ${streams.length} with valid URLs`);
+  return streams;
 }
 
 export async function searchTorrentio(
@@ -357,66 +311,14 @@ export async function searchTorrentio(
   season?: number,
   episode?: number
 ): Promise<TorrentioStream[]> {
-  // Check if custom Torrentio addon URL is configured
-  const customBase = getTorrentioBaseUrl();
-  const hasCustomUrl = customBase !== TORRENTIO_BASE;
-  
-  // If custom addon URL is configured, use client-side search directly
-  // This bypasses the edge function which often gets blocked by Torrentio
-  if (hasCustomUrl) {
-    console.log("[Torrentio] Using custom addon URL, skipping edge function");
-    const rdApiKey = getRdApiKeyFromStorage();
-    const streams = await searchTorrentioClientSide(imdbId, type, season, episode, rdApiKey || undefined);
-    return sortStreams(streams);
-  }
-  
-  // Try client-side first as it's faster and more reliable
-  // Edge functions often get blocked by Torrentio's Cloudflare protection
+  // Always use client-side search - it's faster and less likely to be blocked
   try {
-    console.log("[Torrentio] Trying client-side search first (faster)...");
-    const rdApiKey = getRdApiKeyFromStorage();
-    const streams = await searchTorrentioClientSide(imdbId, type, season, episode, rdApiKey || undefined);
-    if (streams.length > 0) {
-      console.log(`[Torrentio] Client-side found ${streams.length} streams`);
-      return sortStreams(streams);
-    }
-    // If no streams found, try edge function as fallback
-    console.log("[Torrentio] Client-side returned 0 streams, trying edge function...");
-  } catch (clientError: any) {
-    console.log("[Torrentio] Client-side failed, trying edge function...", clientError.message);
-  }
-  
-  // Fallback to edge function
-  try {
-    const { data, error } = await supabase.functions.invoke("torrentio", {
-      body: { action: "search", imdbId, type, season, episode },
-    });
-
-    if (error) throw new Error(error.message);
-
-    const payload = (data || {}) as any;
-    if (payload.error) {
-      // Check if it's a Torrentio blocking error
-      const errorMsg = payload.message || payload.error;
-      if (errorMsg.includes("403") || 
-          errorMsg.includes("blocked") || 
-          errorMsg.includes("Cloudflare") ||
-          errorMsg.includes("Access denied") ||
-          errorMsg.includes("STREAM_FETCH_FAILED")) {
-        console.log("[Torrentio] Edge function blocked, no streams available");
-        // Return empty array - the UI will show "no streams found"
-        return [];
-      }
-      throw new Error(errorMsg);
-    }
-
-    const rawStreams: TorrentioStream[] = payload.streams || [];
-    // Normalize streams to ensure they have usable URLs
-    const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
+    console.log("[Torrentio] Using client-side search...");
+    const streams = await searchTorrentioClientSide(imdbId, type, season, episode);
+    console.log(`[Torrentio] Found ${streams.length} streams`);
     return sortStreams(streams);
   } catch (err: any) {
-    console.error("[Torrentio] Edge function also failed:", err.message);
-    // Return empty array rather than throwing - let UI handle gracefully
+    console.error("[Torrentio] Search failed:", err.message);
     return [];
   }
 }
