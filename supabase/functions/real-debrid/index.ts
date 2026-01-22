@@ -517,11 +517,25 @@ serve(async (req) => {
       case "instant_availability":
         // Check instant availability for multiple hashes
         // This tells us which torrents are already cached on RD
+        // NOTE: Real-Debrid may disable this endpoint (error 37). Handle gracefully.
         console.log("Checking instant availability for", hashes!.length, "hashes...");
         const hashesPath = hashes!.join('/');
         response = await rdFetch(`${RD_API_BASE}/torrents/instantAvailability/${hashesPath}`, { headers });
         data = await response.json();
         console.log("Instant availability response status:", response.status);
+        
+        // Handle disabled_endpoint error (error_code 37) gracefully
+        // Return empty object so client can proceed without cache filtering
+        if (data?.error === 'disabled_endpoint' || data?.error_code === 37 || response.status === 403) {
+          console.log("Instant availability endpoint is disabled (error 37), returning empty result");
+          return new Response(JSON.stringify({}), {
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              "X-RateLimit-Remaining": String(rateLimit.remaining),
+            },
+          });
+        }
         break;
 
       default:

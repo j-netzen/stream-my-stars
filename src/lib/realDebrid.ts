@@ -267,6 +267,9 @@ export async function getSupportedHosts(): Promise<Record<string, unknown>> {
  * Check instant availability for multiple torrent hashes
  * Returns a map of hash -> cached file info (empty object if not cached)
  * This allows pre-filtering streams to only show cached ones
+ * 
+ * NOTE: Real-Debrid may disable this endpoint (error code 37). When disabled,
+ * this returns an empty object and the caller should proceed without cache filtering.
  */
 export async function checkInstantAvailability(hashes: string[]): Promise<Record<string, unknown>> {
   if (hashes.length === 0) return {};
@@ -278,8 +281,24 @@ export async function checkInstantAvailability(hashes: string[]): Promise<Record
     const batch = hashes.slice(i, i + batchSize);
     try {
       const data = await invokeRealDebrid({ action: "instant_availability", hashes: batch }) as Record<string, unknown>;
+      
+      // Check if endpoint is disabled (error 37)
+      if (data && typeof data === 'object' && 'error' in data) {
+        const errorData = data as { error?: string; error_code?: number };
+        if (errorData.error === 'disabled_endpoint' || errorData.error_code === 37) {
+          console.warn("[Real-Debrid] Instant availability endpoint is disabled (error 37). Skipping cache check.");
+          return {}; // Return empty - caller will proceed without cache filtering
+        }
+      }
+      
       Object.assign(results, data);
-    } catch (err) {
+    } catch (err: unknown) {
+      // Check if error indicates disabled endpoint
+      const errMsg = String(err);
+      if (errMsg.includes('disabled_endpoint') || errMsg.includes('error_code: 37') || errMsg.includes('403')) {
+        console.warn("[Real-Debrid] Instant availability endpoint is disabled. Skipping cache check.");
+        return {}; // Return empty - caller will proceed without cache filtering
+      }
       console.warn("Instant availability check failed for batch:", err);
     }
   }
