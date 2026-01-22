@@ -161,13 +161,15 @@ const RATE_LIMIT = {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const VALID_ACTIONS = ["user", "unrestrict", "streaming", "add_magnet", "add_torrent", "select_files", "torrent_info", "torrents", "downloads", "hosts"] as const;
+const VALID_ACTIONS = ["user", "unrestrict", "streaming", "add_magnet", "add_torrent", "select_files", "torrent_info", "torrents", "downloads", "hosts", "instant_availability"] as const;
 const URL_REGEX = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
 const MAGNET_REGEX = /^magnet:\?xt=urn:[a-z0-9]+:[a-z0-9]{32,}/i;
 const TORRENT_ID_REGEX = /^[a-zA-Z0-9]+$/;
+const HASH_REGEX = /^[a-fA-F0-9]{40}$/;
 const MAX_LINK_LENGTH = 2000;
 const MAX_MAGNET_LENGTH = 5000;
 const MAX_TORRENT_ID_LENGTH = 50;
+const MAX_HASHES = 50; // Max hashes per instant_availability check
 
 interface ValidationResult {
   valid: boolean;
@@ -179,6 +181,7 @@ interface ValidationResult {
     magnet?: string;
     torrentId?: string;
     torrentFile?: string; // base64 encoded torrent file
+    hashes?: string[]; // for instant_availability action
   };
 }
 
@@ -255,7 +258,23 @@ function validateRealDebridInput(body: unknown): ValidationResult {
     }
   }
   
-  const { fileId } = body as Record<string, unknown>;
+  // Validate hashes for instant_availability action
+  if (action === "instant_availability") {
+    const { hashes } = body as Record<string, unknown>;
+    if (!Array.isArray(hashes) || hashes.length === 0) {
+      return { valid: false, error: "Hashes array is required for instant_availability action" };
+    }
+    if (hashes.length > MAX_HASHES) {
+      return { valid: false, error: `Too many hashes. Maximum ${MAX_HASHES} hashes per request` };
+    }
+    for (const hash of hashes) {
+      if (typeof hash !== 'string' || !HASH_REGEX.test(hash)) {
+        return { valid: false, error: "Invalid hash format. Must be 40-character hex string" };
+      }
+    }
+  }
+  
+  const { fileId, hashes } = body as Record<string, unknown>;
   
   return { 
     valid: true, 
@@ -266,6 +285,7 @@ function validateRealDebridInput(body: unknown): ValidationResult {
       magnet: magnet as string | undefined, 
       torrentId: torrentId as string | undefined,
       torrentFile: torrentFile as string | undefined,
+      hashes: hashes as string[] | undefined,
     } 
   };
 }
@@ -369,8 +389,8 @@ serve(async (req) => {
       );
     }
 
-    const { action, link, fileId, magnet, torrentId, torrentFile } = validation.data!;
-    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", fileId: fileId ? "provided" : "none", magnet: magnet ? "provided" : "none", torrentFile: torrentFile ? "provided" : "none" });
+    const { action, link, fileId, magnet, torrentId, torrentFile, hashes } = validation.data!;
+    console.log("Real-Debrid request (validated):", { action, link: link ? "provided" : "none", fileId: fileId ? "provided" : "none", magnet: magnet ? "provided" : "none", torrentFile: torrentFile ? "provided" : "none", hashes: hashes?.length || 0 });
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
@@ -492,6 +512,16 @@ serve(async (req) => {
         response = await rdFetch(`${RD_API_BASE}/hosts`, { headers });
         data = await response.json();
         console.log("Hosts response status:", response.status);
+        break;
+
+      case "instant_availability":
+        // Check instant availability for multiple hashes
+        // This tells us which torrents are already cached on RD
+        console.log("Checking instant availability for", hashes!.length, "hashes...");
+        const hashesPath = hashes!.join('/');
+        response = await rdFetch(`${RD_API_BASE}/torrents/instantAvailability/${hashesPath}`, { headers });
+        data = await response.json();
+        console.log("Instant availability response status:", response.status);
         break;
 
       default:
