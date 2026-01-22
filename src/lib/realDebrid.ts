@@ -126,6 +126,34 @@ function isTokenError(error: unknown): boolean {
 }
 
 /**
+ * Check if an error is a "skip this stream" error (copyright, unavailable, etc.)
+ * These errors should trigger automatic fallback to the next stream
+ */
+function isSkipStreamError(error: unknown): boolean {
+  if (!error) return false;
+  const message = String(error).toLowerCase();
+  return (
+    message.includes("copyright") ||
+    message.includes("infringing") ||
+    message.includes("unavailable") ||
+    message.includes("dmca") ||
+    message.includes("451") ||
+    message.includes("file_unavailable") ||
+    message.includes("hoster_unavailable")
+  );
+}
+
+/**
+ * Custom error class for stream-specific errors that should trigger fallback
+ */
+export class StreamUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StreamUnavailableError";
+  }
+}
+
+/**
  * Main function to invoke Real-Debrid API with automatic token refresh
  */
 async function invokeRealDebrid(body: Record<string, unknown>, retryCount = 0): Promise<unknown> {
@@ -145,6 +173,11 @@ async function invokeRealDebrid(body: Record<string, unknown>, retryCount = 0): 
       throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
     }
     
+    // Check for skip-stream errors (copyright, unavailable, etc.)
+    if (isSkipStreamError(error.message || error)) {
+      throw new StreamUnavailableError("Stream blocked - trying next");
+    }
+    
     // Check if it's a service unavailable error
     const errorMessage = error.message || "";
     if (errorMessage.includes("503") || errorMessage.includes("service_unavailable")) {
@@ -157,6 +190,7 @@ async function invokeRealDebrid(body: Record<string, unknown>, retryCount = 0): 
   
   if (data?.error) {
     const errorString = String(data.error || "");
+    const errorCode = data.details?.error_code;
     
     // Check for token errors in response
     if (isTokenError(errorString) && retryCount === 0) {
@@ -166,6 +200,13 @@ async function invokeRealDebrid(body: Record<string, unknown>, retryCount = 0): 
         return invokeRealDebrid(body, retryCount + 1);
       }
       throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
+    }
+    
+    // Check for skip-stream errors (copyright DMCA, file unavailable, etc.)
+    // Error codes: 35 = infringing_file, 7 = hoster_unavailable, 8 = file_unavailable
+    if (isSkipStreamError(errorString) || [35, 7, 8].includes(errorCode)) {
+      console.log("Stream unavailable (copyright/DMCA), triggering fallback");
+      throw new StreamUnavailableError("Stream blocked - trying next");
     }
     
     // Check for service unavailable in data error
