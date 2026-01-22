@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { StreamCardSkeleton } from "@/components/ui/media-skeleton";
 
 export interface StreamQualityInfo {
   quality: string;
@@ -1169,12 +1169,18 @@ export function StreamSelectionDialog({
           <div className="flex-1 flex flex-col min-h-0 bg-[#0a0a0f]">
             {activeTab === "streams" ? (
               <>
-                {/* Loading state */}
+                {/* Loading state with skeleton cards */}
                 {isSearching && (
-                  <div className="flex-1 flex items-center justify-center p-8">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                      <span className="text-white/60">Searching for streams...</span>
+                  <div className="flex-1 flex flex-col p-6 gap-4 overflow-hidden">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      <span className="text-white/60 text-sm">Searching for streams...</span>
+                    </div>
+                    {/* Skeleton stream cards */}
+                    <div className="flex flex-col gap-3">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <StreamCardSkeleton key={i} className="animate-pulse" />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1421,10 +1427,19 @@ export function StreamSelectionDialog({
                   </div>
                 </div>
 
-                {/* Loading state */}
+                {/* Loading state with skeleton cards */}
                 {isLoadingDownloads && (
-                  <div className="flex-1 flex items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <div className="flex-1 flex flex-col p-6 gap-4 overflow-hidden">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      <span className="text-white/60 text-sm">Loading downloads...</span>
+                    </div>
+                    {/* Skeleton download cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <StreamCardSkeleton key={i} className="animate-pulse" />
+                      ))}
+                    </div>
                   </div>
                 )}
 
