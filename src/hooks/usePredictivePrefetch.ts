@@ -100,10 +100,9 @@ export function usePredictivePrefetch() {
       if (data.backdropUrl) imagePreloadQueue.push(data.backdropUrl);
       processImageQueue();
 
-      // Prefetch streams in background if we have IMDB ID (for movies only - TV needs episode selection)
-      if (imdbId && mediaType === 'movie') {
-        prefetchStreams(tmdbId, mediaType, imdbId);
-      }
+      // NOTE: Stream prefetching disabled to reduce unnecessary API calls
+      // Streams are fetched on-demand when user opens stream selection dialog
+      // This prevents potential rate-limiting and reduces network overhead
 
       return data;
     } catch (error) {
