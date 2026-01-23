@@ -3,7 +3,7 @@ import { useMedia, Media, WatchProviderInfo } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
 import { MediaCard } from "@/components/media/MediaCard";
-import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { VideoPlayerLazy as VideoPlayer } from "@/components/media/VideoPlayerLazy";
 import { TrendingNetworkRow } from "@/components/networks/TrendingNetworkRow";
 import { HeroCarousel } from "@/components/media/HeroCarousel";
 import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";

@@ -3,7 +3,7 @@ import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
 import { MediaRow } from "@/components/media/MediaRow";
-import { VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayer";
+import { VideoPlayerLazy as VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayerLazy";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
