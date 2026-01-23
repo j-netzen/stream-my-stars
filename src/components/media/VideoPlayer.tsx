@@ -10,6 +10,72 @@ import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { prepareStreamUrl, forceHttps } from "@/lib/streamUtils";
 
+// MIME type detection based on file extension for maximum compatibility
+const getMimeType = (url: string): string => {
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  
+  // HLS/DASH streaming formats
+  if (cleanUrl.includes('.m3u8') || cleanUrl.includes('m3u8')) {
+    return 'application/x-mpegURL';
+  }
+  if (cleanUrl.includes('.mpd')) {
+    return 'application/dash+xml';
+  }
+  
+  // Extract extension
+  const extension = cleanUrl.split('.').pop() || '';
+  
+  const mimeTypes: Record<string, string> = {
+    // Standard video containers
+    'mp4': 'video/mp4',
+    'm4v': 'video/mp4',
+    'mov': 'video/mp4',
+    'webm': 'video/webm',
+    'ogv': 'video/ogg',
+    'ogg': 'video/ogg',
+    
+    // MKV/Matroska - use x-matroska for broader support
+    'mkv': 'video/x-matroska',
+    'mk3d': 'video/x-matroska',
+    'mka': 'audio/x-matroska',
+    
+    // AVI and legacy formats
+    'avi': 'video/x-msvideo',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv',
+    'f4v': 'video/x-f4v',
+    
+    // MPEG formats
+    'mpeg': 'video/mpeg',
+    'mpg': 'video/mpeg',
+    'mpe': 'video/mpeg',
+    'mpv': 'video/mpeg',
+    'm2v': 'video/mpeg',
+    
+    // Transport streams
+    'ts': 'video/mp2t',
+    'mts': 'video/mp2t',
+    'm2ts': 'video/mp2t',
+    
+    // 3GPP mobile formats
+    '3gp': 'video/3gpp',
+    '3g2': 'video/3gpp2',
+    
+    // Raw video
+    'h264': 'video/h264',
+    'h265': 'video/h265',
+    'hevc': 'video/hevc',
+  };
+  
+  return mimeTypes[extension] || 'video/mp4'; // Default to mp4 for unknown
+};
+
+// Check if URL is a streaming format (HLS/DASH)
+const isStreamingFormat = (url: string): boolean => {
+  const cleanUrl = url.toLowerCase();
+  return cleanUrl.includes('.m3u8') || cleanUrl.includes('m3u8') || cleanUrl.includes('.mpd');
+};
+
 interface Media {
   id: string;
   title: string;
@@ -115,10 +181,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     if (playerRef.current && src) {
       const preparedUrl = getPreparedUrl();
       if (preparedUrl) {
-        const isHls = src.includes('.m3u8');
+        const mimeType = getMimeType(src);
         playerRef.current.src({
           src: preparedUrl,
-          type: isHls ? 'application/x-mpegURL' : 'video/mp4'
+          type: mimeType
         });
         playerRef.current.play()?.catch(console.error);
       }
@@ -137,9 +203,13 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     setErrorMessage("");
     errorRetryCountRef.current = 0;
 
-    const isHlsStream = src.includes('.m3u8') || src.includes('m3u8');
+    // Detect MIME type dynamically based on URL
+    const detectedMimeType = getMimeType(src);
+    const isStreaming = isStreamingFormat(src);
 
-    // Video.js options with professional configuration
+    console.log('[VideoPlayer] Detected MIME type:', detectedMimeType, 'Streaming:', isStreaming);
+
+    // Video.js options with VHS (videojs-http-streaming) configuration
     const options: any = {
       autoplay: true,
       controls: true,
@@ -166,24 +236,36 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       },
       html5: {
         vhs: {
+          // VHS configuration for adaptive streaming
           overrideNative: !useNativePlayer,
           enableLowInitialPlaylist: true,
           smoothQualityChange: true,
           handlePartialData: true,
           fastQualityChange: true,
+          allowSeeksWithinUnsafeLiveWindow: true,
+          // Bandwidth and buffer settings
+          bandwidth: 50000000, // 50 Mbps initial estimate
+          useBandwidthFromLocalStorage: true,
+          // Retry settings for reliability
+          maxPlaylistRetries: 5,
+          // Handle different codecs
+          handleManifestRedirects: true,
         },
         nativeAudioTracks: useNativePlayer,
         nativeVideoTracks: useNativePlayer,
+        nativeTextTracks: useNativePlayer,
       },
       sources: [{
         src: preparedUrl,
-        type: isHlsStream ? 'application/x-mpegURL' : 'video/mp4',
+        type: detectedMimeType,
       }],
       poster: backdropUrl || undefined,
       liveui: false,
       liveTracker: {
         trackingThreshold: 0,
       },
+      // Tech order - prefer html5 with VHS
+      techOrder: ['html5'],
     };
 
     console.log('[VideoPlayer] Initializing with URL:', preparedUrl.substring(0, 100) + '...');
@@ -261,14 +343,14 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           if (playerRef.current && src) {
             const retryUrl = getPreparedUrl();
             if (retryUrl) {
-              const isHls = src.includes('.m3u8');
-              console.log('[VideoPlayer] Retrying with URL:', retryUrl.substring(0, 80) + '...');
+              const retryMimeType = getMimeType(src);
+              console.log('[VideoPlayer] Retrying with URL:', retryUrl.substring(0, 80) + '...', 'MIME:', retryMimeType);
               
               // Reset the player source completely
               playerRef.current.reset();
               playerRef.current.src({
                 src: retryUrl,
-                type: isHls ? 'application/x-mpegURL' : 'video/mp4'
+                type: retryMimeType
               });
               playerRef.current.load();
               playerRef.current.play()?.catch((e) => {
