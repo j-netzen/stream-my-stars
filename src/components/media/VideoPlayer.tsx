@@ -149,6 +149,11 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     const preparedUrl = getPreparedUrl();
     if (!preparedUrl) return;
 
+    // Reset error state on new initialization
+    setHasError(false);
+    setErrorMessage("");
+    errorRetryCountRef.current = 0;
+
     const isHlsStream = src.includes('.m3u8') || src.includes('m3u8');
 
     // Video.js options with professional configuration
@@ -182,6 +187,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           enableLowInitialPlaylist: true,
           smoothQualityChange: true,
           handlePartialData: true,
+          fastQualityChange: true,
         },
         nativeAudioTracks: useNativePlayer,
         nativeVideoTracks: useNativePlayer,
@@ -191,7 +197,13 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         type: isHlsStream ? 'application/x-mpegURL' : 'video/mp4',
       }],
       poster: backdropUrl || undefined,
+      liveui: false,
+      liveTracker: {
+        trackingThreshold: 0,
+      },
     };
+
+    console.log('[VideoPlayer] Initializing with URL:', preparedUrl.substring(0, 100) + '...');
 
     // Create Video.js player
     const player = videojs(videoRef.current, options, function onPlayerReady() {
@@ -206,32 +218,69 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
     playerRef.current = player;
 
+    // Track if we've started loading - don't count early errors before content loads
+    let hasStartedLoading = false;
+    let loadStartTime = Date.now();
+
+    player.on('loadstart', () => {
+      console.log('[VideoPlayer] Load started');
+      hasStartedLoading = true;
+      loadStartTime = Date.now();
+    });
+
+    player.on('loadedmetadata', () => {
+      console.log('[VideoPlayer] Metadata loaded - stream is valid');
+      // Reset retry count once we know the stream works
+      errorRetryCountRef.current = 0;
+    });
+
+    player.on('playing', () => {
+      console.log('[VideoPlayer] Playback started successfully');
+      // Stream is working, reset retries
+      errorRetryCountRef.current = 0;
+    });
+
     // Handle errors with retry logic
     player.on('error', () => {
       const error = player.error();
-      console.error('[VideoPlayer] Video.js error:', error, 'Retry count:', errorRetryCountRef.current);
+      const timeSinceLoadStart = Date.now() - loadStartTime;
+      
+      console.error('[VideoPlayer] Video.js error:', error?.code, error?.message, 
+        'Retry:', errorRetryCountRef.current, 
+        'Time since load:', timeSinceLoadStart + 'ms');
       
       // Clear any pending error timeout
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
+
+      // If error happens very early (within 500ms), it might be a transient init error
+      // Give it more chances to recover
+      const effectiveMaxRetries = timeSinceLoadStart < 500 ? MAX_AUTO_RETRIES + 2 : MAX_AUTO_RETRIES;
       
       // Auto-retry a few times before showing error
-      if (errorRetryCountRef.current < MAX_AUTO_RETRIES) {
+      if (errorRetryCountRef.current < effectiveMaxRetries) {
         errorRetryCountRef.current += 1;
-        console.log(`[VideoPlayer] Auto-retrying... (${errorRetryCountRef.current}/${MAX_AUTO_RETRIES})`);
+        console.log(`[VideoPlayer] Auto-retrying... (${errorRetryCountRef.current}/${effectiveMaxRetries})`);
         
-        // Wait and retry
+        // Wait and retry with fresh source
         errorTimeoutRef.current = setTimeout(() => {
           if (playerRef.current && src) {
             const retryUrl = getPreparedUrl();
             if (retryUrl) {
               const isHls = src.includes('.m3u8');
+              console.log('[VideoPlayer] Retrying with URL:', retryUrl.substring(0, 80) + '...');
+              
+              // Reset the player source completely
+              playerRef.current.reset();
               playerRef.current.src({
                 src: retryUrl,
                 type: isHls ? 'application/x-mpegURL' : 'video/mp4'
               });
-              playerRef.current.play()?.catch(console.error);
+              playerRef.current.load();
+              playerRef.current.play()?.catch((e) => {
+                console.warn('[VideoPlayer] Play promise rejected:', e.message);
+              });
             }
           }
         }, 1500);
