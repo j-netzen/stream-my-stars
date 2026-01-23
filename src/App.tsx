@@ -10,6 +10,7 @@ import { BrowseHereProvider } from "@/hooks/useBrowseHere";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
 import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import MoviesPage from "./pages/MoviesPage";
@@ -24,98 +25,110 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Inner component to use hooks
+function AppContent() {
+  // Handle service worker updates and clear stale caches
+  useServiceWorkerUpdate();
+
+  return (
+    <>
+      <Toaster />
+      <Sonner />
+      <PWAInstallPrompt />
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route
+              path="/"
+              element={
+                <MainLayout>
+                  <HomePage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/movies"
+              element={
+                <MainLayout>
+                  <MoviesPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/tv-shows"
+              element={
+                <MainLayout>
+                  <TVShowsPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/home-movies"
+              element={
+                <MainLayout>
+                  <HomeMoviesPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/networks"
+              element={
+                <MainLayout>
+                  <NetworksPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/playlists"
+              element={
+                <MainLayout>
+                  <PlaylistsPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/discover"
+              element={
+                <MainLayout>
+                  <DiscoverPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <MainLayout>
+                  <SettingsPage />
+                </MainLayout>
+              }
+            />
+            <Route
+              path="/live-tv"
+              element={
+                <MainLayout>
+                  <LiveTVPage />
+                </MainLayout>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <TVModeProvider>
         <BrowseHereProvider>
-        <AuthProvider>
-          <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <PWAInstallPrompt />
-          <ErrorBoundary>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/auth" element={<AuthPage />} />
-              <Route
-                path="/"
-                element={
-                  <MainLayout>
-                    <HomePage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/movies"
-                element={
-                  <MainLayout>
-                    <MoviesPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/tv-shows"
-                element={
-                  <MainLayout>
-                    <TVShowsPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/home-movies"
-                element={
-                  <MainLayout>
-                    <HomeMoviesPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/networks"
-                element={
-                  <MainLayout>
-                    <NetworksPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/playlists"
-                element={
-                  <MainLayout>
-                    <PlaylistsPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/discover"
-                element={
-                  <MainLayout>
-                    <DiscoverPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <MainLayout>
-                    <SettingsPage />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/live-tv"
-                element={
-                  <MainLayout>
-                    <LiveTVPage />
-                  </MainLayout>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          </ErrorBoundary>
-          </TooltipProvider>
-        </AuthProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <AppContent />
+            </TooltipProvider>
+          </AuthProvider>
         </BrowseHereProvider>
       </TVModeProvider>
     </ThemeProvider>

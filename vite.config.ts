@@ -20,7 +20,28 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff,woff2}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB limit
+        // Clean up old caches on new SW activation
+        cleanupOutdatedCaches: true,
+        // Skip waiting to activate new SW immediately
+        skipWaiting: true,
+        // Claim all clients immediately
+        clientsClaim: true,
         runtimeCaching: [
+          {
+            // Cache JS chunks with NetworkFirst to always get fresh versions
+            urlPattern: /\.js$/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "js-chunks",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/i,
             handler: "CacheFirst",
