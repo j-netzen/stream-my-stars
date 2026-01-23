@@ -47,6 +47,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isReady, setIsReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const errorRetryCountRef = useRef(0);
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const MAX_AUTO_RETRIES = 3;
@@ -226,6 +227,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       console.log('[VideoPlayer] Load started');
       hasStartedLoading = true;
       loadStartTime = Date.now();
+      setIsLoading(true);
     });
 
     player.on('loadedmetadata', () => {
@@ -238,6 +240,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       console.log('[VideoPlayer] Playback started successfully');
       // Stream is working, reset retries
       errorRetryCountRef.current = 0;
+      setIsLoading(false);
+    });
+
+    player.on('waiting', () => {
+      setIsLoading(true);
+    });
+
+    player.on('canplay', () => {
+      setIsLoading(false);
     });
 
     // Handle errors with retry logic
@@ -423,6 +434,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       ref={containerRef}
       className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-black flex flex-col overflow-hidden"
     >
+      {/* Loading Overlay - prevents flashing */}
+      {isLoading && !hasError && (
+        <div className="absolute inset-0 z-20 bg-black flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <p className="text-muted-foreground text-sm">Loading stream...</p>
+          </div>
+        </div>
+      )}
       {/* Video.js Player Container */}
       <div className="flex-1 relative">
         {/* Error State */}
@@ -489,27 +509,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         )}
       </div>
 
-      {/* VLC Fallback Button - Below Player */}
-      <div className="bg-black/95 border-t border-white/10 p-4">
-        <div className="flex items-center justify-center gap-4 max-w-lg mx-auto">
-          <Button
-            onClick={openInVlc}
-            variant="outline"
-            className="flex-1 gap-2 bg-gradient-to-r from-orange-500/20 to-orange-600/20 border-orange-500/40 hover:bg-orange-500/30 text-orange-400 hover:text-orange-300"
-          >
-            <ExternalLink className="w-4 h-4" />
-            External Player (VLC)
-          </Button>
-          
-          <Button
-            onClick={copyStreamUrl}
-            variant="ghost"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            Copy URL
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
