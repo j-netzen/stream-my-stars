@@ -47,6 +47,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isReady, setIsReady] = useState(false);
+  const errorRetryCountRef = useRef(0);
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const MAX_AUTO_RETRIES = 3;
 
   const src = media.source_url;
   const backdropUrl = media.backdrop_path 
@@ -122,6 +125,10 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const handleRetry = useCallback(() => {
     setHasError(false);
     setErrorMessage("");
+    errorRetryCountRef.current = 0; // Reset retry count on manual retry
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+    }
     if (playerRef.current && src) {
       const preparedUrl = getPreparedUrl();
       if (preparedUrl) {
@@ -199,33 +206,63 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
     playerRef.current = player;
 
-    // Handle errors
+    // Handle errors with retry logic
     player.on('error', () => {
       const error = player.error();
-      console.error('[VideoPlayer] Video.js error:', error);
+      console.error('[VideoPlayer] Video.js error:', error, 'Retry count:', errorRetryCountRef.current);
       
-      setHasError(true);
-      let message = 'Stream currently unavailable. Try another link or open in VLC.';
+      // Clear any pending error timeout
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
       
-      if (error) {
-        switch (error.code) {
-          case 2: // MEDIA_ERR_NETWORK
-            message = 'Network error. Check your connection or try VLC.';
-            break;
-          case 3: // MEDIA_ERR_DECODE
-            message = 'Media decode error. This format may not be supported in browser.';
-            break;
-          case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-            message = 'Source not supported. Try opening in VLC.';
-            break;
+      // Auto-retry a few times before showing error
+      if (errorRetryCountRef.current < MAX_AUTO_RETRIES) {
+        errorRetryCountRef.current += 1;
+        console.log(`[VideoPlayer] Auto-retrying... (${errorRetryCountRef.current}/${MAX_AUTO_RETRIES})`);
+        
+        // Wait and retry
+        errorTimeoutRef.current = setTimeout(() => {
+          if (playerRef.current && src) {
+            const retryUrl = getPreparedUrl();
+            if (retryUrl) {
+              const isHls = src.includes('.m3u8');
+              playerRef.current.src({
+                src: retryUrl,
+                type: isHls ? 'application/x-mpegURL' : 'video/mp4'
+              });
+              playerRef.current.play()?.catch(console.error);
+            }
+          }
+        }, 1500);
+        return;
+      }
+      
+      // After max retries, show error after a delay to allow recovery
+      errorTimeoutRef.current = setTimeout(() => {
+        let message = 'Stream currently unavailable. Try another link or open in VLC.';
+        
+        if (error) {
+          switch (error.code) {
+            case 2: // MEDIA_ERR_NETWORK
+              message = 'Network error. Check your connection or try VLC.';
+              break;
+            case 3: // MEDIA_ERR_DECODE
+              message = 'Media decode error. This format may not be supported in browser.';
+              break;
+            case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+              message = 'Source not supported. Try opening in VLC.';
+              break;
+          }
         }
-      }
-      
-      setErrorMessage(message);
-      
-      if (onPlaybackError) {
-        onPlaybackError();
-      }
+        
+        setHasError(true);
+        setErrorMessage(message);
+        
+        if (onPlaybackError) {
+          onPlaybackError();
+        }
+      }, 2000);
     });
 
     // Handle ended
@@ -235,6 +272,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
     // Cleanup on unmount
     return () => {
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
       if (playerRef.current) {
         playerRef.current.dispose();
         playerRef.current = null;
