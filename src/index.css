@@ -756,3 +756,194 @@
     background-position: 200% 0;
   }
 }
+
+/* Video.js Professional Theme - City/Ocean inspired dark theme */
+.video-js {
+  font-family: inherit;
+  background-color: #000;
+}
+
+.video-js .vjs-big-play-button {
+  background-color: hsl(var(--primary) / 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  line-height: 80px;
+  font-size: 40px;
+  top: 50%;
+  left: 50%;
+  margin-top: -40px;
+  margin-left: -40px;
+  transition: all 0.2s ease;
+}
+
+.video-js:hover .vjs-big-play-button,
+.video-js .vjs-big-play-button:focus {
+  background-color: hsl(var(--primary));
+  transform: scale(1.1);
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.5);
+}
+
+.video-js .vjs-control-bar {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  height: 50px;
+  padding-top: 10px;
+}
+
+.video-js .vjs-play-progress,
+.video-js .vjs-volume-level {
+  background-color: hsl(var(--primary));
+}
+
+.video-js .vjs-slider {
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+.video-js .vjs-load-progress {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+}
+
+.video-js .vjs-load-progress div {
+  background-color: hsl(var(--muted-foreground) / 0.5);
+}
+
+.video-js .vjs-time-control {
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  min-width: auto;
+}
+
+.video-js .vjs-remaining-time {
+  display: flex;
+}
+
+.video-js .vjs-playback-rate .vjs-playback-rate-value {
+  font-size: 14px;
+  line-height: 30px;
+}
+
+.video-js .vjs-menu-button-popup .vjs-menu {
+  bottom: 40px;
+}
+
+.video-js .vjs-menu li {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.video-js .vjs-menu li.vjs-selected,
+.video-js .vjs-menu li.vjs-selected:hover {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.video-js .vjs-menu li:hover {
+  background-color: hsl(var(--muted));
+}
+
+/* Hide default error display - using custom */
+.video-js .vjs-error-display {
+  display: none;
+}
+
+/* Loading spinner */
+.video-js .vjs-loading-spinner {
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+.video-js .vjs-loading-spinner::before,
+.video-js .vjs-loading-spinner::after {
+  border-top-color: hsl(var(--primary));
+}
+
+/* Progress bar handle */
+.video-js .vjs-progress-control:hover .vjs-progress-holder {
+  font-size: 1.5em;
+}
+
+.video-js .vjs-play-progress::before {
+  top: -0.25em;
+  font-size: 1em;
+  color: hsl(var(--primary));
+}
+
+/* Volume panel styling */
+.video-js .vjs-volume-panel {
+  display: flex;
+  align-items: center;
+}
+
+.video-js .vjs-volume-panel.vjs-volume-panel-horizontal.vjs-hover,
+.video-js .vjs-volume-panel.vjs-volume-panel-horizontal:active,
+.video-js .vjs-volume-panel.vjs-volume-panel-horizontal.vjs-slider-active {
+  width: 10em;
+}
+
+/* Fullscreen styling */
+.video-js.vjs-fullscreen {
+  padding-top: 0 !important;
+}
+
+.video-js.vjs-fullscreen .vjs-control-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+/* Hide controls on user inactivity */
+.video-js.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.video-js.vjs-user-active .vjs-control-bar {
+  opacity: 1;
+}
+
+/* Mobile-friendly controls */
+@media (max-width: 640px) {
+  .video-js .vjs-big-play-button {
+    width: 60px;
+    height: 60px;
+    line-height: 60px;
+    font-size: 30px;
+    margin-top: -30px;
+    margin-left: -30px;
+  }
+
+  .video-js .vjs-control-bar {
+    height: 40px;
+    padding-top: 5px;
+  }
+
+  .video-js .vjs-time-control {
+    font-size: 11px;
+    padding: 0 4px;
+  }
+
+  .video-js .vjs-remaining-time {
+    display: none;
+  }
+}
+
+/* TV Mode specific adjustments */
+.tv-mode .video-js .vjs-big-play-button {
+  width: 100px;
+  height: 100px;
+  line-height: 100px;
+  font-size: 50px;
+  margin-top: -50px;
+  margin-left: -50px;
+}
+
+.tv-mode .video-js .vjs-control-bar {
+  height: 60px;
+  padding-top: 15px;
+}
+
+.tv-mode .video-js .vjs-time-control {
+  font-size: 16px;
+}
