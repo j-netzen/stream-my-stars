@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, Wifi, WifiOff, AlertTriangle, HardDrive } from "lucide-react";
+import Hls from "hls.js";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -32,12 +33,14 @@ interface VideoPlayerProps {
 export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoPlayedRef = useRef(false);
   const hasAutoFullscreenedRef = useRef(false);
   const bufferCheckIntervalRef = useRef<NodeJS.Timeout>();
   const lastBufferTimeRef = useRef<number>(0);
   const bufferStallCountRef = useRef<number>(0);
+  const hasTriedHttpsRef = useRef(false);
 
   const { settings } = usePlaybackSettings();
   
@@ -70,7 +73,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(getPersistedVolume);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay compatibility
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCustomFullscreen, setIsCustomFullscreen] = useState(false); // Custom fullscreen state
   const [showControls, setShowControls] = useState(true);
@@ -81,8 +84,9 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   const [bufferHealth, setBufferHealth] = useState<'good' | 'warning' | 'poor'>('good');
   const [bufferedPercent, setBufferedPercent] = useState(0);
   const [showBufferWarning, setShowBufferWarning] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState<string | null>(media.source_url || null);
 
-  const src = media.source_url || null;
+  const src = currentSrc;
   const backdropUrl = media.backdrop_path 
     ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
     : media.poster_path 
@@ -200,35 +204,28 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     const video = videoRef.current;
     if (!video) return;
 
-    // Always ensure audio is set correctly - force unmuted and set volume
-    video.muted = false;
+    // Start muted for autoplay compatibility, then show unmute overlay
     video.volume = volume;
-    setIsMuted(false);
 
     // Start aggressive buffer fill
     startAggressiveBuffer();
 
     // Always auto-play and enter fullscreen
     if (!hasAutoPlayedRef.current) {
+      // Try muted autoplay first (more reliable across browsers)
+      video.muted = true;
+      setIsMuted(true);
+      
       video.play().then(() => {
         setIsPlaying(true);
         hasAutoPlayedRef.current = true;
         // Always enter fullscreen after playback starts
         enterFullscreen();
+        // Show muted overlay so user can tap to unmute
+        setShowMutedOverlay(true);
+        console.log('[VideoPlayer] Autoplay started (muted)');
       }).catch((err) => {
-        console.warn("Auto-play failed:", err);
-        // Try muted autoplay as fallback and show unmute overlay
-        video.muted = true;
-        setIsMuted(true);
-        video.play().then(() => {
-          setIsPlaying(true);
-          hasAutoPlayedRef.current = true;
-          enterFullscreen();
-          // Show muted overlay so user can tap to unmute
-          setShowMutedOverlay(true);
-        }).catch(() => {
-          console.warn("Muted auto-play also failed");
-        });
+        console.warn('[VideoPlayer] Muted auto-play failed:', err);
       });
     }
   }, [volume, enterFullscreen, startAggressiveBuffer]);
@@ -237,7 +234,113 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   useEffect(() => {
     hasAutoPlayedRef.current = false;
     hasAutoFullscreenedRef.current = false;
-  }, [media.id, src]);
+    hasTriedHttpsRef.current = false;
+    setCurrentSrc(media.source_url || null);
+  }, [media.id, media.source_url]);
+
+  // Helper to switch http to https
+  const switchToHttps = useCallback((url: string): string | null => {
+    if (url.startsWith('http://')) {
+      return url.replace('http://', 'https://');
+    }
+    return null;
+  }, []);
+
+  // HLS.js initialization and error handling
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !src) return;
+
+    // Cleanup previous HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    const isHlsStream = src.includes('.m3u8') || src.includes('m3u8');
+
+    // Handle HLS streams
+    if (isHlsStream && Hls.isSupported()) {
+      console.log('[VideoPlayer] Initializing HLS.js for:', src);
+      
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 120,
+        startLevel: -1, // Auto quality selection
+      });
+
+      hlsRef.current = hls;
+      hls.loadSource(src);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('[VideoPlayer] HLS manifest parsed, ready to play');
+        // Video will auto-play via handleCanPlay
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error('[VideoPlayer] HLS Error:', {
+          type: data.type,
+          details: data.details,
+          fatal: data.fatal,
+          url: data.url || src,
+        });
+
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.log('[VideoPlayer] Network error, attempting recovery...');
+              
+              // Try switching to https if we haven't already
+              if (!hasTriedHttpsRef.current && src.startsWith('http://')) {
+                const httpsUrl = switchToHttps(src);
+                if (httpsUrl) {
+                  console.log('[VideoPlayer] Switching to HTTPS:', httpsUrl);
+                  hasTriedHttpsRef.current = true;
+                  hls.destroy();
+                  setCurrentSrc(httpsUrl);
+                  return;
+                }
+              }
+              
+              // Try to recover
+              hls.startLoad();
+              break;
+              
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.log('[VideoPlayer] Media error, attempting recovery...');
+              hls.recoverMediaError();
+              break;
+              
+            default:
+              console.error('[VideoPlayer] Fatal error, destroying HLS instance');
+              hls.destroy();
+              if (onPlaybackError) {
+                onPlaybackError();
+              }
+              break;
+          }
+        }
+      });
+
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    } 
+    // Native HLS support (Safari/iOS)
+    else if (isHlsStream && video.canPlayType('application/vnd.apple.mpegurl')) {
+      console.log('[VideoPlayer] Using native HLS support');
+      video.src = src;
+    }
+    // Non-HLS streams (MP4, MKV, etc.)
+    else {
+      console.log('[VideoPlayer] Using direct source:', src);
+      video.src = src;
+    }
+  }, [src, switchToHttps, onPlaybackError]);
 
   // Handle fullscreen changes - sync custom state with native
   useEffect(() => {
@@ -391,8 +494,28 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
   };
 
-  const handleVideoError = () => {
-    // Just call the error callback silently - no error message displayed
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const video = e.currentTarget;
+    const error = video.error;
+    
+    console.error('[VideoPlayer] Video error:', {
+      code: error?.code,
+      message: error?.message,
+      src: src,
+    });
+
+    // Try switching to https if we haven't already and it's an http URL
+    if (!hasTriedHttpsRef.current && src?.startsWith('http://')) {
+      const httpsUrl = switchToHttps(src);
+      if (httpsUrl) {
+        console.log('[VideoPlayer] Video error, switching to HTTPS:', httpsUrl);
+        hasTriedHttpsRef.current = true;
+        setCurrentSrc(httpsUrl);
+        return;
+      }
+    }
+
+    // Call the error callback
     if (onPlaybackError) {
       onPlaybackError();
     }
@@ -638,7 +761,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         controls={useNativePlayer}
         style={{ pointerEvents: useNativePlayer ? 'auto' : 'none' }}
       >
-        {src && <source src={src} />}
+        {/* Source is set via HLS.js or directly in useEffect */}
       </video>
 
       {/* Click overlay for play/pause - separate from video with pointer-events control */}
