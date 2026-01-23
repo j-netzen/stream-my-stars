@@ -18,17 +18,17 @@ import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RealDebridPairingDialog } from "@/components/RealDebridPairingDialog";
 import { hasOAuthTokens, clearStoredTokens } from "@/lib/realDebridOAuth";
-
+import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset, inputMode, setInputMode } = useTVMode();
   const { settings: playbackSettings, updateSetting: updatePlaybackSetting, measureConnectionSpeed } = usePlaybackSettings();
+  const { checkForUpdates, forceRefresh, isChecking, lastChecked } = useServiceWorkerUpdate();
   const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
   const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
   const [isLoadingRd, setIsLoadingRd] = useState(false);
   const [rdError, setRdError] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isTestingSpeed, setIsTestingSpeed] = useState(false);
   const [clientRdApiKey, setClientRdApiKey] = useState(() => 
     localStorage.getItem("realDebridApiKey") || ""
@@ -93,29 +93,25 @@ export default function SettingsPage() {
   };
 
 
-  const handleUpdateApp = async () => {
-    setIsUpdating(true);
+  const handleCheckForUpdates = async () => {
     toast.info("Checking for updates...");
     
-    try {
-      // Clear caches if available
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-      }
-      
-      // Short delay for visual feedback
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success("Reloading app with latest version...");
-      
-      // Force reload from server, bypassing cache
-      window.location.reload();
-    } catch (error) {
-      console.error("Update failed:", error);
-      toast.error("Update failed. Please try again.");
-      setIsUpdating(false);
+    const result = await checkForUpdates();
+    
+    if (result.hasUpdate) {
+      toast.success(result.message);
+      // Small delay before reload to show the toast
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      toast.success(result.message);
     }
+  };
+
+  const handleForceRefresh = async () => {
+    toast.info("Clearing cache and reloading...");
+    await forceRefresh();
   };
 
   return (
@@ -984,26 +980,46 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-            Reload the app to get the latest features and bug fixes. Your data will be preserved.
+            Check for app updates or force refresh to clear cached files.
           </p>
-          <Button 
-            size={isTVMode ? "tv" : "default"} 
-            onClick={handleUpdateApp}
-            disabled={isUpdating}
-            className="gap-2"
-          >
-            {isUpdating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              <>
-                <RotateCcw className="w-4 h-4" />
-                Check for Updates
-              </>
-            )}
-          </Button>
+          
+          {lastChecked && (
+            <p className="text-xs text-muted-foreground">
+              Last checked: {formatDistanceToNow(lastChecked, { addSuffix: true })}
+            </p>
+          )}
+          
+          <div className="flex flex-wrap gap-3">
+            <Button 
+              size={isTVMode ? "tv" : "default"} 
+              onClick={handleCheckForUpdates}
+              disabled={isChecking}
+              className="gap-2"
+            >
+              {isChecking ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" />
+                  Check for Updates
+                </>
+              )}
+            </Button>
+            
+            <Button 
+              variant="outline"
+              size={isTVMode ? "tv" : "default"} 
+              onClick={handleForceRefresh}
+              disabled={isChecking}
+              className="gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear Cache & Reload
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
