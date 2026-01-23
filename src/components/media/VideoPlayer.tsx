@@ -246,10 +246,13 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           // Bandwidth and buffer settings
           bandwidth: 50000000, // 50 Mbps initial estimate
           useBandwidthFromLocalStorage: true,
-          // Retry settings for reliability
-          maxPlaylistRetries: 5,
-          // Handle different codecs
+          // More aggressive retry settings for reliability (helps with 2004 errors)
+          maxPlaylistRetries: 10,
+          playlistExclusionDuration: 10, // Shorter exclusion for failed playlists
+          // Handle different codecs and redirects
           handleManifestRedirects: true,
+          // Timeout settings
+          timeout: 45000, // 45 second timeout
         },
         nativeAudioTracks: useNativePlayer,
         nativeVideoTracks: useNativePlayer,
@@ -320,7 +323,12 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       const error = player.error();
       const timeSinceLoadStart = Date.now() - loadStartTime;
       
+      // VHS error codes: 2004 = playlist request failed, 2002 = manifest request timeout
+      const isVhsPlaylistError = error?.code === 2004 || error?.code === 2002 || 
+        (error?.message && error.message.toLowerCase().includes('playlist'));
+      
       console.error('[VideoPlayer] Video.js error:', error?.code, error?.message, 
+        'VHS playlist error:', isVhsPlaylistError,
         'Retry:', errorRetryCountRef.current, 
         'Time since load:', timeSinceLoadStart + 'ms');
       
@@ -329,14 +337,22 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         clearTimeout(errorTimeoutRef.current);
       }
 
-      // If error happens very early (within 500ms), it might be a transient init error
-      // Give it more chances to recover
-      const effectiveMaxRetries = timeSinceLoadStart < 500 ? MAX_AUTO_RETRIES + 2 : MAX_AUTO_RETRIES;
+      // VHS playlist errors (2004) get more retries as they're often transient
+      // Early errors also get more retries
+      let effectiveMaxRetries = MAX_AUTO_RETRIES;
+      if (isVhsPlaylistError) {
+        effectiveMaxRetries = MAX_AUTO_RETRIES + 3; // 6 retries for playlist errors
+      } else if (timeSinceLoadStart < 500) {
+        effectiveMaxRetries = MAX_AUTO_RETRIES + 2; // 5 retries for early errors
+      }
       
-      // Auto-retry a few times before showing error
+      // Auto-retry before showing error
       if (errorRetryCountRef.current < effectiveMaxRetries) {
         errorRetryCountRef.current += 1;
         console.log(`[VideoPlayer] Auto-retrying... (${errorRetryCountRef.current}/${effectiveMaxRetries})`);
+        
+        // VHS playlist errors may need longer delay for server recovery
+        const retryDelay = isVhsPlaylistError ? 2500 : 1500;
         
         // Wait and retry with fresh source
         errorTimeoutRef.current = setTimeout(() => {
@@ -358,7 +374,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
               });
             }
           }
-        }, 1500);
+        }, retryDelay);
         return;
       }
       
@@ -369,13 +385,17 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         if (error) {
           switch (error.code) {
             case 2: // MEDIA_ERR_NETWORK
-              message = 'Network error. Check your connection or try VLC.';
+              message = 'Network error. Check your connection or try another stream.';
               break;
             case 3: // MEDIA_ERR_DECODE
               message = 'Media decode error. This format may not be supported in browser.';
               break;
             case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
-              message = 'Source not supported. Try opening in VLC.';
+              message = 'Source not supported. Try another stream.';
+              break;
+            case 2004: // VHS: Playlist request failed
+            case 2002: // VHS: Manifest request timeout
+              message = 'Stream playlist unavailable. The source may be temporarily down - try another stream.';
               break;
           }
         }
