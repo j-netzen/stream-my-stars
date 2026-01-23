@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Play, ExternalLink, AlertCircle, RefreshCw } from "lucide-react";
+import { X, AlertCircle, RefreshCw } from "lucide-react";
 import videojs from "video.js";
 import type Player from "video.js/dist/types/player";
 import "video.js/dist/video-js.css";
@@ -43,7 +43,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
   // Lock to landscape orientation on native apps
   useVideoPlayerOrientation(true);
 
-  const [showPlayScreen, setShowPlayScreen] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isReady, setIsReady] = useState(false);
@@ -73,23 +72,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     // For direct streams, use CORS proxy if enabled
     return useCorsProxy ? prepareStreamUrl(src, true) : forceHttps(src);
   }, [src, settings.useCorsProxy]);
-
-  // Open in VLC
-  const openInVlc = useCallback(() => {
-    if (!src) return;
-    const vlcUrl = `vlc://${src}`;
-    window.open(vlcUrl, "_blank");
-  }, [src]);
-
-  // Copy stream URL
-  const copyStreamUrl = useCallback(async () => {
-    if (!src) return;
-    try {
-      await navigator.clipboard.writeText(src);
-    } catch (err) {
-      console.error("Failed to copy stream URL:", err);
-    }
-  }, [src]);
 
   // Enter fullscreen
   const enterFullscreen = useCallback(async () => {
@@ -145,7 +127,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
 
   // Initialize Video.js player
   useEffect(() => {
-    if (showPlayScreen || !videoRef.current || !src) return;
+    if (!videoRef.current || !src) return;
 
     const preparedUrl = getPreparedUrl();
     if (!preparedUrl) return;
@@ -340,7 +322,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         playerRef.current = null;
       }
     };
-  }, [showPlayScreen, src, backdropUrl, getPreparedUrl, enterFullscreen, useNativePlayer, onPlaybackError]);
+  }, [src, backdropUrl, getPreparedUrl, enterFullscreen, useNativePlayer, onPlaybackError]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -366,69 +348,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
       document.body.style.overflow = '';
     };
   }, []);
-
-  // Handle play screen click
-  const handlePlayScreenClick = () => {
-    setShowPlayScreen(false);
-  };
-
-  // Show "Click to Play" screen first
-  if (showPlayScreen) {
-    return (
-      <div
-        ref={containerRef}
-        className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-gradient-to-br from-background via-background to-primary/20 flex items-center justify-center overflow-hidden overscroll-none touch-none cursor-pointer"
-        onClick={handlePlayScreenClick}
-      >
-        {/* Background poster with overlay */}
-        {backdropUrl && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center opacity-30"
-            style={{ backgroundImage: `url(${backdropUrl})` }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/60" />
-        
-        {/* Close button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 z-20 text-muted-foreground hover:text-foreground"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleClose();
-          }}
-        >
-          <X className="w-6 h-6" />
-        </Button>
-        
-        {/* Content */}
-        <div className="relative z-10 flex flex-row items-center gap-6 p-4">
-          <div className="relative flex-shrink-0">
-            <div className="absolute inset-0 bg-primary/40 rounded-full blur-xl animate-pulse" />
-            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-2xl hover:scale-105 transition-transform">
-              <Play className="w-8 h-8 text-primary-foreground ml-0.5" />
-            </div>
-          </div>
-          
-          <div className="text-left">
-            <h1 className="text-lg font-bold text-foreground line-clamp-1">
-              {media.title}
-            </h1>
-            {streamQuality && (
-              <p className="text-muted-foreground text-xs">
-                {streamQuality.quality} {streamQuality.size && `• ${streamQuality.size}`}
-              </p>
-            )}
-            <p className="text-foreground/80 text-xs mt-1">
-              Tap anywhere to play
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       ref={containerRef}
@@ -457,11 +376,6 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
                 <Button onClick={handleRetry} variant="outline" className="w-full gap-2">
                   <RefreshCw className="w-4 h-4" />
                   Try Again
-                </Button>
-                
-                <Button onClick={openInVlc} className="w-full gap-2 bg-orange-500 hover:bg-orange-600 text-white">
-                  <ExternalLink className="w-4 h-4" />
-                  Open in VLC
                 </Button>
                 
                 <Button onClick={handleClose} variant="ghost" className="w-full">
