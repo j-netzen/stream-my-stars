@@ -8,6 +8,7 @@ import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { useSmartBuffer, BufferState } from "@/hooks/useSmartBuffer";
+import { prepareStreamUrl, proxyFragmentUrl, CORS_PROXY_URL, isProxiedUrl, extractProviderDomain } from "@/lib/streamUtils";
 
 interface Media {
   id: string;
@@ -246,7 +247,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return null;
   }, []);
 
-  // HLS.js initialization and error handling
+  // HLS.js initialization and error handling with CORS proxy support
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
@@ -258,10 +259,17 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
 
     const isHlsStream = src.includes('.m3u8') || src.includes('m3u8');
+    
+    // Prepare the stream URL with CORS proxy
+    const proxiedSrc = prepareStreamUrl(src, true);
+    console.log('[VideoPlayer] Prepared stream URL:', { original: src, proxied: proxiedSrc });
 
     // Handle HLS streams
     if (isHlsStream && Hls.isSupported()) {
-      console.log('[VideoPlayer] Initializing HLS.js for:', src);
+      console.log('[VideoPlayer] Initializing HLS.js with CORS proxy for:', proxiedSrc);
+      
+      // Extract original provider domain for Referer header simulation
+      const providerDomain = extractProviderDomain(src);
       
       const hls = new Hls({
         enableWorker: true,
@@ -269,10 +277,23 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         maxBufferLength: 30,
         maxMaxBufferLength: 120,
         startLevel: -1, // Auto quality selection
+        // Configure xhrSetup to proxy all fragment requests
+        xhrSetup: function(xhr, url) {
+          // Proxy the fragment URL if not already proxied
+          const proxiedUrl = isProxiedUrl(url) ? url : proxyFragmentUrl(url);
+          
+          // Re-open the request to the proxied URL
+          xhr.open('GET', proxiedUrl, true);
+          
+          // Add headers that make the request look like a standard browser
+          xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+          
+          console.log('[VideoPlayer] HLS fragment request proxied:', { original: url, proxied: proxiedUrl });
+        },
       });
 
       hlsRef.current = hls;
-      hls.loadSource(src);
+      hls.loadSource(proxiedSrc);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -286,6 +307,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           details: data.details,
           fatal: data.fatal,
           url: data.url || src,
+          response: data.response,
         });
 
         if (data.fatal) {
@@ -293,7 +315,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
             case Hls.ErrorTypes.NETWORK_ERROR:
               console.log('[VideoPlayer] Network error, attempting recovery...');
               
-              // Try switching to https if we haven't already
+              // Try switching to https if we haven't already and source is http
               if (!hasTriedHttpsRef.current && src.startsWith('http://')) {
                 const httpsUrl = switchToHttps(src);
                 if (httpsUrl) {
@@ -330,15 +352,15 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         hlsRef.current = null;
       };
     } 
-    // Native HLS support (Safari/iOS)
+    // Native HLS support (Safari/iOS) - use proxied URL
     else if (isHlsStream && video.canPlayType('application/vnd.apple.mpegurl')) {
-      console.log('[VideoPlayer] Using native HLS support');
-      video.src = src;
+      console.log('[VideoPlayer] Using native HLS support with proxied URL');
+      video.src = proxiedSrc;
     }
-    // Non-HLS streams (MP4, MKV, etc.)
+    // Non-HLS streams (MP4, MKV, etc.) - use proxied URL
     else {
-      console.log('[VideoPlayer] Using direct source:', src);
-      video.src = src;
+      console.log('[VideoPlayer] Using direct source with proxy:', proxiedSrc);
+      video.src = proxiedSrc;
     }
   }, [src, switchToHttps, onPlaybackError]);
 

@@ -2,8 +2,13 @@
  * Stream URL Utilities
  * 
  * Provides helpers for preparing stream URLs for playback,
- * including HTTPS forcing and provider-specific fixes.
+ * including HTTPS forcing, CORS proxy wrapping, and provider-specific fixes.
  */
+
+/**
+ * Public CORS proxy URL - used to bypass provider restrictions
+ */
+export const CORS_PROXY_URL = 'https://corsproxy.io/?url=';
 
 /**
  * Force HTTPS on stream URLs to avoid mixed-content blocks
@@ -43,12 +48,56 @@ export function isHttpUrl(url: string): boolean {
 }
 
 /**
+ * Check if a URL is already proxied
+ */
+export function isProxiedUrl(url: string): boolean {
+  return url?.includes('corsproxy.io') ?? false;
+}
+
+/**
+ * Wrap a URL with the CORS proxy
+ * Only wraps if not already proxied
+ */
+export function wrapWithCorsProxy(url: string): string {
+  if (!url) return url;
+  
+  // Don't double-proxy
+  if (isProxiedUrl(url)) {
+    return url;
+  }
+  
+  // Force HTTPS first
+  const httpsUrl = forceHttps(url);
+  
+  // Wrap with proxy
+  return `${CORS_PROXY_URL}${encodeURIComponent(httpsUrl)}`;
+}
+
+/**
+ * Unwrap a proxied URL to get the original
+ */
+export function unwrapProxiedUrl(url: string): string {
+  if (!isProxiedUrl(url)) {
+    return url;
+  }
+  
+  try {
+    const originalEncoded = url.replace(CORS_PROXY_URL, '');
+    return decodeURIComponent(originalEncoded);
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Extract the provider domain from a stream URL
  * Used for setting appropriate Referer headers
  */
 export function extractProviderDomain(url: string): string {
   try {
-    const urlObj = new URL(url);
+    // Unwrap if proxied to get original domain
+    const actualUrl = unwrapProxiedUrl(url);
+    const urlObj = new URL(actualUrl);
     return urlObj.origin;
   } catch {
     return '';
@@ -83,9 +132,10 @@ export function getStreamFetchHeaders(url: string): Record<string, string> {
 /**
  * Prepare a stream URL for playback
  * - Forces HTTPS
+ * - Wraps with CORS proxy for bypass
  * - Validates URL format
  */
-export function prepareStreamUrl(url: string): string {
+export function prepareStreamUrl(url: string, useCorsProxy: boolean = true): string {
   if (!url) return '';
   
   // Force HTTPS first
@@ -94,9 +144,29 @@ export function prepareStreamUrl(url: string): string {
   // Validate the URL is well-formed
   try {
     new URL(httpsUrl);
-    return httpsUrl;
   } catch {
     console.warn('[StreamUtils] Invalid URL format:', url);
-    return httpsUrl;
   }
+  
+  // Wrap with CORS proxy if enabled
+  if (useCorsProxy) {
+    return wrapWithCorsProxy(httpsUrl);
+  }
+  
+  return httpsUrl;
+}
+
+/**
+ * Prepare a URL for HLS fragment requests via CORS proxy
+ * Used in hls.js xhrSetup
+ */
+export function proxyFragmentUrl(url: string): string {
+  // Don't proxy if already proxied
+  if (isProxiedUrl(url)) {
+    return url;
+  }
+  
+  // Force HTTPS and proxy
+  const httpsUrl = forceHttps(url);
+  return wrapWithCorsProxy(httpsUrl);
 }
