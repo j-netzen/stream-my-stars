@@ -11,6 +11,7 @@ import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
+import { prepareStreamUrl } from "@/lib/streamUtils";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,8 @@ import {
 } from "@/components/ui/select";
 import { ScrollAreaWithArrows } from "@/components/ui/scroll-area-with-arrows";
 import { Input } from "@/components/ui/input";
-import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Loader2, Play, Film, Tv, RefreshCw, Star, Calendar, Zap, AlertCircle, Clock, Download, Search, X, HardDrive, Wifi, ChevronDown, ChevronUp, Users, Filter } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { StreamCardSkeleton } from "@/components/ui/media-skeleton";
@@ -56,7 +58,7 @@ export function StreamSelectionDialog({
   const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
   const { getCachedStreams, prefetchStreams } = usePredictivePrefetch();
   const { quickPlay, isQuickPlaying } = useQuickPlay();
-  const { settings: playbackSettings } = usePlaybackSettings();
+  const { settings: playbackSettings, updateSetting } = usePlaybackSettings();
   const [activeTab, setActiveTab] = useState<string>("streams");
   const [isSearching, setIsSearching] = useState(false);
   const [streams, setStreams] = useState<TorrentioStream[]>([]);
@@ -703,19 +705,19 @@ export function StreamSelectionDialog({
       
       if (streamingLinks?.streaming_not_supported) {
         console.log("Streaming not supported for this file, using download URL");
-        return downloadUrl;
+        return prepareStreamUrl(downloadUrl);
       }
       
       if (!streamingLinks || typeof streamingLinks !== 'object') {
         console.log("No valid streaming response, using download URL");
-        return downloadUrl;
+        return prepareStreamUrl(downloadUrl);
       }
       
       const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
       for (const quality of qualityOrder) {
         if (streamingLinks[quality]?.full) {
           console.log(`Using ${quality} streaming link`);
-          return streamingLinks[quality].full;
+          return prepareStreamUrl(streamingLinks[quality].full);
         }
       }
       
@@ -724,12 +726,12 @@ export function StreamSelectionDialog({
         const firstQuality = availableQualities[0];
         if (streamingLinks[firstQuality]?.full) {
           console.log(`Using ${firstQuality} streaming link`);
-          return streamingLinks[firstQuality].full;
+          return prepareStreamUrl(streamingLinks[firstQuality].full);
         }
       }
       
       console.log("No streaming links available, using download URL");
-      return downloadUrl;
+      return prepareStreamUrl(downloadUrl);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("wrong_parameter") || errorMessage.includes("invalid")) {
@@ -737,7 +739,7 @@ export function StreamSelectionDialog({
       } else {
         console.warn("Could not get streaming links, using download URL:", errorMessage);
       }
-      return downloadUrl;
+      return prepareStreamUrl(downloadUrl);
     }
   };
 
@@ -787,11 +789,12 @@ export function StreamSelectionDialog({
     
     try {
       if (isDirectRdLink(stream.url)) {
+        const preparedUrl = prepareStreamUrl(stream.url);
         setResolveProgress(100);
         setResolveStatus("Ready!");
         setTimeout(() => {
           onOpenChange(false);
-          onStreamSelected(media, stream.url, qualityInfo, createTryNextStream());
+          onStreamSelected(media, preparedUrl, qualityInfo, createTryNextStream());
         }, 300);
         return;
       }
@@ -1305,14 +1308,41 @@ export function StreamSelectionDialog({
                   <SelectItem value="english">English</SelectItem>
                 </SelectContent>
               </Select>
+              
+              {/* Cached Only Toggle */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <Filter className="w-3.5 h-3.5 text-white/60" />
+                <span className="text-xs text-white/80 whitespace-nowrap">Cached Only</span>
+                <Switch
+                  checked={playbackSettings.onlyShowCachedStreams}
+                  onCheckedChange={(checked) => updateSetting('onlyShowCachedStreams', checked)}
+                  className="scale-75 data-[state=checked]:bg-primary"
+                />
+                {isCheckingCache && (
+                  <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                )}
+              </div>
             </div>
 
             {/* Stream count - right aligned */}
-            <div className="ml-auto text-sm text-white/40">
-              {activeTab === "streams" ? (
-                isSearching ? "Searching..." : `${filteredStreams.length} streams`
-              ) : (
-                isLoadingDownloads ? "Loading..." : `${filteredDownloads.length} downloads`
+            <div className="ml-auto flex items-center gap-3">
+              <span className="text-sm text-white/40">
+                {activeTab === "streams" ? (
+                  isSearching ? "Searching..." : 
+                  isCheckingCache ? "Checking cache..." :
+                  playbackSettings.onlyShowCachedStreams && cachedHashes.size > 0 
+                    ? `${filteredStreams.length} cached`
+                    : `${filteredStreams.length} streams`
+                ) : (
+                  isLoadingDownloads ? "Loading..." : `${filteredDownloads.length} downloads`
+                )}
+              </span>
+              
+              {/* Cache status indicator */}
+              {!isSearching && !isCheckingCache && cachedHashes.size > 0 && activeTab === "streams" && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                  {cachedHashes.size} instant
+                </span>
               )}
             </div>
 
