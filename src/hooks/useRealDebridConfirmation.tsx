@@ -55,19 +55,12 @@ export function useRealDebridConfirmation() {
     });
   }, []);
 
+  // Always auto-approve for direct-to-video experience (no confirmation popup)
   const confirmAddToRealDebrid = useCallback(
-    (streamName?: string): Promise<boolean> => {
-      if (skipConfirmation) {
-        return Promise.resolve(true);
-      }
-      return confirm(
-        "Add to Real-Debrid?",
-        streamName
-          ? `This will add "${streamName}" to your Real-Debrid cloud. Continue?`
-          : "This will add content to your Real-Debrid cloud. Continue?"
-      );
+    (_streamName?: string): Promise<boolean> => {
+      return Promise.resolve(true);
     },
-    [confirm, skipConfirmation]
+    []
   );
 
   const handleConfirm = useCallback(() => {
