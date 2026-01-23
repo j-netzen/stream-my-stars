@@ -139,13 +139,18 @@ serve(async (req) => {
     let response: Response;
     try {
       // Use manual redirect handling to validate redirect targets for SSRF protection
+      // Use standard Chrome browser headers to bypass provider restrictions
       response = await fetch(decodedUrl, {
         method: req.method === 'HEAD' ? 'HEAD' : 'GET',
         headers: {
-          'User-Agent': 'MediaHub/1.0 StreamProxy (Android; iOS; Web)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
           'Referer': targetUrl.origin + '/',
+          'Origin': targetUrl.origin,
+          'Sec-Fetch-Dest': 'video',
+          'Sec-Fetch-Mode': 'no-cors',
+          'Sec-Fetch-Site': 'cross-site',
           'Range': req.headers.get('range') || '',
         },
         signal: controller.signal,
@@ -174,10 +179,14 @@ serve(async (req) => {
           response = await fetch(redirectUrl.href, {
             method: req.method === 'HEAD' ? 'HEAD' : 'GET',
             headers: {
-              'User-Agent': 'MediaHub/1.0 StreamProxy (Android; iOS; Web)',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
               'Accept': '*/*',
               'Accept-Language': 'en-US,en;q=0.9',
               'Referer': redirectUrl.origin + '/',
+              'Origin': redirectUrl.origin,
+              'Sec-Fetch-Dest': 'video',
+              'Sec-Fetch-Mode': 'no-cors',
+              'Sec-Fetch-Site': 'cross-site',
               'Range': req.headers.get('range') || '',
             },
             signal: controller.signal,
@@ -202,9 +211,13 @@ serve(async (req) => {
               response = await fetch(secondRedirectUrl.href, {
                 method: req.method === 'HEAD' ? 'HEAD' : 'GET',
                 headers: {
-                  'User-Agent': 'MediaHub/1.0 StreamProxy (Android; iOS; Web)',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                   'Accept': '*/*',
+                  'Accept-Language': 'en-US,en;q=0.9',
                   'Referer': secondRedirectUrl.origin + '/',
+                  'Origin': secondRedirectUrl.origin,
+                  'Sec-Fetch-Dest': 'video',
+                  'Sec-Fetch-Mode': 'no-cors',
                   'Range': req.headers.get('range') || '',
                 },
                 signal: controller.signal,

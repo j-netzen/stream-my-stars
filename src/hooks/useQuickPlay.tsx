@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
+import { prepareStreamUrl } from "@/lib/streamUtils";
 import { toast } from "sonner";
 
 export interface StreamQualityInfo {
@@ -23,24 +24,24 @@ export function useQuickPlay() {
   // Get streamable URL from Real-Debrid
   const getStreamableUrl = async (fileId: string, downloadUrl: string): Promise<string> => {
     if (!fileId || fileId.length < 5) {
-      return downloadUrl;
+      return prepareStreamUrl(downloadUrl);
     }
 
     try {
       const streamingLinks = await getStreamingLinks(fileId);
       
       if (streamingLinks?.streaming_not_supported) {
-        return downloadUrl;
+        return prepareStreamUrl(downloadUrl);
       }
       
       if (!streamingLinks || typeof streamingLinks !== 'object') {
-        return downloadUrl;
+        return prepareStreamUrl(downloadUrl);
       }
       
       const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
       for (const quality of qualityOrder) {
         if (streamingLinks[quality]?.full) {
-          return streamingLinks[quality].full;
+          return prepareStreamUrl(streamingLinks[quality].full);
         }
       }
       
@@ -48,13 +49,13 @@ export function useQuickPlay() {
       if (availableQualities.length > 0) {
         const firstQuality = availableQualities[0];
         if (streamingLinks[firstQuality]?.full) {
-          return streamingLinks[firstQuality].full;
+          return prepareStreamUrl(streamingLinks[firstQuality].full);
         }
       }
       
-      return downloadUrl;
+      return prepareStreamUrl(downloadUrl);
     } catch {
-      return downloadUrl;
+      return prepareStreamUrl(downloadUrl);
     }
   };
 
@@ -143,7 +144,7 @@ export function useQuickPlay() {
 
     // Direct RD link
     if (isDirectRdLink(stream.url)) {
-      return { url: stream.url, qualityInfo };
+      return { url: prepareStreamUrl(stream.url), qualityInfo };
     }
 
     // Magnet link
