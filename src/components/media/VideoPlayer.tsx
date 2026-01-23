@@ -8,7 +8,7 @@ import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { useSmartBuffer, BufferState } from "@/hooks/useSmartBuffer";
-import { prepareStreamUrl, proxyFragmentUrl, CORS_PROXY_URL, isProxiedUrl, extractProviderDomain } from "@/lib/streamUtils";
+import { prepareStreamUrl, proxyFragmentUrl, forceHttps, isProxiedUrl, extractProviderDomain } from "@/lib/streamUtils";
 
 interface Media {
   id: string;
@@ -247,7 +247,7 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     return null;
   }, []);
 
-  // HLS.js initialization and error handling with CORS proxy support
+  // HLS.js initialization and error handling with optional CORS proxy support
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !src) return;
@@ -259,26 +259,28 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
     }
 
     const isHlsStream = src.includes('.m3u8') || src.includes('m3u8');
+    const useCorsProxy = settings.useCorsProxy;
     
-    // Prepare the stream URL with CORS proxy
-    const proxiedSrc = prepareStreamUrl(src, true);
-    console.log('[VideoPlayer] Prepared stream URL:', { original: src, proxied: proxiedSrc });
+    // Prepare the stream URL - use CORS proxy if enabled
+    const preparedSrc = useCorsProxy ? prepareStreamUrl(src, true) : forceHttps(src);
+    console.log('[VideoPlayer] Prepared stream URL:', { original: src, prepared: preparedSrc, useCorsProxy });
 
     // Handle HLS streams
     if (isHlsStream && Hls.isSupported()) {
-      console.log('[VideoPlayer] Initializing HLS.js with CORS proxy for:', proxiedSrc);
+      console.log('[VideoPlayer] Initializing HLS.js for:', preparedSrc, useCorsProxy ? '(proxied)' : '(direct)');
       
-      // Extract original provider domain for Referer header simulation
-      const providerDomain = extractProviderDomain(src);
-      
-      const hls = new Hls({
+      // Configure HLS options
+      const hlsConfig: Partial<Hls['config']> = {
         enableWorker: true,
         lowLatencyMode: true,
         maxBufferLength: 30,
         maxMaxBufferLength: 120,
         startLevel: -1, // Auto quality selection
-        // Configure xhrSetup to proxy all fragment requests
-        xhrSetup: function(xhr, url) {
+      };
+      
+      // Only add xhrSetup for CORS proxy mode
+      if (useCorsProxy) {
+        hlsConfig.xhrSetup = function(xhr, url) {
           // Proxy the fragment URL if not already proxied
           const proxiedUrl = isProxiedUrl(url) ? url : proxyFragmentUrl(url);
           
@@ -289,11 +291,13 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
           xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
           
           console.log('[VideoPlayer] HLS fragment request proxied:', { original: url, proxied: proxiedUrl });
-        },
-      });
+        };
+      }
+      
+      const hls = new Hls(hlsConfig as any);
 
       hlsRef.current = hls;
-      hls.loadSource(proxiedSrc);
+      hls.loadSource(preparedSrc);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -352,17 +356,17 @@ export function VideoPlayer({ media, onClose, streamQuality, onPlaybackError }: 
         hlsRef.current = null;
       };
     } 
-    // Native HLS support (Safari/iOS) - use proxied URL
+    // Native HLS support (Safari/iOS)
     else if (isHlsStream && video.canPlayType('application/vnd.apple.mpegurl')) {
-      console.log('[VideoPlayer] Using native HLS support with proxied URL');
-      video.src = proxiedSrc;
+      console.log('[VideoPlayer] Using native HLS support');
+      video.src = preparedSrc;
     }
-    // Non-HLS streams (MP4, MKV, etc.) - use proxied URL
+    // Non-HLS streams (MP4, MKV, etc.)
     else {
-      console.log('[VideoPlayer] Using direct source with proxy:', proxiedSrc);
-      video.src = proxiedSrc;
+      console.log('[VideoPlayer] Using direct source:', preparedSrc);
+      video.src = preparedSrc;
     }
-  }, [src, switchToHttps, onPlaybackError]);
+  }, [src, switchToHttps, onPlaybackError, settings.useCorsProxy]);
 
   // Handle fullscreen changes - sync custom state with native
   useEffect(() => {

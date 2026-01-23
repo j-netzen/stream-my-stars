@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2 } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2, Shield } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getDebugLogs, clearDebugLogs, formatLogTime, getErrorTypeInfo, StreamDebugEntry } from "@/lib/streamDebugLog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -345,6 +345,37 @@ export default function SettingsPage() {
               id="fps-mode"
               checked={!playbackSettings.limitFps30}
               onCheckedChange={(checked) => updatePlaybackSetting('limitFps30', !checked)}
+              className={isTVMode ? "scale-125" : ""}
+            />
+          </div>
+
+          {/* CORS Proxy Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="cors-proxy" className={cn("font-medium", isTVMode && "text-lg")}>
+                  Use CORS Proxy
+                </Label>
+                <Badge 
+                  variant={playbackSettings.useCorsProxy ? "default" : "secondary"}
+                  className={cn(
+                    "text-xs",
+                    playbackSettings.useCorsProxy && "bg-green-500/20 text-green-500 border-green-500/30"
+                  )}
+                >
+                  {playbackSettings.useCorsProxy ? "Enabled" : "Off"}
+                </Badge>
+              </div>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                {playbackSettings.useCorsProxy 
+                  ? "Routes streams through a proxy to bypass CORS/copyright restrictions" 
+                  : "Direct stream access without proxy (may fail on some providers)"}
+              </p>
+            </div>
+            <Switch
+              id="cors-proxy"
+              checked={playbackSettings.useCorsProxy}
+              onCheckedChange={(checked) => updatePlaybackSetting('useCorsProxy', checked)}
               className={isTVMode ? "scale-125" : ""}
             />
           </div>
@@ -1009,17 +1040,17 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Stream Debug Logs */}
+      {/* Network Debug Logs */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
                 <Bug className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                Stream Debug Logs
+                Network Debug Logs
               </CardTitle>
               <CardDescription className={isTVMode ? "text-base" : ""}>
-                Recent stream failures for debugging ({debugLogs.length} entries)
+                Recent network/stream failures for debugging ({debugLogs.length} entries)
               </CardDescription>
             </div>
             <div className="flex gap-2">
