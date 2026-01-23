@@ -3,6 +3,7 @@ import { Media } from "@/hooks/useMedia";
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
 import { prepareStreamUrl } from "@/lib/streamUtils";
+import { addDebugLog, classifyError } from "@/lib/streamDebugLog";
 import { toast } from "sonner";
 
 export interface StreamQualityInfo {
@@ -337,6 +338,18 @@ export function useQuickPlay() {
             err.message?.includes("copyright") ||
             err.message?.includes("unavailable") ||
             err.message?.includes("Not cached");
+          
+          // Log to debug system
+          const { type: errorType, message: errorMessage } = classifyError(err);
+          addDebugLog({
+            mediaTitle: media.title,
+            streamTitle: stream.title || stream.name,
+            streamUrl: stream.url?.substring(0, 100),
+            errorType,
+            errorMessage,
+            errorDetails: `Quick Play attempt ${index + 1}/${allStreams.length}`,
+            action: index + 1 < allStreams.length ? 'retry' : 'failed',
+          });
           
           if (isStreamError) {
             console.log(`Quick Play: Stream ${index + 1} blocked/unavailable, trying next...`);
