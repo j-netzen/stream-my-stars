@@ -9,8 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2 } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2 } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
+import { getDebugLogs, clearDebugLogs, formatLogTime, getErrorTypeInfo, StreamDebugEntry } from "@/lib/streamDebugLog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -37,6 +39,17 @@ export default function SettingsPage() {
   const [torrentioAddonUrl, setTorrentioAddonUrl] = useState(() => 
     localStorage.getItem("torrentioAddonUrl") || ""
   );
+  const [debugLogs, setDebugLogs] = useState<StreamDebugEntry[]>(() => getDebugLogs());
+  
+  const refreshDebugLogs = () => {
+    setDebugLogs(getDebugLogs());
+  };
+  
+  const handleClearDebugLogs = () => {
+    clearDebugLogs();
+    setDebugLogs([]);
+    toast.success("Debug logs cleared");
+  };
 
   const fetchRealDebridData = async () => {
     setIsLoadingRd(true);
@@ -993,6 +1006,96 @@ export default function SettingsPage() {
               {import.meta.env.MODE}
             </Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Stream Debug Logs */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+                <Bug className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+                Stream Debug Logs
+              </CardTitle>
+              <CardDescription className={isTVMode ? "text-base" : ""}>
+                Recent stream failures for debugging ({debugLogs.length} entries)
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refreshDebugLogs}
+                className="gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Refresh
+              </Button>
+              {debugLogs.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleClearDebugLogs}
+                  className="gap-1 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {debugLogs.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-4">
+              No stream failures logged yet. Errors will appear here when streams fail to load.
+            </p>
+          ) : (
+            <ScrollArea className="h-[200px] rounded-md border border-border/50 bg-muted/30">
+              <div className="p-3 space-y-2">
+                {debugLogs.map((log) => {
+                  const typeInfo = getErrorTypeInfo(log.errorType);
+                  return (
+                    <div 
+                      key={log.id} 
+                      className="p-2 rounded-lg bg-background/60 border border-border/30 text-sm space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className={cn("px-1.5 py-0.5 rounded text-xs font-medium shrink-0", typeInfo.color)}>
+                            {typeInfo.label}
+                          </span>
+                          <span className="font-medium truncate">{log.mediaTitle}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {formatLogTime(log.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {log.errorMessage}
+                      </p>
+                      {log.streamTitle && (
+                        <p className="text-xs text-muted-foreground/70 truncate">
+                          Stream: {log.streamTitle}
+                        </p>
+                      )}
+                      {log.errorDetails && (
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                            Details
+                          </summary>
+                          <pre className="mt-1 p-2 bg-muted/50 rounded text-[10px] overflow-x-auto whitespace-pre-wrap break-all">
+                            {log.errorDetails}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
         </CardContent>
       </Card>
 

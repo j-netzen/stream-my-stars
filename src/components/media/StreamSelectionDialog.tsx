@@ -12,6 +12,7 @@ import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, i
 import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
 import { getImageUrl } from "@/lib/tmdb";
 import { prepareStreamUrl } from "@/lib/streamUtils";
+import { addDebugLog, classifyError } from "@/lib/streamDebugLog";
 import {
   Dialog,
   DialogContent,
@@ -913,6 +914,18 @@ export function StreamSelectionDialog({
     } catch (err: any) {
       console.error("Stream selection error:", err);
       
+      // Log to debug system
+      const { type: errorType, message: errorMessage } = classifyError(err);
+      addDebugLog({
+        mediaTitle: media.title,
+        streamTitle: stream.title || stream.name,
+        streamUrl: stream.url?.substring(0, 100),
+        errorType,
+        errorMessage,
+        errorDetails: err.stack || JSON.stringify(err, null, 2),
+        action: 'retry',
+      });
+      
       // Mark this stream as failed
       setFailedStreams(prev => {
         const newSet = new Set(prev);
@@ -945,6 +958,16 @@ export function StreamSelectionDialog({
           return;
         }
       }
+      
+      // Update log action to 'failed' since we couldn't recover
+      addDebugLog({
+        mediaTitle: media.title,
+        streamTitle: stream.title || stream.name,
+        streamUrl: stream.url?.substring(0, 100),
+        errorType,
+        errorMessage: "All streams exhausted: " + errorMessage,
+        action: 'failed',
+      });
       
       // No more streams or non-recoverable error
       toast.error(err.message || "Failed to process stream");
