@@ -11,6 +11,9 @@ export interface PlaybackSettings {
   // Stream filtering
   onlyShowCachedStreams: boolean; // hide uncached streams in selection dialog
   
+  // Network settings
+  useCorsProxy: boolean; // route streams through CORS proxy to bypass restrictions
+  
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
   isSlowConnection: boolean;
@@ -21,6 +24,7 @@ const DEFAULT_SETTINGS: PlaybackSettings = {
   autoQualityDowngrade: true,
   limitFps30: false,
   onlyShowCachedStreams: false,
+  useCorsProxy: true, // enabled by default
   connectionSpeedMbps: null,
   isSlowConnection: false,
 };
