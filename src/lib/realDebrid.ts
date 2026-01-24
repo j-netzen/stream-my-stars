@@ -110,19 +110,26 @@ export interface RealDebridMagnetResponse {
 }
 
 /**
- * Check if an error indicates an expired/invalid token
+ * Check if an error indicates an expired/invalid auth token
+ * Note: bad_token with error_code 8 is FILE unavailable, not auth error
  */
 function isTokenError(error: unknown): boolean {
   if (!error) return false;
-  const message = String(error);
+  const message = String(error).toLowerCase();
+  
+  // Check if it's actually a file unavailable error (not auth)
+  if (message.includes("error_code: 8") || message.includes("error_code\":8") || message.includes("no longer available")) {
+    return false;
+  }
+  
   return (
     message.includes("401") ||
-    message.includes("Bad Token") ||
+    message.includes("bad token") ||
     message.includes("bad_token") ||
     message.includes("expired") ||
     message.includes("invalid_grant") ||
-    message.includes("Unauthorized")
-  );
+    message.includes("unauthorized")
+  ) && !message.includes("410") && !message.includes("no longer available");
 }
 
 /**
@@ -131,6 +138,13 @@ function isTokenError(error: unknown): boolean {
  */
 function isSkipStreamError(error: unknown): boolean {
   if (!error) return false;
+  
+  // Check for 410 status code (server signals "try next stream")
+  const errorObj = error as { status?: number; code?: number; message?: string; skipStream?: boolean };
+  if (errorObj.status === 410 || errorObj.skipStream === true) {
+    return true;
+  }
+  
   const message = String(error).toLowerCase();
   return (
     message.includes("copyright") ||
@@ -138,8 +152,12 @@ function isSkipStreamError(error: unknown): boolean {
     message.includes("unavailable") ||
     message.includes("dmca") ||
     message.includes("451") ||
+    message.includes("410") ||
     message.includes("file_unavailable") ||
-    message.includes("hoster_unavailable")
+    message.includes("hoster_unavailable") ||
+    message.includes("bad_token") ||
+    message.includes("no longer available") ||
+    message.includes("try a different stream")
   );
 }
 
@@ -268,8 +286,17 @@ async function processRealDebridResponse(
     const errorString = String(responseData.error || "");
     const details = responseData.details as Record<string, unknown> | undefined;
     const errorCode = details?.error_code as number | undefined;
+    const skipStream = responseData.skipStream === true;
+    const httpStatus = responseData.httpStatus as number | undefined;
     
-    // Check for token errors in response
+    // Check for skip-stream errors first (these should NOT trigger token refresh)
+    // Error codes: 35 = infringing_file, 7 = hoster_unavailable, 8 = file_unavailable/bad_token
+    if (skipStream || httpStatus === 410 || (errorCode && [35, 7, 8].includes(errorCode)) || isSkipStreamError(errorString)) {
+      console.log("Stream unavailable (file/hoster issue), triggering fallback");
+      throw new StreamUnavailableError(errorString || "Stream unavailable - trying next");
+    }
+    
+    // Check for token errors in response (only if not a skip-stream error)
     if (isTokenError(errorString) && retryCount === 0) {
       console.log("Token error in response, attempting refresh...");
       const newToken = await getValidAccessTokenWithRefresh();
@@ -279,16 +306,9 @@ async function processRealDebridResponse(
       throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
     }
     
-    // Check for skip-stream errors (copyright DMCA, file unavailable, etc.)
-    // Error codes: 35 = infringing_file, 7 = hoster_unavailable, 8 = file_unavailable
-    if (isSkipStreamError(errorString) || (errorCode && [35, 7, 8].includes(errorCode))) {
-      console.log("Stream unavailable (copyright/DMCA), triggering fallback");
-      throw new StreamUnavailableError("Stream blocked - trying next");
-    }
-    
     // Check for service unavailable in data error
-    const httpStatus = String(responseData.httpStatus || "");
-    if (errorCode === 25 || httpStatus.includes("503") || errorString.includes("overloaded")) {
+    const httpStatusStr = String(responseData.httpStatus || "");
+    if (errorCode === 25 || httpStatusStr.includes("503") || errorString.includes("overloaded")) {
       const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
       setRealDebridServiceUnavailable(serviceError);
       throw new Error(serviceError);
