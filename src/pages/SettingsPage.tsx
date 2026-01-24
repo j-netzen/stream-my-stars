@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2, Shield } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2, Shield, Play, Clapperboard } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getDebugLogs, clearDebugLogs, formatLogTime, getErrorTypeInfo, StreamDebugEntry } from "@/lib/streamDebugLog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -279,10 +279,62 @@ export default function SettingsPage() {
             Video Playback
           </CardTitle>
           <CardDescription className={isTVMode ? "text-base" : ""}>
-            Configure video playback and buffering settings
+          Configure video playback and buffering settings
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Player Engine Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label className={cn("font-medium", isTVMode && "text-lg")}>
+                Player Engine
+              </Label>
+              <Badge 
+                variant="secondary"
+                className="text-xs"
+              >
+                {playbackSettings.playerEngine === 'basic' ? 'Basic (Recommended)' : 'Video.js'}
+              </Badge>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant={playbackSettings.playerEngine === 'basic' ? "default" : "outline"}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2",
+                  playbackSettings.playerEngine === 'basic' && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                  isTVMode && "h-14 text-lg"
+                )}
+                onClick={() => {
+                  updatePlaybackSetting('playerEngine', 'basic');
+                  toast.success("Switched to Basic player");
+                }}
+              >
+                <Play className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+                Basic
+              </Button>
+              <Button
+                variant={playbackSettings.playerEngine === 'videojs' ? "default" : "outline"}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2",
+                  playbackSettings.playerEngine === 'videojs' && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                  isTVMode && "h-14 text-lg"
+                )}
+                onClick={() => {
+                  updatePlaybackSetting('playerEngine', 'videojs');
+                  toast.success("Switched to Video.js player");
+                }}
+              >
+                <Clapperboard className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+                Video.js
+              </Button>
+            </div>
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+              {playbackSettings.playerEngine === 'basic' 
+                ? "Lightweight HTML5 player with hls.js. More reliable for most streams." 
+                : "Full-featured Video.js player with VHS. Better for complex adaptive streams."}
+            </p>
+          </div>
+
           {/* Only Show Cached Streams Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -375,6 +427,39 @@ export default function SettingsPage() {
               className={isTVMode ? "scale-125" : ""}
             />
           </div>
+
+          {/* Smart Proxy Toggle (only shown when CORS proxy is enabled) */}
+          {playbackSettings.useCorsProxy && (
+            <div className="flex items-center justify-between pl-4 border-l-2 border-primary/30">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="smart-proxy" className={cn("font-medium", isTVMode && "text-lg")}>
+                    Smart Proxy Detection
+                  </Label>
+                  <Badge 
+                    variant={playbackSettings.useSmartProxy ? "default" : "secondary"}
+                    className={cn(
+                      "text-xs",
+                      playbackSettings.useSmartProxy && "bg-blue-500/20 text-blue-500 border-blue-500/30"
+                    )}
+                  >
+                    {playbackSettings.useSmartProxy ? "Auto" : "Always Proxy"}
+                  </Badge>
+                </div>
+                <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                  {playbackSettings.useSmartProxy 
+                    ? "Skips proxy for Real-Debrid (has CORS headers). Uses proxy for other sources." 
+                    : "Always routes through CORS proxy regardless of source."}
+                </p>
+              </div>
+              <Switch
+                id="smart-proxy"
+                checked={playbackSettings.useSmartProxy ?? true}
+                onCheckedChange={(checked) => updatePlaybackSetting('useSmartProxy', checked)}
+                className={isTVMode ? "scale-125" : ""}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

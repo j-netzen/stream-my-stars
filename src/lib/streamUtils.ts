@@ -11,6 +11,65 @@
 export const CORS_PROXY_URL = 'https://corsproxy.io/?url=';
 
 /**
+ * Stream source types for smart proxy decision
+ */
+export type StreamSourceType = 'real-debrid' | 'hls' | 'direct' | 'unknown';
+
+/**
+ * Debug info for stream URL analysis
+ */
+export interface StreamDebugInfo {
+  originalUrl: string;
+  preparedUrl: string;
+  sourceType: StreamSourceType;
+  isHls: boolean;
+  usedCorsProxy: boolean;
+  usedBackendProxy: boolean;
+  playerMode: 'native-hls' | 'hls.js' | 'direct';
+}
+
+/**
+ * Detect the source type of a stream URL
+ */
+export function detectStreamSourceType(url: string): StreamSourceType {
+  if (!url) return 'unknown';
+  
+  const lowerUrl = url.toLowerCase();
+  
+  // Real-Debrid URLs
+  if (
+    lowerUrl.includes('real-debrid.com') || 
+    lowerUrl.includes('rdb.so') ||
+    lowerUrl.includes('rd.') ||
+    lowerUrl.includes('/d/') && lowerUrl.includes('debrid')
+  ) {
+    return 'real-debrid';
+  }
+  
+  // HLS manifests
+  if (lowerUrl.includes('.m3u8') || lowerUrl.includes('m3u8')) {
+    return 'hls';
+  }
+  
+  // Direct file URLs (mp4, mkv, etc.)
+  const directExtensions = ['.mp4', '.mkv', '.avi', '.webm', '.mov', '.ts'];
+  if (directExtensions.some(ext => lowerUrl.includes(ext))) {
+    return 'direct';
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Check if URL is an HLS manifest
+ */
+export function isHlsUrl(url: string): boolean {
+  if (!url) return false;
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.includes('.m3u8') || lowerUrl.includes('m3u8');
+}
+
+/**
  * Force HTTPS on stream URLs to avoid mixed-content blocks
  * Returns the HTTPS version of the URL, or original if already HTTPS
  */
@@ -52,6 +111,37 @@ export function isHttpUrl(url: string): boolean {
  */
 export function isProxiedUrl(url: string): boolean {
   return url?.includes('corsproxy.io') ?? false;
+}
+
+/**
+ * Check if URL needs CORS proxy based on source type
+ * Real-Debrid URLs typically don't need proxy as they have proper CORS headers
+ */
+export function shouldUseCorsProxy(url: string, forceCorsProxy: boolean, useSmartProxy: boolean): boolean {
+  if (!url) return false;
+  
+  // If CORS proxy is disabled entirely
+  if (!forceCorsProxy) return false;
+  
+  // If smart proxy is disabled, always use CORS proxy when enabled
+  if (!useSmartProxy) return true;
+  
+  const sourceType = detectStreamSourceType(url);
+  
+  // Smart proxy decisions:
+  // - Real-Debrid: No proxy needed (they set proper CORS headers)
+  // - HLS: Usually needs proxy for fragment requests
+  // - Direct: Often needs proxy for cross-origin
+  switch (sourceType) {
+    case 'real-debrid':
+      return false; // RD has proper CORS
+    case 'hls':
+      return true; // HLS typically needs proxy
+    case 'direct':
+      return true; // Direct URLs often need proxy
+    default:
+      return true; // Unknown sources get proxy
+  }
 }
 
 /**
@@ -130,7 +220,76 @@ export function getStreamFetchHeaders(url: string): Record<string, string> {
 }
 
 /**
- * Prepare a stream URL for playback
+ * Mask a URL for debug display (show domain and partial path)
+ */
+export function maskUrlForDebug(url: string): string {
+  if (!url) return '';
+  try {
+    const actualUrl = unwrapProxiedUrl(url);
+    const urlObj = new URL(actualUrl);
+    const pathParts = urlObj.pathname.split('/').filter(Boolean);
+    const maskedPath = pathParts.length > 2 
+      ? `/${pathParts[0]}/.../${pathParts[pathParts.length - 1]}`
+      : urlObj.pathname;
+    return `${urlObj.host}${maskedPath}`;
+  } catch {
+    return url.substring(0, 50) + '...';
+  }
+}
+
+/**
+ * Prepare a stream URL for playback with smart proxy detection
+ * Returns both the prepared URL and debug info
+ */
+export function prepareStreamUrlWithDebug(
+  url: string, 
+  useCorsProxy: boolean, 
+  useSmartProxy: boolean
+): StreamDebugInfo {
+  if (!url) {
+    return {
+      originalUrl: '',
+      preparedUrl: '',
+      sourceType: 'unknown',
+      isHls: false,
+      usedCorsProxy: false,
+      usedBackendProxy: false,
+      playerMode: 'direct',
+    };
+  }
+  
+  const sourceType = detectStreamSourceType(url);
+  const isHls = isHlsUrl(url);
+  const shouldProxy = shouldUseCorsProxy(url, useCorsProxy, useSmartProxy);
+  
+  // Force HTTPS first
+  const httpsUrl = forceHttps(url);
+  
+  // Apply proxy if needed
+  const preparedUrl = shouldProxy ? wrapWithCorsProxy(httpsUrl) : httpsUrl;
+  
+  // Determine player mode
+  let playerMode: StreamDebugInfo['playerMode'] = 'direct';
+  if (isHls) {
+    // Check if browser has native HLS support (Safari)
+    const video = document.createElement('video');
+    const canPlayNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
+    playerMode = canPlayNativeHls ? 'native-hls' : 'hls.js';
+  }
+  
+  return {
+    originalUrl: url,
+    preparedUrl,
+    sourceType,
+    isHls,
+    usedCorsProxy: shouldProxy,
+    usedBackendProxy: false, // Future: integrate with backend proxy
+    playerMode,
+  };
+}
+
+/**
+ * Prepare a stream URL for playback (simple version)
  * - Forces HTTPS
  * - Wraps with CORS proxy for bypass
  * - Validates URL format
