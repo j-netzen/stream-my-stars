@@ -1077,32 +1077,37 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 {debugLogs.map((log, index) => {
                   const errorInfo = getErrorTypeInfo(log.errorType);
+                  const isFailed = log.action === 'failed';
                   return (
                     <div 
-                      key={index} 
+                      key={log.id || index} 
                       className={cn(
                         "p-3 rounded-lg border",
-                        log.success ? "bg-green-500/10 border-green-500/20" : "bg-destructive/10 border-destructive/20"
+                        isFailed ? "bg-destructive/10 border-destructive/20" : "bg-yellow-500/10 border-yellow-500/20"
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <Badge variant={log.success ? "default" : "destructive"} className="text-xs">
-                              {log.success ? "Success" : errorInfo.label}
+                            <Badge className={cn("text-xs", errorInfo.color)}>
+                              {errorInfo.label}
+                            </Badge>
+                            <Badge variant={isFailed ? "destructive" : "outline"} className="text-xs">
+                              {log.action === 'skipped' ? 'Skipped' : log.action === 'retry' ? 'Retried' : 'Failed'}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {formatLogTime(log.timestamp)}
                             </span>
                           </div>
-                          <p className={cn("font-mono text-xs truncate", log.success ? "text-green-500" : "text-destructive")}>
-                            {log.url}
-                          </p>
-                          {log.error && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                              {log.error}
+                          <p className="font-medium text-sm truncate">{log.mediaTitle}</p>
+                          {log.streamTitle && (
+                            <p className="font-mono text-xs truncate text-muted-foreground">
+                              {log.streamTitle}
                             </p>
                           )}
+                          <p className="text-xs text-destructive mt-1 line-clamp-2">
+                            {log.errorMessage}
+                          </p>
                         </div>
                       </div>
                     </div>

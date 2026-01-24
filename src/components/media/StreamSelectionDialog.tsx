@@ -2,14 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Media, useMedia } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
 import { useBrowseHere } from "@/hooks/useBrowseHere";
-import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
-import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
+import { useTorBoxStatus } from "@/hooks/useTorBoxStatus";
 import { usePredictivePrefetch } from "@/hooks/usePredictivePrefetch";
 import { useQuickPlay } from "@/hooks/useQuickPlay";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
-import { unrestrictLink, addMagnetAndWait, getStreamingLinks, listDownloads, RealDebridUnrestrictedLink, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
+import { addMagnetAndWait, listDownloads, getStreamableUrl as getTorBoxStreamUrl, TorBoxTorrent, StreamUnavailableError, checkInstantAvailability, isHashCached, findLargestVideoFile } from "@/lib/torbox";
 import { getImageUrl } from "@/lib/tmdb";
 import { prepareStreamUrl } from "@/lib/streamUtils";
 import { addDebugLog, classifyError } from "@/lib/streamDebugLog";
@@ -55,8 +54,7 @@ export function StreamSelectionDialog({
   const { updateMedia } = useMedia();
   const { isTVMode } = useTVMode();
   const { isBrowseHere } = useBrowseHere();
-  const { status: rdStatus, error: rdError, refresh: refreshRdStatus } = useRealDebridStatus();
-  const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
+  const { status: torBoxStatus, error: torBoxError, refresh: refreshTorBoxStatus } = useTorBoxStatus();
   const { getCachedStreams, prefetchStreams } = usePredictivePrefetch();
   const { quickPlay, isQuickPlaying } = useQuickPlay();
   const { settings: playbackSettings, updateSetting } = usePlaybackSettings();
@@ -163,8 +161,8 @@ export function StreamSelectionDialog({
     [centerElementInScrollVertical, streamsScrollRef],
   );
 
-  // Fail-Safe state
-  const [myDownloads, setMyDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
+  // Downloads state (TorBox torrents)
+  const [myDownloads, setMyDownloads] = useState<TorBoxTorrent[]>([]);
   const [isLoadingDownloads, setIsLoadingDownloads] = useState(false);
   const [downloadsError, setDownloadsError] = useState<string | null>(null);
   const [downloadSearchQuery, setDownloadSearchQuery] = useState("");
@@ -221,9 +219,9 @@ export function StreamSelectionDialog({
           setCacheCheckFailed(true);
           setCachedHashes(new Set());
         } else {
-          const cached = new Set(hashes.filter(hash => isHashCached(hash, availabilityData)));
+        const cached = new Set(hashes.filter(hash => isHashCached(hash, availabilityData)));
           setCachedHashes(cached);
-          console.log(`[StreamDialog] ${cached.size}/${hashes.length} streams cached on RD`);
+          console.log(`[StreamDialog] ${cached.size}/${hashes.length} streams cached on TorBox`);
         }
       } catch (err) {
         console.warn("[StreamDialog] Cache check failed:", err);
@@ -331,13 +329,13 @@ export function StreamSelectionDialog({
   const filteredDownloads = myDownloads.filter((download) => {
     if (!media) return true;
     
-    const filename = download.filename.toLowerCase();
+    const filename = download.name.toLowerCase();
     const mediaTitle = media.title.toLowerCase();
     
     const normalizeForMatch = (str: string) => 
       str.replace(/[^\w\s]/g, '').replace(/\s+/g, '.').toLowerCase();
     
-    const normalizedFilename = normalizeForMatch(download.filename);
+    const normalizedFilename = normalizeForMatch(download.name);
     const normalizedTitle = normalizeForMatch(media.title);
     
     const titleWords = media.title.toLowerCase().split(/\s+/);
@@ -354,7 +352,7 @@ export function StreamSelectionDialog({
         new RegExp(`season\\s*${selectedSeason}.*episode\\s*${selectedEpisode}`, 'i'),
       ];
       
-      return episodePatterns.some(pattern => pattern.test(download.filename));
+      return episodePatterns.some(pattern => pattern.test(download.name));
     }
     
     if (downloadSearchQuery.trim()) {
@@ -519,7 +517,7 @@ export function StreamSelectionDialog({
   };
 
   // Keyboard navigation for downloads - vertical scrolling
-  const handleDownloadKeyDown = (e: React.KeyboardEvent, index: number, download: RealDebridUnrestrictedLink) => {
+  const handleDownloadKeyDown = (e: React.KeyboardEvent, index: number, download: TorBoxTorrent) => {
     if (isResolving) return;
 
     switch (e.key) {
@@ -593,11 +591,14 @@ export function StreamSelectionDialog({
     
     try {
       const downloads = await listDownloads();
-      const videoDownloads = downloads.filter(d => 
-        d.streamable === 1 && 
-        (d.mimeType?.startsWith('video/') || 
-         d.filename?.match(/\.(mp4|mkv|avi|m4v|webm)$/i))
-      );
+      // TorBox downloads are torrents that are ready (download_present = true)
+      const videoDownloads = downloads.filter(d => {
+        // Check if has video files
+        const hasVideoFiles = d.files?.some(f => 
+          f.name?.match(/\.(mp4|mkv|avi|m4v|webm)$/i)
+        );
+        return hasVideoFiles;
+      });
       setMyDownloads(videoDownloads);
     } catch (err: any) {
       console.error("Failed to load downloads:", err);
@@ -620,15 +621,18 @@ export function StreamSelectionDialog({
     
     try {
       const downloads = await listDownloads();
-      const videoDownloads = downloads.filter(d => 
-        d.streamable === 1 && 
-        (d.mimeType?.startsWith('video/') || 
-         d.filename?.match(/\.(mp4|mkv|avi|m4v|webm)$/i))
-      );
+      // TorBox downloads are torrents that are ready (download_present = true)
+      const videoDownloads = downloads.filter(d => {
+        // Check if has video files
+        const hasVideoFiles = d.files?.some(f => 
+          f.name?.match(/\.(mp4|mkv|avi|m4v|webm)$/i)
+        );
+        return hasVideoFiles;
+      });
       setMyDownloads(videoDownloads);
     } catch (err: any) {
       console.error("Failed to load downloads:", err);
-      setDownloadsError(err.message || "Failed to load Real-Debrid downloads");
+      setDownloadsError(err.message || "Failed to load TorBox downloads");
     }
     
     setIsLoadingDownloads(false);
@@ -694,53 +698,17 @@ export function StreamSelectionDialog({
     setIsSearching(false);
   };
 
-  const getStreamableUrl = async (fileId: string, downloadUrl: string): Promise<string> => {
-    if (!fileId || fileId.length < 5) {
-      console.log("Invalid file ID, using direct download URL");
-      return downloadUrl;
-    }
-
+  // For TorBox, we get CDN streaming URLs directly via getStreamableUrl from lib/torbox
+  const getStreamableUrlForTorBox = async (torrentId: number, fileId: number): Promise<string> => {
     try {
       setResolveStatus("Getting streaming URL...");
-      const streamingLinks = await getStreamingLinks(fileId);
-      
-      if (streamingLinks?.streaming_not_supported) {
-        console.log("Streaming not supported for this file, using download URL");
-        return prepareStreamUrl(downloadUrl);
-      }
-      
-      if (!streamingLinks || typeof streamingLinks !== 'object') {
-        console.log("No valid streaming response, using download URL");
-        return prepareStreamUrl(downloadUrl);
-      }
-      
-      const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
-      for (const quality of qualityOrder) {
-        if (streamingLinks[quality]?.full) {
-          console.log(`Using ${quality} streaming link`);
-          return prepareStreamUrl(streamingLinks[quality].full);
-        }
-      }
-      
-      const availableQualities = Object.keys(streamingLinks).filter(k => k !== 'streaming_not_supported');
-      if (availableQualities.length > 0) {
-        const firstQuality = availableQualities[0];
-        if (streamingLinks[firstQuality]?.full) {
-          console.log(`Using ${firstQuality} streaming link`);
-          return prepareStreamUrl(streamingLinks[firstQuality].full);
-        }
-      }
-      
-      console.log("No streaming links available, using download URL");
-      return prepareStreamUrl(downloadUrl);
+      const cdnUrl = await getTorBoxStreamUrl(torrentId, fileId);
+      console.log("Got TorBox CDN URL");
+      return prepareStreamUrl(cdnUrl);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage.includes("wrong_parameter") || errorMessage.includes("invalid")) {
-        console.log("File doesn't support transcoding, using direct download URL");
-      } else {
-        console.warn("Could not get streaming links, using download URL:", errorMessage);
-      }
-      return prepareStreamUrl(downloadUrl);
+      console.warn("Could not get TorBox streaming URL:", errorMessage);
+      throw err;
     }
   };
 
@@ -789,119 +757,33 @@ export function StreamSelectionDialog({
     };
     
     try {
-      if (isDirectRdLink(stream.url)) {
-        const preparedUrl = prepareStreamUrl(stream.url);
-        setResolveProgress(100);
-        setResolveStatus("Ready!");
-        setTimeout(() => {
-          onOpenChange(false);
-          onStreamSelected(media, preparedUrl, qualityInfo, createTryNextStream());
-        }, 300);
-        return;
+      // For TorBox, all streams from Torrentio need to be processed as magnets
+      // Extract magnet from stream URL
+      const magnetLink = extractMagnetFromTorrentioUrl(stream.url) || (isMagnetLink(stream.url) ? stream.url : null);
+      
+      if (!magnetLink) {
+        throw new Error("Could not extract magnet link from stream");
       }
       
-      if (isMagnetLink(stream.url)) {
-        setResolveStatus("Processing magnet...");
-        
-        const shouldAdd = await confirmAddToRealDebrid(stream.title || stream.name || "Unknown");
-        if (!shouldAdd) {
-          setIsResolving(false);
-          setResolvingStream(null);
-          setResolveProgress(0);
-          setResolveStatus("");
-          return;
-        }
-        
-        setResolveProgress(20);
-        
-        const result = await addMagnetAndWait(stream.url, (progress) => {
-          setResolveProgress(20 + Math.floor(progress * 0.6));
-          setResolveStatus(status);
-        });
-        
-        // Links are available once RD starts processing, even if not fully downloaded
-        if (result.links && result.links.length > 0) {
-          setResolveProgress(85);
-          setResolveStatus("Unrestricting link...");
-          
-          const videoLink = result.links.find((l: string) => 
-            /\.(mp4|mkv|avi|m4v|webm)$/i.test(l)
-          ) || result.links[0];
-          
-          const unrestricted = await unrestrictLink(videoLink);
-          
-          setResolveProgress(95);
-          const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
-          
-          setResolveProgress(100);
-          setResolveStatus("Ready!");
-          
-          setTimeout(() => {
-            onOpenChange(false);
-            onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
-          }, 300);
-        } else {
-          throw new Error("Not cached - trying next stream");
-        }
-        return;
+      setResolveStatus("Adding to TorBox...");
+      setResolveProgress(20);
+      
+      const result = await addMagnetAndWait(magnetLink, (progress) => {
+        setResolveProgress(20 + Math.floor(progress * 0.6));
+        setResolveStatus(`Processing: ${progress}%`);
+      });
+      
+      // Find the largest video file in the torrent
+      const videoFile = findLargestVideoFile(result);
+      
+      if (!videoFile) {
+        throw new Error("No video files found in torrent");
       }
       
-      // Handle Torrentio URL with embedded magnet
-      const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
-      if (magnetLink) {
-        setResolveStatus("Processing stream...");
-        
-        const shouldAdd = await confirmAddToRealDebrid(stream.title || stream.name || "Unknown");
-        if (!shouldAdd) {
-          setIsResolving(false);
-          setResolvingStream(null);
-          setResolveProgress(0);
-          setResolveStatus("");
-          return;
-        }
-        
-        setResolveProgress(20);
-        
-        const result = await addMagnetAndWait(magnetLink, (progress) => {
-          setResolveProgress(20 + Math.floor(progress * 0.6));
-          setResolveStatus(status);
-        });
-        
-        // Links are available once RD starts processing, even if not fully downloaded
-        if (result.links && result.links.length > 0) {
-          setResolveProgress(85);
-          setResolveStatus("Unrestricting link...");
-          
-          const videoLink = result.links.find((l: string) => 
-            /\.(mp4|mkv|avi|m4v|webm)$/i.test(l)
-          ) || result.links[0];
-          
-          const unrestricted = await unrestrictLink(videoLink);
-          
-          setResolveProgress(95);
-          const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
-          
-          setResolveProgress(100);
-          setResolveStatus("Ready!");
-          
-          setTimeout(() => {
-            onOpenChange(false);
-            onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
-          }, 300);
-        } else {
-          throw new Error("Not cached - trying next stream");
-        }
-        return;
-      }
+      setResolveProgress(85);
+      setResolveStatus("Getting stream URL...");
       
-      // Handle as HTTP URL
-      setResolveStatus("Unrestricting link...");
-      setResolveProgress(40);
-      
-      const unrestricted = await unrestrictLink(stream.url);
-      
-      setResolveProgress(90);
-      const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
+      const streamUrl = await getStreamableUrlForTorBox(result.id, videoFile.id);
       
       setResolveProgress(100);
       setResolveStatus("Ready!");
@@ -979,22 +861,32 @@ export function StreamSelectionDialog({
     }
   };
 
-  const handleDownloadSelect = async (download: RealDebridUnrestrictedLink) => {
+  const handleDownloadSelect = async (download: TorBoxTorrent) => {
     if (!media || isResolving) return;
     
     setIsResolving(true);
-    setResolvingStream(download.download);
     setResolveProgress(50);
     setResolveStatus("Getting stream URL...");
     
-    const quality = extractQuality(download.filename);
+    // Find the largest video file
+    const videoFile = findLargestVideoFile(download);
+    
+    if (!videoFile) {
+      toast.error("No video files found in this download");
+      setIsResolving(false);
+      return;
+    }
+    
+    setResolvingStream(String(download.id));
+    
+    const quality = extractQuality(download.name);
     const qualityInfo: StreamQualityInfo = {
       quality: quality || "Unknown",
-      size: formatFileSize(download.filesize),
+      size: formatFileSize(download.size),
     };
     
     try {
-      const streamUrl = await getStreamableUrl(download.id, download.download);
+      const streamUrl = await getStreamableUrlForTorBox(download.id, videoFile.id);
       
       setResolveProgress(100);
       setResolveStatus("Ready!");
@@ -1369,11 +1261,11 @@ export function StreamSelectionDialog({
               )}
             </div>
 
-            {/* Real-Debrid status indicator */}
-            {(rdStatus === "service_unavailable" || rdStatus === "error") && (
+            {/* TorBox status indicator */}
+            {(torBoxStatus === "service_unavailable" || torBoxStatus === "error") && (
               <div className="flex items-center gap-2 text-xs text-red-400">
                 <AlertCircle className="w-4 h-4" />
-                <span>RD unavailable</span>
+                <span>TorBox unavailable</span>
               </div>
             )}
           </div>
@@ -1762,8 +1654,8 @@ export function StreamSelectionDialog({
                       >
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           {filteredDownloads.map((download, index) => {
-                            const quality = extractQuality(download.filename);
-                            const isCurrentlyResolving = resolvingStream === download.download;
+                            const quality = extractQuality(download.name);
+                            const isCurrentlyResolving = resolvingStream === String(download.id);
                             const isFocused = downloadFocusedIndex === index;
                             
                             return (
@@ -1817,14 +1709,14 @@ export function StreamSelectionDialog({
 
                                 {/* Filename - truncated to 2 lines */}
                                 <p className="text-sm text-white/80 leading-tight mb-2 line-clamp-2 h-10">
-                                  {download.filename}
+                                  {download.name}
                                 </p>
 
                                 {/* File size */}
                                 <div className="flex items-center text-xs text-white/40">
                                   <span className="flex items-center gap-1">
                                     <HardDrive className="w-3.5 h-3.5" />
-                                    {formatFileSize(download.filesize)}
+                                    {formatFileSize(download.size)}
                                   </span>
                                 </div>
                               </button>
@@ -1856,7 +1748,6 @@ export function StreamSelectionDialog({
         </div>
       </DialogContent>
     </Dialog>
-    <ConfirmationDialog />
     </>
   );
 }

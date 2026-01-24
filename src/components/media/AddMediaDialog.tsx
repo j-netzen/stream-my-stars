@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useMedia, CreateMediaInput } from "@/hooks/useMedia";
 import { useTVMode } from "@/hooks/useTVMode";
-import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
-import { useRealDebridConfirmation } from "@/hooks/useRealDebridConfirmation";
+import { useTorBoxStatus } from "@/hooks/useTorBoxStatus";
 import { searchTMDB, getMovieDetails, getTVDetails, TMDBSearchResult, getImageUrl } from "@/lib/tmdb";
-import { unrestrictLink, addMagnetAndWait, listTorrents, listDownloads, RealDebridTorrent, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
+import { addMagnetAndWait, listTorrents, listDownloads, TorBoxTorrent, getStreamableUrl, findLargestVideoFile } from "@/lib/torbox";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isMagnetLink, extractMagnetFromTorrentioUrl } from "@/lib/torrentio";
 import {
   Dialog,
   DialogContent,
@@ -47,8 +46,7 @@ interface AddMediaDialogProps {
 export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const { addMedia } = useMedia();
   const { isTVMode } = useTVMode();
-  const { status: rdServiceStatus, isServiceAvailable: isRdAvailable, refresh: refreshRdStatus } = useRealDebridStatus();
-  const { confirmAddToRealDebrid, ConfirmationDialog } = useRealDebridConfirmation();
+  const { status: torBoxServiceStatus, isServiceAvailable: isTorBoxAvailable, refresh: refreshTorBoxStatus } = useTorBoxStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingFileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -65,13 +63,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [hasStoredHandle, setHasStoredHandle] = useState(false);
   
-  // Real-Debrid state
+  // TorBox state
   const [rdLink, setRdLink] = useState("");
   const [rdProgress, setRdProgress] = useState(0);
   const [rdStatus, setRdStatus] = useState<string | null>(null);
   const [isUnrestricting, setIsUnrestricting] = useState(false);
-  const [rdTorrents, setRdTorrents] = useState<RealDebridTorrent[]>([]);
-  const [rdDownloadsList, setRdDownloadsList] = useState<RealDebridUnrestrictedLink[]>([]);
+  const [rdTorrents, setRdTorrents] = useState<TorBoxTorrent[]>([]);
+  const [rdDownloadsList, setRdDownloadsList] = useState<TorBoxTorrent[]>([]);
   const [filteredRdItems, setFilteredRdItems] = useState<{ label: string; value: string; type: "torrent" | "download" }[]>([]);
   const [isLoadingRdItems, setIsLoadingRdItems] = useState(false);
   const [showRdDropdown, setShowRdDropdown] = useState(false);
@@ -329,70 +327,28 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       return;
     }
 
-    // Check if any items need RD download (magnet or extractable magnet)
-    const needsRdDownload = readyItems.some(item => {
-      const streamUrl = item.stream!.url;
-      return isMagnetLink(streamUrl) || 
-             (!isDirectRdLink(streamUrl) && extractMagnetFromTorrentioUrl(streamUrl));
-    });
-
-    if (needsRdDownload) {
-      const confirmed = await confirmAddToRealDebrid(`${readyItems.length} episodes`);
-      if (!confirmed) {
-        toast.info("Batch add cancelled");
-        return;
-      }
-    }
-
     setIsAdding(true);
     let added = 0;
 
-
     for (const item of readyItems) {
       try {
-        // Check if it's already a direct RD link (from Torrentio with RD configured)
-        let downloadUrl: string;
+        // For TorBox, all streams need to go through magnet processing
         const streamUrl = item.stream!.url;
+        const magnetLink = extractMagnetFromTorrentioUrl(streamUrl) || (isMagnetLink(streamUrl) ? streamUrl : null);
         
-        if (isDirectRdLink(streamUrl)) {
-          // Already unrestricted, use directly
-          downloadUrl = streamUrl;
-        } else if (isMagnetLink(streamUrl)) {
-          // Magnet link - need to add and wait for download
-          const torrent = await addMagnetAndWait(streamUrl, () => {});
-          if (torrent.links && torrent.links.length > 0) {
-            const unrestricted = await unrestrictLink(torrent.links[0]);
-            downloadUrl = unrestricted.download;
-          } else {
-            throw new Error("No download links available from torrent");
-          }
-        } else {
-          // Regular link - try to unrestrict, fallback to magnet extraction if it fails
-          try {
-            const unrestricted = await unrestrictLink(streamUrl);
-            downloadUrl = unrestricted.download;
-          } catch (unrestrictError: any) {
-            // Check if it's a hoster_unsupported error and try magnet fallback
-            const errorMessage = unrestrictError?.message || '';
-            if (errorMessage.includes('hoster_unsupported') || errorMessage.includes('400')) {
-              console.log(`Episode S${item.season}E${item.episode}: Unrestrict failed, trying magnet fallback...`);
-              const magnetLink = extractMagnetFromTorrentioUrl(streamUrl);
-              if (magnetLink) {
-                const torrent = await addMagnetAndWait(magnetLink, () => {});
-                if (torrent.links && torrent.links.length > 0) {
-                  const unrestricted = await unrestrictLink(torrent.links[0]);
-                  downloadUrl = unrestricted.download;
-                } else {
-                  throw new Error("No download links available from torrent");
-                }
-              } else {
-                throw new Error("Link not supported and no magnet hash found");
-              }
-            } else {
-              throw unrestrictError;
-            }
-          }
+        if (!magnetLink) {
+          throw new Error("Could not extract magnet link from stream");
         }
+
+        const torrent = await addMagnetAndWait(magnetLink, () => {});
+        const videoFile = findLargestVideoFile(torrent);
+        
+        if (!videoFile) {
+          throw new Error("No video files found in torrent");
+        }
+        
+        const downloadUrl = await getStreamableUrl(torrent.id, videoFile.id);
+        
         const episodeTitle = `${manualTitle} - S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
         
         const input: CreateMediaInput = {
@@ -432,42 +388,28 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const fetchRdItems = useCallback(async () => {
     setIsLoadingRdItems(true);
     try {
-      const [torrents, downloads] = await Promise.all([
-        listTorrents().catch(() => []),
-        listDownloads().catch(() => [])
-      ]);
+      const torrents = await listTorrents().catch(() => []);
       setRdTorrents(torrents);
-      setRdDownloadsList(downloads);
+      setRdDownloadsList(torrents.filter(t => t.download_present));
     } catch (error) {
-      console.error("Failed to fetch Real-Debrid items:", error);
+      console.error("Failed to fetch TorBox items:", error);
     }
     setIsLoadingRdItems(false);
   }, []);
 
-  // Filter RD items based on title (show all if title is empty)
+  // Filter items based on title (show all if title is empty)
   useEffect(() => {
     const searchTerm = manualTitle.toLowerCase().trim();
     const items: { label: string; value: string; type: "torrent" | "download" }[] = [];
 
-    // Filter torrents - use first link from each torrent
+    // Filter torrents - use torrent ID
     rdTorrents
-      .filter(t => t.links.length > 0 && (searchTerm === "" || t.filename.toLowerCase().includes(searchTerm)))
+      .filter(t => t.files.length > 0 && (searchTerm === "" || t.name.toLowerCase().includes(searchTerm)))
       .forEach(t => {
         items.push({
-          label: `[Torrent] ${t.filename}`,
-          value: t.links[0], // First link from torrent
+          label: `[Torrent] ${t.name}`,
+          value: String(t.id),
           type: "torrent"
-        });
-      });
-
-    // Filter downloads
-    rdDownloadsList
-      .filter(d => searchTerm === "" || d.filename.toLowerCase().includes(searchTerm))
-      .forEach(d => {
-        items.push({
-          label: `[Download] ${d.filename}`,
-          value: d.link,
-          type: "download"
         });
       });
 
@@ -647,7 +589,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
-  // Real-Debrid handler (for manual magnet/URL entry)
+  // TorBox handler (for manual magnet/URL entry)
   const handleRealDebrid = async () => {
     if (!rdLink.trim()) {
       toast.error("Please enter a link or magnet");
@@ -666,72 +608,25 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     try {
       let streamUrl: string;
 
-      // Check if it's a magnet link
-      if (isMagnetLink(rdLink)) {
-        // Confirm before adding to Real-Debrid
-        const confirmed = await confirmAddToRealDebrid(manualTitle || "this content");
-        if (!confirmed) {
-          setIsUnrestricting(false);
-          return;
-        }
-        
-        setRdStatus("Adding magnet to Real-Debrid...");
-        const torrent = await addMagnetAndWait(rdLink, (progress) => {
+      // Extract magnet from the link
+      const magnetLink = extractMagnetFromTorrentioUrl(rdLink) || (isMagnetLink(rdLink) ? rdLink : null);
+      
+      if (magnetLink) {
+        setRdStatus("Adding magnet to TorBox...");
+        const torrent = await addMagnetAndWait(magnetLink, (progress) => {
           setRdProgress(progress);
-          setRdStatus(`Downloading: ${progress}%`);
+          setRdStatus(`Processing: ${progress}%`);
         });
 
-        if (torrent.links && torrent.links.length > 0) {
-          setRdStatus("Unrestricting download link...");
-          const unrestricted = await unrestrictLink(torrent.links[0]);
-          streamUrl = unrestricted.download;
-        } else {
-          throw new Error("No download links available from torrent");
+        const videoFile = findLargestVideoFile(torrent);
+        if (!videoFile) {
+          throw new Error("No video files found in torrent");
         }
-      } else if (isDirectRdLink(rdLink)) {
-        // Already a direct RD link (e.g., from Torrentio with RD), use directly
-        setRdStatus("Using direct link...");
-        streamUrl = rdLink;
+        
+        setRdStatus("Getting stream URL...");
+        streamUrl = await getStreamableUrl(torrent.id, videoFile.id);
       } else {
-        // Regular link - try to unrestrict, fallback to magnet extraction if it fails
-        setRdStatus("Unrestricting link...");
-        try {
-          const unrestricted = await unrestrictLink(rdLink);
-          streamUrl = unrestricted.download;
-        } catch (unrestrictError: any) {
-          // Check if it's a hoster_unsupported error and try magnet fallback
-          const errorMessage = unrestrictError?.message || '';
-          if (errorMessage.includes('hoster_unsupported') || errorMessage.includes('400')) {
-            console.log("Unrestrict failed, attempting magnet extraction fallback...");
-            const magnetLink = extractMagnetFromTorrentioUrl(rdLink);
-            if (magnetLink) {
-              // Confirm before adding to Real-Debrid
-              const confirmed = await confirmAddToRealDebrid(manualTitle || "this content");
-              if (!confirmed) {
-                setIsUnrestricting(false);
-                return;
-              }
-              
-              setRdStatus("Falling back to magnet link...");
-              const torrent = await addMagnetAndWait(magnetLink, (progress) => {
-                setRdProgress(progress);
-                setRdStatus(`Downloading: ${progress}%`);
-              });
-              
-              if (torrent.links && torrent.links.length > 0) {
-                setRdStatus("Unrestricting download link...");
-                const unrestricted = await unrestrictLink(torrent.links[0]);
-                streamUrl = unrestricted.download;
-              } else {
-                throw new Error("No download links available from torrent");
-              }
-            } else {
-              throw new Error("Link not supported and no magnet hash found");
-            }
-          } else {
-            throw unrestrictError;
-          }
-        }
+        throw new Error("Please provide a magnet link or torrentio URL");
       }
 
       setRdStatus("Adding to library...");
@@ -875,16 +770,16 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
         <div className={isTVMode ? "h-[500px]" : "h-[450px]"}>
           <ScrollAreaWithArrows scrollStep={150} isTVMode={isTVMode}>
-            {/* Real-Debrid Service Warning Banner */}
-            {rdServiceStatus === "service_unavailable" && (
+            {/* TorBox Service Warning Banner */}
+            {torBoxServiceStatus === "service_unavailable" && (
               <Alert variant="destructive" className="mb-4 mx-1">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="flex items-center justify-between">
-                  <span>Real-Debrid servers are experiencing issues. Operations may fail.</span>
+                  <span>TorBox servers are experiencing issues. Operations may fail.</span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={refreshRdStatus}
+                    onClick={refreshTorBoxStatus}
                     className="ml-2 h-7"
                   >
                     <RefreshCw className="w-3 h-3 mr-1" />
@@ -1545,7 +1440,6 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
-    <ConfirmationDialog />
     </>
   );
 }

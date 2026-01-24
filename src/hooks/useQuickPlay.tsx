@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { Media } from "@/hooks/useMedia";
-import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isDirectRdLink, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
-import { unrestrictLink, addMagnetAndWait, getStreamingLinks, StreamUnavailableError, checkInstantAvailability, isHashCached } from "@/lib/realDebrid";
+import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
+import { addMagnetAndWait, getStreamableUrl, StreamUnavailableError, checkInstantAvailability, isHashCached, findLargestVideoFile } from "@/lib/torbox";
 import { prepareStreamUrl } from "@/lib/streamUtils";
 import { addDebugLog, classifyError } from "@/lib/streamDebugLog";
 import { toast } from "sonner";
@@ -22,41 +22,14 @@ export function useQuickPlay() {
   const [isQuickPlaying, setIsQuickPlaying] = useState(false);
   const [quickPlayMedia, setQuickPlayMedia] = useState<Media | null>(null);
 
-  // Get streamable URL from Real-Debrid
-  const getStreamableUrl = async (fileId: string, downloadUrl: string): Promise<string> => {
-    if (!fileId || fileId.length < 5) {
-      return prepareStreamUrl(downloadUrl);
-    }
-
+  // Get streamable URL from TorBox CDN
+  const getTorBoxCdnUrl = async (torrentId: number, fileId: number): Promise<string> => {
     try {
-      const streamingLinks = await getStreamingLinks(fileId);
-      
-      if (streamingLinks?.streaming_not_supported) {
-        return prepareStreamUrl(downloadUrl);
-      }
-      
-      if (!streamingLinks || typeof streamingLinks !== 'object') {
-        return prepareStreamUrl(downloadUrl);
-      }
-      
-      const qualityOrder = ['full', 'original', '1080p', '720p', '480p', '360p'];
-      for (const quality of qualityOrder) {
-        if (streamingLinks[quality]?.full) {
-          return prepareStreamUrl(streamingLinks[quality].full);
-        }
-      }
-      
-      const availableQualities = Object.keys(streamingLinks).filter(k => k !== 'streaming_not_supported');
-      if (availableQualities.length > 0) {
-        const firstQuality = availableQualities[0];
-        if (streamingLinks[firstQuality]?.full) {
-          return prepareStreamUrl(streamingLinks[firstQuality].full);
-        }
-      }
-      
-      return prepareStreamUrl(downloadUrl);
-    } catch {
-      return prepareStreamUrl(downloadUrl);
+      const cdnUrl = await getStreamableUrl(torrentId, fileId);
+      return prepareStreamUrl(cdnUrl);
+    } catch (err) {
+      console.error("Failed to get TorBox CDN URL:", err);
+      throw err;
     }
   };
 
@@ -134,7 +107,7 @@ export function useQuickPlay() {
     return streamsToUse.length > 0 ? streamsToUse[0] : null;
   };
 
-  // Resolve a single stream
+  // Resolve a single stream via TorBox
   const resolveStream = async (stream: TorrentioStream, media: Media): Promise<{ url: string; qualityInfo: StreamQualityInfo }> => {
     const info = parseStreamInfo(stream);
     const qualityInfo: StreamQualityInfo = {
@@ -143,47 +116,24 @@ export function useQuickPlay() {
       qualityRank: info.qualityRank
     };
 
-    // Direct RD link
-    if (isDirectRdLink(stream.url)) {
-      return { url: prepareStreamUrl(stream.url), qualityInfo };
+    // For TorBox, all Torrentio streams need to be processed as magnets
+    // Extract magnet from stream URL
+    const magnetLink = extractMagnetFromTorrentioUrl(stream.url) || (isMagnetLink(stream.url) ? stream.url : null);
+    
+    if (!magnetLink) {
+      throw new Error("Could not extract magnet link from stream");
     }
-
-    // Magnet link
-    if (isMagnetLink(stream.url)) {
-      const result = await addMagnetAndWait(stream.url, () => {});
-      
-      if (result.links && result.links.length > 0) {
-        const videoLink = result.links.find((l: string) => 
-          /\.(mp4|mkv|avi|m4v|webm)$/i.test(l)
-        ) || result.links[0];
-        
-        const unrestricted = await unrestrictLink(videoLink);
-        const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
-        return { url: streamUrl, qualityInfo };
-      }
-      throw new Error("Not cached - trying next stream");
+    
+    const result = await addMagnetAndWait(magnetLink, () => {});
+    
+    // Find the largest video file
+    const videoFile = findLargestVideoFile(result);
+    
+    if (!videoFile) {
+      throw new Error("No video files found in torrent");
     }
-
-    // Torrentio URL with embedded magnet
-    const magnetLink = extractMagnetFromTorrentioUrl(stream.url);
-    if (magnetLink) {
-      const result = await addMagnetAndWait(magnetLink, () => {});
-      
-      if (result.links && result.links.length > 0) {
-        const videoLink = result.links.find((l: string) => 
-          /\.(mp4|mkv|avi|m4v|webm)$/i.test(l)
-        ) || result.links[0];
-        
-        const unrestricted = await unrestrictLink(videoLink);
-        const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
-        return { url: streamUrl, qualityInfo };
-      }
-      throw new Error("Not cached - trying next stream");
-    }
-
-    // HTTP URL
-    const unrestricted = await unrestrictLink(stream.url);
-    const streamUrl = await getStreamableUrl(unrestricted.id, unrestricted.download);
+    
+    const streamUrl = await getTorBoxCdnUrl(result.id, videoFile.id);
     return { url: streamUrl, qualityInfo };
   };
 
