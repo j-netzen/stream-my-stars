@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useRealDebridStatus } from "@/hooks/useRealDebridStatus";
+import { useTorBoxStatus } from "@/hooks/useTorBoxStatus";
 import { cn } from "@/lib/utils";
 import {
   Home,
@@ -73,7 +73,7 @@ export function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const { signOut } = useAuth();
-  const { status: rdStatus, user: rdUser, refresh: refreshRdStatus } = useRealDebridStatus();
+  const { status: tbStatus, user: tbUser, refresh: refreshTbStatus } = useTorBoxStatus();
   const { isTVMode } = useTVMode();
   
   // Keyboard navigation for sidebar in TV mode
@@ -376,61 +376,61 @@ export function Sidebar({
           "relative z-10 p-2 border-t border-border/50 space-y-1",
           isTVMode && "p-2 space-y-0.5"
         )}>
-          {/* Real-Debrid Status Indicator */}
+          {/* TorBox Status Indicator */}
           {collapsed && !mobileOpen ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={refreshRdStatus}
-                  disabled={rdStatus === "loading"}
+                  onClick={refreshTbStatus}
+                  disabled={tbStatus === "loading"}
                   className={cn(
                     "flex items-center justify-center rounded-lg text-sm transition-colors hover:bg-secondary/50",
                     isTVMode ? "px-2 py-2.5 min-h-[44px]" : "px-2 py-2",
-                    rdStatus === "connected" && "text-green-500",
-                    rdStatus === "disconnected" && "text-yellow-500",
-                    rdStatus === "error" && "text-destructive",
-                    rdStatus === "loading" && "text-muted-foreground"
+                    tbStatus === "connected" && "text-green-500",
+                    tbStatus === "disconnected" && "text-yellow-500",
+                    tbStatus === "error" && "text-destructive",
+                    tbStatus === "loading" && "text-muted-foreground"
                   )}
                 >
-                  {rdStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                  {rdStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                  {rdStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                  {rdStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {tbStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {tbStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {tbStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  {tbStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                {rdStatus === "loading" && "Checking Real-Debrid..."}
-                {rdStatus === "connected" && `Real-Debrid: ${rdUser?.username || "Connected"} (Click to refresh)`}
-                {rdStatus === "disconnected" && "Real-Debrid: No Premium (Click to refresh)"}
-                {rdStatus === "error" && "Real-Debrid: Connection Error (Click to retry)"}
+                {tbStatus === "loading" && "Checking TorBox..."}
+                {tbStatus === "connected" && `TorBox: ${tbUser?.email || "Connected"} (Click to refresh)`}
+                {tbStatus === "disconnected" && "TorBox: Not Subscribed (Click to refresh)"}
+                {tbStatus === "error" && "TorBox: Connection Error (Click to retry)"}
               </TooltipContent>
             </Tooltip>
           ) : (
             <button
-              onClick={refreshRdStatus}
-              disabled={rdStatus === "loading"}
+              onClick={refreshTbStatus}
+              disabled={tbStatus === "loading"}
               className={cn(
                 "w-full flex items-center justify-between gap-2 rounded-lg font-medium transition-colors",
                 isTVMode ? "px-3 py-2 min-h-[40px] text-xs" : "px-4 py-2 text-xs",
-                rdStatus === "connected" && "text-green-500 bg-green-500/10 hover:bg-green-500/20",
-                rdStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20",
-                rdStatus === "error" && "text-destructive bg-destructive/10 hover:bg-destructive/20",
-                rdStatus === "loading" && "text-muted-foreground bg-secondary/50"
+                tbStatus === "connected" && "text-green-500 bg-green-500/10 hover:bg-green-500/20",
+                tbStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20",
+                tbStatus === "error" && "text-destructive bg-destructive/10 hover:bg-destructive/20",
+                tbStatus === "loading" && "text-muted-foreground bg-secondary/50"
               )}
             >
               <div className="flex items-center gap-2">
-                {rdStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                {rdStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                {rdStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                {rdStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {tbStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {tbStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {tbStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                {tbStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
                 <span>
-                  {rdStatus === "loading" && "Checking RD..."}
-                  {rdStatus === "connected" && `RD: ${rdUser?.username || "Connected"}`}
-                  {rdStatus === "disconnected" && "RD: No Premium"}
-                  {rdStatus === "error" && "RD: Error"}
+                  {tbStatus === "loading" && "Checking TB..."}
+                  {tbStatus === "connected" && `TB: ${tbUser?.email?.split('@')[0] || "Connected"}`}
+                  {tbStatus === "disconnected" && "TB: Not Subscribed"}
+                  {tbStatus === "error" && "TB: Error"}
                 </span>
               </div>
-              {rdStatus !== "loading" && (
+              {tbStatus !== "loading" && (
                 <span className={cn("opacity-60", isTVMode ? "text-[10px]" : "text-[10px]")}>Refresh</span>
               )}
             </button>
