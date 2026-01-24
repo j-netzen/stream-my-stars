@@ -30,6 +30,7 @@ import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, File
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
+import { StreamResolutionOverlay } from "./StreamResolutionOverlay";
 import {
   storeFileHandle,
   isFileSystemAccessSupported,
@@ -64,15 +65,16 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   const [hasStoredHandle, setHasStoredHandle] = useState(false);
   
   // TorBox state
-  const [rdLink, setRdLink] = useState("");
-  const [rdProgress, setRdProgress] = useState(0);
-  const [rdStatus, setRdStatus] = useState<string | null>(null);
+  const [torboxLink, setTorboxLink] = useState("");
+  const [torboxProgress, setTorboxProgress] = useState(0);
+  const [torboxStatus, setTorboxStatus] = useState<string | null>(null);
+  const [torboxStep, setTorboxStep] = useState<"finding" | "caching" | "resolving" | "starting" | "complete">("finding");
   const [isUnrestricting, setIsUnrestricting] = useState(false);
-  const [rdTorrents, setRdTorrents] = useState<TorBoxTorrent[]>([]);
-  const [rdDownloadsList, setRdDownloadsList] = useState<TorBoxTorrent[]>([]);
-  const [filteredRdItems, setFilteredRdItems] = useState<{ label: string; value: string; type: "torrent" | "download" }[]>([]);
-  const [isLoadingRdItems, setIsLoadingRdItems] = useState(false);
-  const [showRdDropdown, setShowRdDropdown] = useState(false);
+  const [torboxTorrents, setTorboxTorrents] = useState<TorBoxTorrent[]>([]);
+  const [torboxDownloadsList, setTorboxDownloadsList] = useState<TorBoxTorrent[]>([]);
+  const [filteredTorboxItems, setFilteredTorboxItems] = useState<{ label: string; value: string; type: "torrent" | "download" }[]>([]);
+  const [isLoadingTorboxItems, setIsLoadingTorboxItems] = useState(false);
+  const [showTorboxDropdown, setShowTorboxDropdown] = useState(false);
   const [isSearchingTmdbForDebrid, setIsSearchingTmdbForDebrid] = useState(false);
   const [tmdbDebridResults, setTmdbDebridResults] = useState<TMDBSearchResult[]>([]);
   const [showTmdbDebridDropdown, setShowTmdbDebridDropdown] = useState(false);
@@ -246,7 +248,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   };
 
   const handleSelectTorrentioStream = (stream: TorrentioStream) => {
-    setRdLink(stream.url);
+    setTorboxLink(stream.url);
     setShowTorrentioDropdown(false);
   };
 
@@ -385,16 +387,16 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setIsAdding(false);
   };
 
-  const fetchRdItems = useCallback(async () => {
-    setIsLoadingRdItems(true);
+  const fetchTorboxItems = useCallback(async () => {
+    setIsLoadingTorboxItems(true);
     try {
       const torrents = await listTorrents().catch(() => []);
-      setRdTorrents(torrents);
-      setRdDownloadsList(torrents.filter(t => t.download_present));
+      setTorboxTorrents(torrents);
+      setTorboxDownloadsList(torrents.filter(t => t.download_present));
     } catch (error) {
       console.error("Failed to fetch TorBox items:", error);
     }
-    setIsLoadingRdItems(false);
+    setIsLoadingTorboxItems(false);
   }, []);
 
   // Filter items based on title (show all if title is empty)
@@ -403,7 +405,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     const items: { label: string; value: string; type: "torrent" | "download" }[] = [];
 
     // Filter torrents - use torrent ID
-    rdTorrents
+    torboxTorrents
       .filter(t => t.files.length > 0 && (searchTerm === "" || t.name.toLowerCase().includes(searchTerm)))
       .forEach(t => {
         items.push({
@@ -413,15 +415,15 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
         });
       });
 
-    setFilteredRdItems(items);
-  }, [manualTitle, rdTorrents, rdDownloadsList]);
+    setFilteredTorboxItems(items);
+  }, [manualTitle, torboxTorrents, torboxDownloadsList]);
 
-  // Fetch RD items when dialog opens
+  // Fetch TorBox items when dialog opens
   useEffect(() => {
     if (open) {
-      fetchRdItems();
+      fetchTorboxItems();
     }
-  }, [open, fetchRdItems]);
+  }, [open, fetchTorboxItems]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -591,7 +593,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
   // TorBox handler (for manual magnet/URL entry)
   const handleTorBoxMagnet = async () => {
-    if (!rdLink.trim()) {
+    if (!torboxLink.trim()) {
       toast.error("Please enter a link or magnet");
       return;
     }
@@ -602,20 +604,25 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     }
 
     setIsUnrestricting(true);
-    setRdProgress(0);
-    setRdStatus(null);
+    setTorboxProgress(0);
+    setTorboxStatus(null);
+    setTorboxStep("finding");
 
     try {
       let streamUrl: string;
 
       // Extract magnet from the link
-      const magnetLink = extractMagnetFromTorrentioUrl(rdLink) || (isMagnetLink(rdLink) ? rdLink : null);
+      const magnetLink = extractMagnetFromTorrentioUrl(torboxLink) || (isMagnetLink(torboxLink) ? torboxLink : null);
       
       if (magnetLink) {
-        setRdStatus("Adding magnet to TorBox...");
+        setTorboxStep("caching");
+        setTorboxStatus("Checking cache availability...");
+        
+        setTorboxStep("resolving");
+        setTorboxStatus("Adding magnet to TorBox...");
         const torrent = await addMagnetAndWait(magnetLink, (progress) => {
-          setRdProgress(progress);
-          setRdStatus(`Processing: ${progress}%`);
+          setTorboxProgress(progress);
+          setTorboxStatus(`Processing: ${progress}%`);
         });
 
         const videoFile = findLargestVideoFile(torrent);
@@ -623,13 +630,14 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           throw new Error("No video files found in torrent");
         }
         
-        setRdStatus("Getting stream URL...");
+        setTorboxStep("starting");
+        setTorboxStatus("Getting stream URL...");
         streamUrl = await getStreamableUrl(torrent.id, videoFile.id);
       } else {
         throw new Error("Please provide a magnet link or torrentio URL");
       }
 
-      setRdStatus("Adding to library...");
+      setTorboxStatus("Adding to library...");
 
       const input: CreateMediaInput = {
         title: manualTitle,
@@ -654,13 +662,14 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       };
 
       await addMedia.mutateAsync(input);
+      setTorboxStep("complete");
       toast.success("Media added via TorBox!");
       resetForm();
       onOpenChange(false);
     } catch (error: any) {
       console.error("TorBox error:", error);
       toast.error(error.message || "Failed to process with TorBox");
-      setRdStatus(null);
+      setTorboxStatus(null);
     }
     setIsUnrestricting(false);
   };
@@ -742,10 +751,11 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
     setSelectedFileName("");
     setHasStoredHandle(false);
     pendingFileHandleRef.current = null;
-    setRdLink("");
-    setRdProgress(0);
-    setRdStatus(null);
-    setShowRdDropdown(false);
+    setTorboxLink("");
+    setTorboxProgress(0);
+    setTorboxStatus(null);
+    setTorboxStep("finding");
+    setShowTorboxDropdown(false);
     setSelectedTmdbForDebrid(null);
     setTmdbDebridResults([]);
     setShowTmdbDebridDropdown(false);
@@ -984,18 +994,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               </p>
             </div>
 
-            {/* Progress indicator for TorBox processing */}
-            {isUnrestricting && rdStatus && (
-              <div className="space-y-2 p-3 bg-secondary/30 rounded-lg">
-                <div className="flex items-center gap-2 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                  <span>{rdStatus}</span>
-                </div>
-                {rdProgress > 0 && (
-                  <Progress value={rdProgress} className="h-2" />
-                )}
-              </div>
-            )}
+            {/* Animated progress overlay for TorBox processing */}
+            <StreamResolutionOverlay
+              isVisible={isUnrestricting}
+              currentStep={torboxStep}
+              progress={torboxProgress}
+              statusMessage={torboxStatus || undefined}
+            />
 
             <div className="space-y-2">
               <Label>Title *</Label>
