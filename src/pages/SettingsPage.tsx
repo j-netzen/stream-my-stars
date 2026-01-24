@@ -18,6 +18,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
 import { TorBoxHealthCheck } from "@/components/settings/TorBoxHealthCheck";
+import { TorBoxPairingDialog } from "@/components/settings/TorBoxPairingDialog";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -33,6 +34,7 @@ export default function SettingsPage() {
     localStorage.getItem("torrentioAddonUrl") || ""
   );
   const [debugLogs, setDebugLogs] = useState<StreamDebugEntry[]>(() => getDebugLogs());
+  const [showPairingDialog, setShowPairingDialog] = useState(false);
   
   const refreshDebugLogs = () => {
     setDebugLogs(getDebugLogs());
@@ -858,19 +860,35 @@ export default function SettingsPage() {
               </div>
             </>
           ) : (
-            <div className="text-center py-4">
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                TorBox API key is configured in Lovable Cloud secrets.
-              </p>
-              <p className={cn("text-muted-foreground mt-2", isTVMode ? "text-sm" : "text-xs")}>
-                Get your API key from{" "}
+            <div className="text-center py-6 space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-full bg-blue-500/10 flex items-center justify-center">
+                <Box className="w-8 h-8 text-blue-500" />
+              </div>
+              <div>
+                <p className={cn("font-medium", isTVMode ? "text-lg" : "text-base")}>
+                  Connect Your TorBox Account
+                </p>
+                <p className={cn("text-muted-foreground mt-1", isTVMode ? "text-base" : "text-sm")}>
+                  Link your TorBox account to enable premium streaming
+                </p>
+              </div>
+              <Button
+                onClick={() => setShowPairingDialog(true)}
+                className="gap-2"
+                size={isTVMode ? "lg" : "default"}
+              >
+                <Key className="w-4 h-4" />
+                Set Up TorBox
+              </Button>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                Don't have an account?{" "}
                 <a 
-                  href="https://torbox.app/settings" 
+                  href="https://torbox.app" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:underline"
                 >
-                  torbox.app/settings
+                  Sign up at torbox.app
                 </a>
               </p>
             </div>
@@ -1124,6 +1142,13 @@ export default function SettingsPage() {
         <LogOut className="w-4 h-4" />
         Sign Out
       </Button>
+
+      {/* TorBox Pairing Dialog */}
+      <TorBoxPairingDialog 
+        open={showPairingDialog} 
+        onOpenChange={setShowPairingDialog}
+        isTVMode={isTVMode}
+      />
     </div>
   );
 }
