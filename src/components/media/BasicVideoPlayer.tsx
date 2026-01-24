@@ -12,6 +12,8 @@ import {
   maskUrlForDebug,
   StreamDebugInfo 
 } from "@/lib/streamUtils";
+import { StreamPreparationOverlay } from "./StreamPreparationOverlay";
+import { getTorrentInfo, getStreamableUrl, findLargestVideoFile, TorBoxTorrent } from "@/lib/torbox";
 
 interface Media {
   id: string;
@@ -19,6 +21,9 @@ interface Media {
   source_url?: string | null;
   poster_path?: string | null;
   backdrop_path?: string | null;
+  // TorBox-specific fields for non-cached streams
+  torboxTorrentId?: number;
+  torboxFileId?: number;
 }
 
 export interface StreamQualityInfo {
@@ -32,6 +37,8 @@ interface BasicVideoPlayerProps {
   onClose: () => void;
   streamQuality?: StreamQualityInfo;
   onPlaybackError?: () => void;
+  // Callback when user wants to go back to stream selection
+  onBackToSelection?: () => void;
 }
 
 // TMDB image helper
@@ -155,6 +162,7 @@ export default function BasicVideoPlayer({
   onClose,
   streamQuality,
   onPlaybackError,
+  onBackToSelection,
 }: BasicVideoPlayerProps) {
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -167,8 +175,8 @@ export default function BasicVideoPlayer({
   const { settings } = usePlaybackSettings();
   useVideoPlayerOrientation(true);
 
-  // State
-  const [playerState, setPlayerState] = useState<"ready" | "loading" | "playing" | "paused" | "error">("ready");
+  // State - Added "preparing" state for non-cached TorBox streams
+  const [playerState, setPlayerState] = useState<"checking" | "preparing" | "ready" | "loading" | "playing" | "paused" | "error">("checking");
   const [errorMessage, setErrorMessage] = useState("");
   const [showControls, setShowControls] = useState(true);
   const [showDebug, setShowDebug] = useState(false);
@@ -179,8 +187,13 @@ export default function BasicVideoPlayer({
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  
+  // TorBox preparation state
+  const [preparingTorrentId, setPreparingTorrentId] = useState<number | null>(null);
+  const [resolvedStreamUrl, setResolvedStreamUrl] = useState<string | null>(null);
 
-  const src = media.source_url;
+  // Determine effective source URL (resolved or original)
+  const effectiveSrc = resolvedStreamUrl || media.source_url;
 
   // Get poster image
   const posterImage = useMemo(() => {
@@ -191,18 +204,67 @@ export default function BasicVideoPlayer({
 
   // Prepare stream URL with debug info
   const debugInfo = useMemo<StreamDebugInfo | null>(() => {
-    if (!src) return null;
+    if (!effectiveSrc) return null;
     return prepareStreamUrlWithDebug(
-      src, 
+      effectiveSrc, 
       settings.useCorsProxy, 
       settings.useSmartProxy ?? true,
       settings.proxyMode ?? 'public'
     );
-  }, [src, settings.useCorsProxy, settings.useSmartProxy, settings.proxyMode]);
+  }, [effectiveSrc, settings.useCorsProxy, settings.useSmartProxy, settings.proxyMode]);
 
   const preparedUrl = debugInfo?.preparedUrl ?? null;
   const isHls = debugInfo?.isHls ?? false;
   const usesBackendProxy = debugInfo?.usedBackendProxy ?? false;
+
+  // Check TorBox stream availability on mount
+  useEffect(() => {
+    const checkTorBoxAvailability = async () => {
+      // If we have a direct URL (not TorBox-managed), skip to ready
+      if (media.source_url && !media.torboxTorrentId) {
+        // Check if this looks like a TorBox CDN URL - those are already resolved
+        if (media.source_url.includes('torbox') || 
+            media.source_url.includes('.m3u8') || 
+            media.source_url.startsWith('http')) {
+          setPlayerState("ready");
+          return;
+        }
+      }
+
+      // If we have a TorBox torrent ID, check if it's ready
+      if (media.torboxTorrentId) {
+        try {
+          const torrent = await getTorrentInfo(media.torboxTorrentId);
+          
+          // If ready, resolve the stream URL
+          if (torrent.download_present || torrent.progress === 1) {
+            const fileId = media.torboxFileId || findLargestVideoFile(torrent)?.id;
+            if (fileId) {
+              const url = await getStreamableUrl(media.torboxTorrentId, fileId);
+              setResolvedStreamUrl(url);
+              setPlayerState("ready");
+            } else {
+              setPlayerState("error");
+              setErrorMessage("No video file found in this torrent.");
+            }
+          } else {
+            // Not ready - show preparation overlay
+            setPreparingTorrentId(media.torboxTorrentId);
+            setPlayerState("preparing");
+          }
+        } catch (err) {
+          console.error("Failed to check TorBox availability:", err);
+          // Fall through to ready state - let playback fail naturally
+          setPlayerState("ready");
+        }
+      } else {
+        // No TorBox ID - assume direct URL is ready
+        setPlayerState("ready");
+      }
+    };
+
+    checkTorBoxAvailability();
+  }, [media.source_url, media.torboxTorrentId, media.torboxFileId]);
 
   // Get auth token for backend proxy
   useEffect(() => {
@@ -211,6 +273,42 @@ export default function BasicVideoPlayer({
       setAuthToken(session?.access_token ?? null);
     };
     getToken();
+  }, []);
+
+  // Handle stream becoming ready from preparation overlay
+  const handleStreamReady = useCallback(async (torrent: TorBoxTorrent) => {
+    try {
+      const fileId = media.torboxFileId || findLargestVideoFile(torrent)?.id;
+      if (!fileId) {
+        setPlayerState("error");
+        setErrorMessage("No video file found in this torrent.");
+        return;
+      }
+
+      const url = await getStreamableUrl(torrent.id, fileId);
+      setResolvedStreamUrl(url);
+      setPreparingTorrentId(null);
+      setPlayerState("ready");
+    } catch (err) {
+      console.error("Failed to get stream URL:", err);
+      setPlayerState("error");
+      setErrorMessage("Failed to get stream URL. Please try again.");
+    }
+  }, [media.torboxFileId]);
+
+  // Handle back from preparation overlay
+  const handlePreparationBack = useCallback(() => {
+    if (onBackToSelection) {
+      onBackToSelection();
+    } else {
+      onClose();
+    }
+  }, [onBackToSelection, onClose]);
+
+  // Handle preparation error
+  const handlePreparationError = useCallback((message: string) => {
+    console.error("Preparation error:", message);
+    // Keep the overlay visible - it will show the error state
   }, []);
 
   // Cleanup HLS instance
@@ -594,6 +692,26 @@ export default function BasicVideoPlayer({
           isExpanded={showDebug}
           onToggle={() => setShowDebug(v => !v)}
         />
+
+        {/* CHECKING STATE - Initial availability check */}
+        {playerState === "checking" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin" />
+              <p className="text-muted-foreground text-sm">Checking stream availability...</p>
+            </div>
+          </div>
+        )}
+
+        {/* PREPARING STATE - TorBox stream preparation overlay */}
+        {playerState === "preparing" && preparingTorrentId && (
+          <StreamPreparationOverlay
+            torrentId={preparingTorrentId}
+            onReady={handleStreamReady}
+            onBack={handlePreparationBack}
+            onError={handlePreparationError}
+          />
+        )}
 
         {/* READY STATE - Centered Play Button */}
         {playerState === "ready" && (
