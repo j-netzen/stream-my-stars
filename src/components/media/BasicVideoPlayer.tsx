@@ -32,18 +32,35 @@ interface BasicVideoPlayerProps {
 }
 
 /**
- * Debug Overlay Component - shows stream analysis info
+ * Debug Overlay Component - shows stream analysis info with quality data
  */
 function DebugOverlay({ 
   debugInfo, 
+  streamQuality,
   isExpanded, 
   onToggle 
 }: { 
   debugInfo: StreamDebugInfo | null; 
+  streamQuality?: StreamQualityInfo;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
   if (!debugInfo) return null;
+
+  // Parse quality info to extract resolution, codec, size
+  const parseQualityInfo = (quality?: string) => {
+    if (!quality) return { resolution: null, codec: null };
+    
+    const resMatch = quality.match(/(\d{3,4}p)/i);
+    const codecMatch = quality.match(/(x264|x265|HEVC|h\.?264|h\.?265|AV1|VP9|HDR|DV|Dolby)/i);
+    
+    return {
+      resolution: resMatch ? resMatch[1] : null,
+      codec: codecMatch ? codecMatch[1].toUpperCase() : null,
+    };
+  };
+
+  const { resolution, codec } = parseQualityInfo(streamQuality?.quality);
   
   return (
     <div className="absolute top-14 right-2 z-30">
@@ -58,10 +75,40 @@ function DebugOverlay({
       
       {isExpanded && (
         <div className="mt-1 p-3 bg-black/90 rounded-lg border border-border/50 text-xs font-mono space-y-2 max-w-xs">
+          {/* Stream Quality Section */}
+          {streamQuality && (
+            <div className="pb-2 border-b border-border/30">
+              <span className="text-muted-foreground block mb-1">Quality Info:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {resolution && (
+                  <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                    {resolution}
+                  </span>
+                )}
+                {codec && (
+                  <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                    {codec}
+                  </span>
+                )}
+                {streamQuality.size && (
+                  <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                    {streamQuality.size}
+                  </span>
+                )}
+              </div>
+              {streamQuality.quality && !resolution && (
+                <p className="text-foreground mt-1 break-all">{streamQuality.quality}</p>
+              )}
+            </div>
+          )}
+          
+          {/* URL Info */}
           <div>
             <span className="text-muted-foreground">URL: </span>
             <span className="text-foreground break-all">{maskUrlForDebug(debugInfo.originalUrl)}</span>
           </div>
+          
+          {/* Source Type Badges */}
           <div className="flex flex-wrap gap-2">
             <span className={`px-1.5 py-0.5 rounded ${
               debugInfo.sourceType === 'real-debrid' ? 'bg-green-500/20 text-green-400' :
@@ -77,6 +124,8 @@ function DebugOverlay({
               </span>
             )}
           </div>
+          
+          {/* Proxy & Player Info */}
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">CORS Proxy:</span>
@@ -84,6 +133,12 @@ function DebugOverlay({
                 {debugInfo.usedCorsProxy ? 'Yes' : 'No'}
               </span>
             </div>
+            {debugInfo.usedBackendProxy && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Backend Proxy:</span>
+                <span className="text-green-400">Yes</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Player Mode:</span>
               <span className="text-foreground">{debugInfo.playerMode}</span>
@@ -120,6 +175,16 @@ export default function BasicVideoPlayer({
   const [showDebug, setShowDebug] = useState(false);
 
   const src = media.source_url;
+  const [authToken, setAuthToken] = useState<string | null>(null);
+
+  // Get auth token for backend proxy requests
+  useEffect(() => {
+    const getToken = async () => {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      setAuthToken(session?.access_token ?? null);
+    };
+    getToken();
+  }, []);
 
   // Use smart URL preparation with debug info
   const debugInfo = useMemo<StreamDebugInfo | null>(() => {
@@ -127,12 +192,14 @@ export default function BasicVideoPlayer({
     return prepareStreamUrlWithDebug(
       src, 
       settings.useCorsProxy, 
-      settings.useSmartProxy ?? true
+      settings.useSmartProxy ?? true,
+      settings.proxyMode ?? 'public'
     );
-  }, [src, settings.useCorsProxy, settings.useSmartProxy]);
+  }, [src, settings.useCorsProxy, settings.useSmartProxy, settings.proxyMode]);
 
   const preparedUrl = debugInfo?.preparedUrl ?? null;
   const isHls = debugInfo?.isHls ?? false;
+  const usesBackendProxy = debugInfo?.usedBackendProxy ?? false;
 
   const teardown = useCallback(() => {
     if (hlsRef.current) {
@@ -194,7 +261,18 @@ export default function BasicVideoPlayer({
       if (canPlayNativeHls) {
         video.src = preparedUrl;
       } else if (Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true });
+        const hlsConfig: Partial<Hls["config"]> = { 
+          enableWorker: true,
+        };
+        
+        // Add auth headers for backend proxy
+        if (usesBackendProxy && authToken) {
+          hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
+            xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+          };
+        }
+        
+        const hls = new Hls(hlsConfig as Hls["config"]);
         hlsRef.current = hls;
 
         hls.on(Hls.Events.ERROR, (_evt, data) => {
@@ -225,7 +303,7 @@ export default function BasicVideoPlayer({
       video.removeEventListener("error", onNativeError);
       teardown();
     };
-  }, [preparedUrl, isHls, reloadKey, teardown, fail]);
+  }, [preparedUrl, isHls, usesBackendProxy, authToken, reloadKey, teardown, fail]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -260,7 +338,8 @@ export default function BasicVideoPlayer({
 
         {/* Debug Overlay */}
         <DebugOverlay 
-          debugInfo={debugInfo} 
+          debugInfo={debugInfo}
+          streamQuality={streamQuality}
           isExpanded={showDebug}
           onToggle={() => setShowDebug(v => !v)}
         />

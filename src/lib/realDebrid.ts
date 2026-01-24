@@ -154,63 +154,130 @@ export class StreamUnavailableError extends Error {
 }
 
 /**
- * Main function to invoke Real-Debrid API with automatic token refresh
+ * Check if an error is a transient gateway error that should be retried
  */
-async function invokeRealDebrid(body: Record<string, unknown>, retryCount = 0): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke("real-debrid", { body });
+function isTransientGatewayError(error: unknown): boolean {
+  if (!error) return false;
+  const message = String(error).toLowerCase();
+  return (
+    message.includes("502") ||
+    message.includes("504") ||
+    message.includes("bad gateway") ||
+    message.includes("gateway timeout") ||
+    message.includes("tls") ||
+    message.includes("handshake") ||
+    message.includes("connection") ||
+    message.includes("eof") ||
+    message.includes("reset") ||
+    message.includes("socket")
+  );
+}
+
+/**
+ * Main function to invoke Real-Debrid API with automatic token refresh and retry
+ */
+async function invokeRealDebrid(
+  body: Record<string, unknown>, 
+  retryCount = 0,
+  maxRetries = 3
+): Promise<unknown> {
+  const startTime = performance.now();
   
-  if (error) {
-    console.error("Real-Debrid API error:", error);
+  try {
+    const { data, error } = await supabase.functions.invoke("real-debrid", { body });
     
-    // Check if it's a token error and we haven't retried yet
-    if (isTokenError(error) && retryCount === 0) {
-      console.log("Token error detected, attempting refresh...");
-      const newToken = await getValidAccessTokenWithRefresh();
-      if (newToken) {
-        // Retry the request after token refresh
-        return invokeRealDebrid(body, retryCount + 1);
+    if (error) {
+      console.error("Real-Debrid API error:", error);
+      
+      // Check if it's a transient gateway error and we can retry
+      if (isTransientGatewayError(error) && retryCount < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000); // Exponential backoff: 1s, 2s, 4s, max 8s
+        console.log(`[RD] Transient error, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return invokeRealDebrid(body, retryCount + 1, maxRetries);
       }
-      throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
+      
+      // Check if it's a token error and we haven't retried yet
+      if (isTokenError(error) && retryCount === 0) {
+        console.log("Token error detected, attempting refresh...");
+        const newToken = await getValidAccessTokenWithRefresh();
+        if (newToken) {
+          // Retry the request after token refresh
+          return invokeRealDebrid(body, retryCount + 1, maxRetries);
+        }
+        throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
+      }
+      
+      // Check for skip-stream errors (copyright, unavailable, etc.)
+      if (isSkipStreamError(error.message || error)) {
+        throw new StreamUnavailableError("Stream blocked - trying next");
+      }
+      
+      // Check if it's a service unavailable error
+      const errorMessage = error.message || "";
+      if (errorMessage.includes("503") || errorMessage.includes("service_unavailable")) {
+        const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
+        setRealDebridServiceUnavailable(serviceError);
+        throw new Error(serviceError);
+      }
+      throw new Error(error.message || "Real-Debrid API error");
     }
     
-    // Check for skip-stream errors (copyright, unavailable, etc.)
-    if (isSkipStreamError(error.message || error)) {
-      throw new StreamUnavailableError("Stream blocked - trying next");
+    // Log latency for monitoring
+    const latency = Math.round(performance.now() - startTime);
+    if (latency > 2000) {
+      console.log(`[RD] Slow response: ${latency}ms for action: ${body.action}`);
     }
     
-    // Check if it's a service unavailable error
-    const errorMessage = error.message || "";
-    if (errorMessage.includes("503") || errorMessage.includes("service_unavailable")) {
-      const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
-      setRealDebridServiceUnavailable(serviceError);
-      throw new Error(serviceError);
+    return processRealDebridResponse(data, body, retryCount, maxRetries);
+  } catch (err) {
+    // Catch network-level errors and retry
+    if (isTransientGatewayError(err) && retryCount < maxRetries) {
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 8000);
+      console.log(`[RD] Network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return invokeRealDebrid(body, retryCount + 1, maxRetries);
     }
-    throw new Error(error.message || "Real-Debrid API error");
+    throw err;
   }
+}
+
+/**
+ * Process Real-Debrid response data and handle errors
+ */
+async function processRealDebridResponse(
+  data: unknown,
+  body: Record<string, unknown>,
+  retryCount: number,
+  maxRetries: number
+): Promise<unknown> {
+  const responseData = data as Record<string, unknown> | null;
   
-  if (data?.error) {
-    const errorString = String(data.error || "");
-    const errorCode = data.details?.error_code;
+  if (responseData?.error) {
+    const errorString = String(responseData.error || "");
+    const details = responseData.details as Record<string, unknown> | undefined;
+    const errorCode = details?.error_code as number | undefined;
     
     // Check for token errors in response
     if (isTokenError(errorString) && retryCount === 0) {
       console.log("Token error in response, attempting refresh...");
       const newToken = await getValidAccessTokenWithRefresh();
       if (newToken) {
-        return invokeRealDebrid(body, retryCount + 1);
+        return invokeRealDebrid(body, retryCount + 1, maxRetries);
       }
       throw new Error("Session expired. Please re-link your Real-Debrid account in Settings.");
     }
     
     // Check for skip-stream errors (copyright DMCA, file unavailable, etc.)
     // Error codes: 35 = infringing_file, 7 = hoster_unavailable, 8 = file_unavailable
-    if (isSkipStreamError(errorString) || [35, 7, 8].includes(errorCode)) {
+    if (isSkipStreamError(errorString) || (errorCode && [35, 7, 8].includes(errorCode))) {
       console.log("Stream unavailable (copyright/DMCA), triggering fallback");
       throw new StreamUnavailableError("Stream blocked - trying next");
     }
     
     // Check for service unavailable in data error
-    if (data.details?.error_code === 25 || String(data.httpStatus || "").includes("503") || errorString.includes("overloaded")) {
+    const httpStatus = String(responseData.httpStatus || "");
+    if (errorCode === 25 || httpStatus.includes("503") || errorString.includes("overloaded")) {
       const serviceError = "Real-Debrid servers are temporarily overloaded. Please wait 30 seconds and try again.";
       setRealDebridServiceUnavailable(serviceError);
       throw new Error(serviceError);

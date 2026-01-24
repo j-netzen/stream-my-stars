@@ -5,10 +5,17 @@
  * including HTTPS forcing, CORS proxy wrapping, and provider-specific fixes.
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 /**
  * Public CORS proxy URL - used to bypass provider restrictions
  */
 export const CORS_PROXY_URL = 'https://corsproxy.io/?url=';
+
+/**
+ * Proxy mode for stream handling
+ */
+export type ProxyMode = 'none' | 'public' | 'backend';
 
 /**
  * Stream source types for smart proxy decision
@@ -238,13 +245,34 @@ export function maskUrlForDebug(url: string): string {
 }
 
 /**
+ * Get the backend proxy URL for a given stream URL
+ */
+export async function getBackendProxyUrl(url: string): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    console.warn('[StreamUtils] No auth session for backend proxy, falling back to public');
+    return wrapWithCorsProxy(forceHttps(url));
+  }
+  
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) {
+    console.warn('[StreamUtils] No Supabase URL configured');
+    return wrapWithCorsProxy(forceHttps(url));
+  }
+  
+  const encodedUrl = encodeURIComponent(forceHttps(url));
+  return `${supabaseUrl}/functions/v1/stream-proxy?url=${encodedUrl}`;
+}
+
+/**
  * Prepare a stream URL for playback with smart proxy detection
  * Returns both the prepared URL and debug info
  */
 export function prepareStreamUrlWithDebug(
   url: string, 
   useCorsProxy: boolean, 
-  useSmartProxy: boolean
+  useSmartProxy: boolean,
+  proxyMode: ProxyMode = 'public'
 ): StreamDebugInfo {
   if (!url) {
     return {
@@ -260,13 +288,35 @@ export function prepareStreamUrlWithDebug(
   
   const sourceType = detectStreamSourceType(url);
   const isHls = isHlsUrl(url);
+  
+  // Determine if we should proxy based on smart detection
   const shouldProxy = shouldUseCorsProxy(url, useCorsProxy, useSmartProxy);
   
   // Force HTTPS first
   const httpsUrl = forceHttps(url);
   
-  // Apply proxy if needed
-  const preparedUrl = shouldProxy ? wrapWithCorsProxy(httpsUrl) : httpsUrl;
+  // Determine which proxy to use
+  let preparedUrl = httpsUrl;
+  let usedCorsProxy = false;
+  let usedBackendProxy = false;
+  
+  if (shouldProxy) {
+    if (proxyMode === 'backend') {
+      // For backend proxy, we build the URL synchronously but the actual auth happens at request time
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        preparedUrl = `${supabaseUrl}/functions/v1/stream-proxy?url=${encodeURIComponent(httpsUrl)}`;
+        usedBackendProxy = true;
+      } else {
+        // Fallback to public proxy
+        preparedUrl = wrapWithCorsProxy(httpsUrl);
+        usedCorsProxy = true;
+      }
+    } else {
+      preparedUrl = wrapWithCorsProxy(httpsUrl);
+      usedCorsProxy = true;
+    }
+  }
   
   // Determine player mode
   let playerMode: StreamDebugInfo['playerMode'] = 'direct';
@@ -282,8 +332,8 @@ export function prepareStreamUrlWithDebug(
     preparedUrl,
     sourceType,
     isHls,
-    usedCorsProxy: shouldProxy,
-    usedBackendProxy: false, // Future: integrate with backend proxy
+    usedCorsProxy,
+    usedBackendProxy,
     playerMode,
   };
 }

@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2, Shield, Play, Clapperboard } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2, Shield, Play, Clapperboard, Server, Cloud } from "lucide-react";
 import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
 import { getDebugLogs, clearDebugLogs, formatLogTime, getErrorTypeInfo, StreamDebugEntry } from "@/lib/streamDebugLog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { RealDebridPairingDialog } from "@/components/RealDebridPairingDialog";
 import { hasOAuthTokens, clearStoredTokens } from "@/lib/realDebridOAuth";
 import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
+import { RealDebridHealthCheck } from "@/components/settings/RealDebridHealthCheck";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -428,36 +429,85 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* Smart Proxy Toggle (only shown when CORS proxy is enabled) */}
+          {/* Proxy Mode Selector (only shown when CORS proxy is enabled) */}
           {playbackSettings.useCorsProxy && (
-            <div className="flex items-center justify-between pl-4 border-l-2 border-primary/30">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="smart-proxy" className={cn("font-medium", isTVMode && "text-lg")}>
-                    Smart Proxy Detection
-                  </Label>
-                  <Badge 
-                    variant={playbackSettings.useSmartProxy ? "default" : "secondary"}
-                    className={cn(
-                      "text-xs",
-                      playbackSettings.useSmartProxy && "bg-blue-500/20 text-blue-500 border-blue-500/30"
-                    )}
-                  >
-                    {playbackSettings.useSmartProxy ? "Auto" : "Always Proxy"}
-                  </Badge>
-                </div>
-                <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                  {playbackSettings.useSmartProxy 
-                    ? "Skips proxy for Real-Debrid (has CORS headers). Uses proxy for other sources." 
-                    : "Always routes through CORS proxy regardless of source."}
-                </p>
+            <div className="space-y-3 pl-4 border-l-2 border-primary/30">
+              <div className="flex items-center gap-2">
+                <Label className={cn("font-medium", isTVMode && "text-lg")}>
+                  Proxy Source
+                </Label>
+                <Badge 
+                  variant="secondary"
+                  className={cn(
+                    "text-xs",
+                    playbackSettings.proxyMode === 'backend' && "bg-green-500/20 text-green-500 border-green-500/30"
+                  )}
+                >
+                  {playbackSettings.proxyMode === 'backend' ? 'Backend' : 'Public'}
+                </Badge>
               </div>
-              <Switch
-                id="smart-proxy"
-                checked={playbackSettings.useSmartProxy ?? true}
-                onCheckedChange={(checked) => updatePlaybackSetting('useSmartProxy', checked)}
-                className={isTVMode ? "scale-125" : ""}
-              />
+              <div className="flex gap-2">
+                <Button
+                  variant={playbackSettings.proxyMode === 'public' ? "default" : "outline"}
+                  size={isTVMode ? "lg" : "sm"}
+                  className={cn(
+                    "flex-1 gap-2",
+                    playbackSettings.proxyMode === 'public' && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                  )}
+                  onClick={() => {
+                    updatePlaybackSetting('proxyMode', 'public');
+                    toast.success("Switched to public proxy (corsproxy.io)");
+                  }}
+                >
+                  <Globe className="w-4 h-4" />
+                  Public
+                </Button>
+                <Button
+                  variant={playbackSettings.proxyMode === 'backend' ? "default" : "outline"}
+                  size={isTVMode ? "lg" : "sm"}
+                  className={cn(
+                    "flex-1 gap-2",
+                    playbackSettings.proxyMode === 'backend' && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                  )}
+                  onClick={() => {
+                    updatePlaybackSetting('proxyMode', 'backend');
+                    toast.success("Switched to backend proxy (more reliable)");
+                  }}
+                >
+                  <Server className="w-4 h-4" />
+                  Backend
+                </Button>
+              </div>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                {playbackSettings.proxyMode === 'backend' 
+                  ? "Uses our secure backend proxy. More reliable but requires authentication." 
+                  : "Uses public corsproxy.io. Works without login but may be less reliable."}
+              </p>
+
+              {/* Smart Proxy Toggle */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="smart-proxy" className={cn("font-medium", isTVMode && "text-base")}>
+                      Smart Detection
+                    </Label>
+                    <Badge 
+                      variant={playbackSettings.useSmartProxy ? "default" : "secondary"}
+                      className="text-xs"
+                    >
+                      {playbackSettings.useSmartProxy ? "Auto" : "Off"}
+                    </Badge>
+                  </div>
+                  <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                    Skip proxy for Real-Debrid (has native CORS support)
+                  </p>
+                </div>
+                <Switch
+                  id="smart-proxy"
+                  checked={playbackSettings.useSmartProxy ?? true}
+                  onCheckedChange={(checked) => updatePlaybackSetting('useSmartProxy', checked)}
+                />
+              </div>
             </div>
           )}
         </CardContent>
@@ -784,6 +834,11 @@ export default function SettingsPage() {
               Real-Debrid API key not configured or invalid.
             </p>
           )}
+
+          {/* API Health Check */}
+          <div className="pt-4 border-t border-border/50">
+            <RealDebridHealthCheck isTVMode={isTVMode} />
+          </div>
 
           {/* OAuth Device Pairing */}
           <div className="pt-4 border-t border-border/50 space-y-3">

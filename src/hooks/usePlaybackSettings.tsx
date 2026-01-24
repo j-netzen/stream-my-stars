@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export type PlayerEngine = 'basic' | 'videojs';
+export type ProxyMode = 'none' | 'public' | 'backend';
 
 export interface PlaybackSettings {
   // Buffer settings
@@ -17,6 +18,7 @@ export interface PlaybackSettings {
   // Network settings
   useCorsProxy: boolean; // route streams through CORS proxy to bypass restrictions
   useSmartProxy: boolean; // automatically detect when to use backend vs public proxy
+  proxyMode: ProxyMode; // which proxy to use: none, public (corsproxy.io), or backend
   
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
@@ -31,6 +33,7 @@ const DEFAULT_SETTINGS: PlaybackSettings = {
   onlyShowCachedStreams: false,
   useCorsProxy: true, // enabled by default
   useSmartProxy: true, // smart detection by default
+  proxyMode: 'public', // use public proxy by default
   connectionSpeedMbps: null,
   isSlowConnection: false,
 };
