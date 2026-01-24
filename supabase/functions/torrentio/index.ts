@@ -227,17 +227,6 @@ function checkRateLimit(req: Request): { allowed: boolean; remaining: number; re
 }
 
 serve(async (req) => {
-  // ========== REAL_DEBRID_API_KEY Configuration Check (hard-fail if missing) ==========
-  const rdApiKey = Deno.env.get('REAL_DEBRID_API_KEY');
-  if (!rdApiKey) {
-    console.error('[STARTUP] ERROR: REAL_DEBRID_API_KEY is not defined in Supabase Secrets');
-    return new Response(
-      JSON.stringify({ error: 'ERROR: REAL_DEBRID_API_KEY is not defined in Supabase Secrets' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  console.log(`[STARTUP] Key detected (Length: ${rdApiKey.length})`);
-
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
