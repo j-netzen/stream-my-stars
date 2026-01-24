@@ -20,6 +20,41 @@ export function RealDebridHealthCheck({ isTVMode = false }: RealDebridHealthChec
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<HealthCheckResult | null>(null);
 
+  const classifyError = (errorMsg: string): { type: string; userMessage: string } => {
+    const msg = errorMsg.toLowerCase();
+    
+    if (msg.includes("502") || msg.includes("504") || msg.includes("tls") || 
+        msg.includes("handshake") || msg.includes("eof") || msg.includes("connection") ||
+        msg.includes("non-2xx") || msg.includes("failed to fetch") || msg.includes("network")) {
+      return { 
+        type: "transient", 
+        userMessage: "Connection issue - try again in a moment" 
+      };
+    }
+    if (msg.includes("401") || msg.includes("token") || msg.includes("expired") || msg.includes("bad_token")) {
+      return { 
+        type: "auth", 
+        userMessage: "Session expired - re-link your account" 
+      };
+    }
+    if (msg.includes("503") || msg.includes("overloaded") || msg.includes("service")) {
+      return { 
+        type: "service", 
+        userMessage: "Real-Debrid servers are busy" 
+      };
+    }
+    if (msg.includes("api_key") || msg.includes("missing") || msg.includes("not configured")) {
+      return { 
+        type: "config", 
+        userMessage: "API key not configured" 
+      };
+    }
+    return { 
+      type: "unknown", 
+      userMessage: errorMsg.substring(0, 50) 
+    };
+  };
+
   const runHealthCheck = useCallback(async () => {
     setIsChecking(true);
     const startTime = performance.now();
@@ -34,25 +69,23 @@ export function RealDebridHealthCheck({ isTVMode = false }: RealDebridHealthChec
 
       if (error) {
         const errorMsg = error.message || "";
-        const isServiceDown = errorMsg.includes("503") || errorMsg.includes("502") || 
-                              errorMsg.includes("tls") || errorMsg.includes("timeout");
+        const { type, userMessage } = classifyError(errorMsg);
         
         setResult({
-          status: isServiceDown ? "unavailable" : "degraded",
+          status: type === "transient" ? "unavailable" : "degraded",
           latency: null,
-          message: isServiceDown 
-            ? "Real-Debrid API is currently unreachable" 
-            : `Error: ${errorMsg.substring(0, 50)}`,
+          message: userMessage,
           lastChecked: new Date(),
         });
         return;
       }
 
       if (data?.error) {
+        const { userMessage } = classifyError(String(data.error));
         setResult({
           status: "degraded",
           latency,
-          message: `API returned error: ${String(data.error).substring(0, 50)}`,
+          message: userMessage,
           lastChecked: new Date(),
         });
         return;
@@ -70,10 +103,11 @@ export function RealDebridHealthCheck({ isTVMode = false }: RealDebridHealthChec
         lastChecked: new Date(),
       });
     } catch (err) {
+      const { userMessage } = classifyError(String(err));
       setResult({
         status: "unavailable",
         latency: null,
-        message: "Failed to connect to Real-Debrid",
+        message: userMessage,
         lastChecked: new Date(),
       });
     } finally {
