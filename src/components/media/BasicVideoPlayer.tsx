@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import Hls from "hls.js";
-import { AlertCircle, RefreshCw, X, Bug, ChevronDown, ChevronUp } from "lucide-react";
-
+import { AlertCircle, RefreshCw, X, Bug, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 import { 
@@ -16,6 +17,8 @@ interface Media {
   id: string;
   title: string;
   source_url?: string | null;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
 }
 
 export interface StreamQualityInfo {
@@ -31,8 +34,14 @@ interface BasicVideoPlayerProps {
   onPlaybackError?: () => void;
 }
 
+// TMDB image helper
+const getImageUrl = (path: string | null | undefined, size: string = "original") => {
+  if (!path) return null;
+  return `https://image.tmdb.org/t/p/${size}${path}`;
+};
+
 /**
- * Debug Overlay Component - shows stream analysis info with quality data
+ * Minimalist Debug Overlay
  */
 function DebugOverlay({ 
   debugInfo, 
@@ -47,13 +56,10 @@ function DebugOverlay({
 }) {
   if (!debugInfo) return null;
 
-  // Parse quality info to extract resolution, codec, size
   const parseQualityInfo = (quality?: string) => {
     if (!quality) return { resolution: null, codec: null };
-    
     const resMatch = quality.match(/(\d{3,4}p)/i);
     const codecMatch = quality.match(/(x264|x265|HEVC|h\.?264|h\.?265|AV1|VP9|HDR|DV|Dolby)/i);
-    
     return {
       resolution: resMatch ? resMatch[1] : null,
       codec: codecMatch ? codecMatch[1].toUpperCase() : null,
@@ -63,86 +69,56 @@ function DebugOverlay({
   const { resolution, codec } = parseQualityInfo(streamQuality?.quality);
   
   return (
-    <div className="absolute top-14 right-2 z-30">
+    <div className="absolute top-4 right-4 z-30">
       <button
         onClick={onToggle}
-        className="flex items-center gap-1 px-2 py-1 bg-black/70 hover:bg-black/90 text-xs text-muted-foreground rounded border border-border/50 transition-colors"
+        className="flex items-center gap-1 px-2 py-1 bg-black/70 hover:bg-black/90 text-xs text-white/70 rounded transition-colors"
       >
         <Bug className="w-3 h-3" />
-        Debug
         {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
       </button>
       
       {isExpanded && (
-        <div className="mt-1 p-3 bg-black/90 rounded-lg border border-border/50 text-xs font-mono space-y-2 max-w-xs">
-          {/* Stream Quality Section */}
+        <div className="mt-1 p-3 bg-black/90 rounded-lg text-xs font-mono space-y-2 max-w-xs">
           {streamQuality && (
-            <div className="pb-2 border-b border-border/30">
-              <span className="text-muted-foreground block mb-1">Quality Info:</span>
+            <div className="pb-2 border-b border-white/10">
+              <span className="text-white/50 block mb-1">Quality:</span>
               <div className="flex flex-wrap gap-1.5">
                 {resolution && (
-                  <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                    {resolution}
-                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">{resolution}</span>
                 )}
                 {codec && (
-                  <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                    {codec}
-                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">{codec}</span>
                 )}
                 {streamQuality.size && (
-                  <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
-                    {streamQuality.size}
-                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">{streamQuality.size}</span>
                 )}
               </div>
-              {streamQuality.quality && !resolution && (
-                <p className="text-foreground mt-1 break-all">{streamQuality.quality}</p>
-              )}
             </div>
           )}
           
-          {/* URL Info */}
           <div>
-            <span className="text-muted-foreground">URL: </span>
-            <span className="text-foreground break-all">{maskUrlForDebug(debugInfo.originalUrl)}</span>
+            <span className="text-white/50">URL: </span>
+            <span className="text-white/80 break-all">{maskUrlForDebug(debugInfo.originalUrl)}</span>
           </div>
           
-          {/* Source Type Badges */}
           <div className="flex flex-wrap gap-2">
-            <span className={`px-1.5 py-0.5 rounded ${
+            <span className={cn(
+              "px-1.5 py-0.5 rounded",
               debugInfo.sourceType === 'torbox' ? 'bg-green-500/20 text-green-400' :
               debugInfo.sourceType === 'hls' ? 'bg-blue-500/20 text-blue-400' :
-              debugInfo.sourceType === 'direct' ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-muted text-muted-foreground'
-            }`}>
+              'bg-yellow-500/20 text-yellow-400'
+            )}>
               {debugInfo.sourceType}
             </span>
             {debugInfo.isHls && (
-              <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                HLS
-              </span>
+              <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">HLS</span>
             )}
           </div>
           
-          {/* Proxy & Player Info */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">CORS Proxy:</span>
-              <span className={debugInfo.usedCorsProxy ? 'text-green-400' : 'text-yellow-400'}>
-                {debugInfo.usedCorsProxy ? 'Yes' : 'No'}
-              </span>
-            </div>
-            {debugInfo.usedBackendProxy && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Backend Proxy:</span>
-                <span className="text-green-400">Yes</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Player Mode:</span>
-              <span className="text-foreground">{debugInfo.playerMode}</span>
-            </div>
+          <div className="space-y-1 text-white/60">
+            <div>Proxy: {debugInfo.usedCorsProxy ? 'Yes' : 'No'}</div>
+            <div>Mode: {debugInfo.playerMode}</div>
           </div>
         </div>
       )}
@@ -151,10 +127,28 @@ function DebugOverlay({
 }
 
 /**
- * BasicVideoPlayer
- * - Plain <video> element
- * - Uses hls.js only when the browser can't play HLS natively
- * - Debug overlay for stream diagnostics
+ * Format time in MM:SS or HH:MM:SS
+ */
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return "0:00";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/**
+ * BasicVideoPlayer - Rebuilt for stability with Click-to-Fullscreen flow
+ * 
+ * Features:
+ * - Clean "Ready" state with poster and centered play button
+ * - Single synchronous click → fullscreen + play
+ * - HLS.js with automatic error recovery (2004 fix)
+ * - Auto-hiding controls after 2s inactivity
+ * - object-fit: contain for proper aspect ratio
  */
 export default function BasicVideoPlayer({
   media,
@@ -162,31 +156,40 @@ export default function BasicVideoPlayer({
   streamQuality,
   onPlaybackError,
 }: BasicVideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Refs
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const { settings } = usePlaybackSettings();
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recoveryAttemptRef = useRef(0);
 
+  // Settings
+  const { settings } = usePlaybackSettings();
   useVideoPlayerOrientation(true);
 
-  const [reloadKey, setReloadKey] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  // State
+  const [playerState, setPlayerState] = useState<"ready" | "loading" | "playing" | "paused" | "error">("ready");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showControls, setShowControls] = useState(true);
   const [showDebug, setShowDebug] = useState(false);
-
-  const src = media.source_url;
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [buffered, setBuffered] = useState(0);
   const [authToken, setAuthToken] = useState<string | null>(null);
 
-  // Get auth token for backend proxy requests
-  useEffect(() => {
-    const getToken = async () => {
-      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
-      setAuthToken(session?.access_token ?? null);
-    };
-    getToken();
-  }, []);
+  const src = media.source_url;
 
-  // Use smart URL preparation with debug info
+  // Get poster image
+  const posterImage = useMemo(() => {
+    return getImageUrl(media.backdrop_path, "w1280") || 
+           getImageUrl(media.poster_path, "w780") || 
+           null;
+  }, [media.backdrop_path, media.poster_path]);
+
+  // Prepare stream URL with debug info
   const debugInfo = useMemo<StreamDebugInfo | null>(() => {
     if (!src) return null;
     return prepareStreamUrlWithDebug(
@@ -201,110 +204,332 @@ export default function BasicVideoPlayer({
   const isHls = debugInfo?.isHls ?? false;
   const usesBackendProxy = debugInfo?.usedBackendProxy ?? false;
 
-  const teardown = useCallback(() => {
+  // Get auth token for backend proxy
+  useEffect(() => {
+    const getToken = async () => {
+      const { data: { session } } = await (await import("@/integrations/supabase/client")).supabase.auth.getSession();
+      setAuthToken(session?.access_token ?? null);
+    };
+    getToken();
+  }, []);
+
+  // Cleanup HLS instance
+  const teardownHls = useCallback(() => {
     if (hlsRef.current) {
       try {
         hlsRef.current.destroy();
       } catch {
-        // ignore
+        // Ignore cleanup errors
       }
       hlsRef.current = null;
     }
   }, []);
 
-  const fail = useCallback(
-    (message: string) => {
-      setIsLoading(false);
-      setHasError(true);
-      setErrorMessage(message);
-      onPlaybackError?.();
-    },
-    [onPlaybackError]
-  );
+  // Auto-hide controls
+  const resetControlsTimeout = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    setShowControls(true);
+    
+    if (playerState === "playing") {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 2000);
+    }
+  }, [playerState]);
 
+  // Handle mouse movement
+  const handleMouseMove = useCallback(() => {
+    resetControlsTimeout();
+  }, [resetControlsTimeout]);
+
+  // Fullscreen handling
+  const enterFullscreen = useCallback(async () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    try {
+      if (container.requestFullscreen) {
+        await container.requestFullscreen();
+      } else if ((container as any).webkitRequestFullscreen) {
+        await (container as any).webkitRequestFullscreen();
+      } else if ((container as any).msRequestFullscreen) {
+        await (container as any).msRequestFullscreen();
+      }
+    } catch (err) {
+      console.warn("Fullscreen request failed:", err);
+    }
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    try {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        await (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        await (document as any).msExitFullscreen();
+      }
+    } catch (err) {
+      console.warn("Exit fullscreen failed:", err);
+    }
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (isFullscreen) {
+      exitFullscreen();
+    } else {
+      enterFullscreen();
+    }
+  }, [isFullscreen, enterFullscreen, exitFullscreen]);
+
+  // Track fullscreen state
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  // Initialize HLS with error recovery
+  const initializePlayer = useCallback(() => {
     const video = videoRef.current;
     if (!video || !preparedUrl) return;
 
-    setHasError(false);
+    setPlayerState("loading");
     setErrorMessage("");
-    setIsLoading(true);
+    recoveryAttemptRef.current = 0;
+    teardownHls();
 
-    teardown();
+    // Event handlers
+    const onPlaying = () => {
+      setPlayerState("playing");
+      resetControlsTimeout();
+    };
+    
+    const onPause = () => {
+      setPlayerState("paused");
+      setShowControls(true);
+    };
+    
+    const onWaiting = () => {
+      if (playerState !== "error") {
+        setPlayerState("loading");
+      }
+    };
+    
+    const onTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+    };
+    
+    const onDurationChange = () => {
+      setDuration(video.duration);
+    };
+    
+    const onProgress = () => {
+      if (video.buffered.length > 0) {
+        setBuffered(video.buffered.end(video.buffered.length - 1));
+      }
+    };
+    
+    const onVolumeChange = () => {
+      setVolume(video.volume);
+      setIsMuted(video.muted);
+    };
 
-    const onPlaying = () => setIsLoading(false);
-    const onCanPlay = () => setIsLoading(false);
-    const onLoadedMetadata = () => setIsLoading(false);
-    const onWaiting = () => setIsLoading(true);
     const onNativeError = () => {
       const code = video.error?.code;
-      const msg =
-        code === 4
-          ? "Source not supported. Try another stream."
-          : "Playback failed. Try another stream.";
-      fail(msg);
+      let msg = "Playback failed. Try another stream.";
+      if (code === 4) {
+        msg = "Source not supported. Try another stream.";
+      } else if (code === 2) {
+        msg = "Network error. Check your connection.";
+      }
+      setPlayerState("error");
+      setErrorMessage(msg);
+      onPlaybackError?.();
     };
 
     video.addEventListener("playing", onPlaying);
-    video.addEventListener("canplay", onCanPlay);
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWaiting);
+    video.addEventListener("timeupdate", onTimeUpdate);
+    video.addEventListener("durationchange", onDurationChange);
+    video.addEventListener("progress", onProgress);
+    video.addEventListener("volumechange", onVolumeChange);
     video.addEventListener("error", onNativeError);
 
-    // ensure a clean reload
-    video.removeAttribute("src");
-    video.load();
-
+    // HLS.js setup with error recovery
     if (isHls) {
       const canPlayNativeHls = !!video.canPlayType("application/vnd.apple.mpegurl");
 
       if (canPlayNativeHls) {
         video.src = preparedUrl;
       } else if (Hls.isSupported()) {
-        const hlsConfig: Partial<Hls["config"]> = { 
+        const hlsConfig: Partial<Hls["config"]> = {
           enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+          maxBufferLength: 60,
+          maxMaxBufferLength: 120,
+          startLevel: -1, // Auto quality
         };
-        
+
         // Add auth headers for backend proxy
         if (usesBackendProxy && authToken) {
-          hlsConfig.xhrSetup = (xhr: XMLHttpRequest, url: string) => {
+          hlsConfig.xhrSetup = (xhr: XMLHttpRequest) => {
             xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
           };
         }
-        
+
         const hls = new Hls(hlsConfig as Hls["config"]);
         hlsRef.current = hls;
 
+        // HLS.js error handler with recovery (THE 2004 FIX)
         hls.on(Hls.Events.ERROR, (_evt, data) => {
+          console.warn("[HLS] Error:", data.type, data.details);
+
           if (data.fatal) {
-            fail("Stream playlist failed to load. Try another stream.");
+            switch (data.type) {
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                // Attempt recovery for media errors
+                if (recoveryAttemptRef.current < 3) {
+                  recoveryAttemptRef.current++;
+                  console.log(`[HLS] Attempting media recovery (attempt ${recoveryAttemptRef.current})`);
+                  hls.recoverMediaError();
+                } else {
+                  setPlayerState("error");
+                  setErrorMessage("Media playback error. Try refreshing or another stream.");
+                  onPlaybackError?.();
+                }
+                break;
+
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                // Attempt recovery for network errors
+                if (recoveryAttemptRef.current < 3) {
+                  recoveryAttemptRef.current++;
+                  console.log(`[HLS] Attempting network recovery (attempt ${recoveryAttemptRef.current})`);
+                  hls.startLoad();
+                } else {
+                  setPlayerState("error");
+                  setErrorMessage("Network error. Check connection or try another stream.");
+                  onPlaybackError?.();
+                }
+                break;
+
+              default:
+                setPlayerState("error");
+                setErrorMessage("Stream failed to load. Try another stream.");
+                onPlaybackError?.();
+                break;
+            }
           }
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log("[HLS] Manifest parsed, ready to play");
         });
 
         hls.loadSource(preparedUrl);
         hls.attachMedia(video);
       } else {
-        // last-ditch attempt
+        // Fallback: try native
         video.src = preparedUrl;
       }
     } else {
+      // Direct video source
       video.src = preparedUrl;
     }
 
-    video.play().catch(() => {
-      // autoplay blocked is fine
-    });
-
+    // Return cleanup function
     return () => {
       video.removeEventListener("playing", onPlaying);
-      video.removeEventListener("canplay", onCanPlay);
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
+      video.removeEventListener("timeupdate", onTimeUpdate);
+      video.removeEventListener("durationchange", onDurationChange);
+      video.removeEventListener("progress", onProgress);
+      video.removeEventListener("volumechange", onVolumeChange);
       video.removeEventListener("error", onNativeError);
-      teardown();
+      teardownHls();
     };
-  }, [preparedUrl, isHls, usesBackendProxy, authToken, reloadKey, teardown, fail]);
+  }, [preparedUrl, isHls, usesBackendProxy, authToken, teardownHls, resetControlsTimeout, onPlaybackError]);
 
+  // THE CLICK-TO-FULLSCREEN FLOW
+  const handlePlayClick = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Initialize player if in ready state
+    if (playerState === "ready") {
+      initializePlayer();
+    }
+
+    // Synchronous: Request fullscreen then play
+    enterFullscreen();
+    
+    // Slight delay to ensure video is ready
+    setTimeout(() => {
+      video.play().catch((err) => {
+        console.warn("Play failed:", err);
+        // Still try to play without fullscreen
+      });
+    }, 100);
+  }, [playerState, initializePlayer, enterFullscreen]);
+
+  // Toggle play/pause
+  const togglePlayPause = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().catch(console.warn);
+    } else {
+      video.pause();
+    }
+    resetControlsTimeout();
+  }, [resetControlsTimeout]);
+
+  // Volume controls
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+  }, []);
+
+  const handleVolumeChange = useCallback((value: number[]) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = value[0];
+    if (value[0] > 0 && video.muted) {
+      video.muted = false;
+    }
+  }, []);
+
+  // Seek
+  const handleSeek = useCallback((value: number[]) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = value[0];
+    resetControlsTimeout();
+  }, [resetControlsTimeout]);
+
+  // Retry on error
+  const handleRetry = useCallback(() => {
+    setPlayerState("ready");
+    setErrorMessage("");
+    recoveryAttemptRef.current = 0;
+  }, []);
+
+  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -312,28 +537,54 @@ export default function BasicVideoPlayer({
     };
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      teardownHls();
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [teardownHls]);
+
   return (
-    <div className="fixed left-0 top-0 z-[100] w-screen h-screen h-[100svh] bg-black flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-background/5">
-        <div className="min-w-0">
-          <p className="text-foreground font-medium truncate">{media.title}</p>
-          {streamQuality?.quality ? (
-            <p className="text-muted-foreground text-xs truncate">{streamQuality.quality}</p>
-          ) : null}
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[100] bg-black flex flex-col"
+      onMouseMove={handleMouseMove}
+      onTouchStart={handleMouseMove}
+    >
+      {/* Header - always visible */}
+      <div 
+        className={cn(
+          "absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 to-transparent transition-opacity duration-300",
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-white font-medium truncate">{media.title}</p>
+          {streamQuality?.quality && (
+            <p className="text-white/60 text-xs truncate">{streamQuality.quality}</p>
+          )}
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close player">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={onClose} 
+          className="text-white hover:bg-white/10"
+        >
           <X className="w-5 h-5" />
         </Button>
       </div>
 
-      <div className="relative flex-1 bg-black">
+      {/* Video container */}
+      <div className="relative flex-1 flex items-center justify-center">
         <video
           ref={videoRef}
-          className="w-full h-full"
-          controls
+          className="w-full h-full object-contain"
           playsInline
-          autoPlay
-          muted
+          poster={posterImage || undefined}
+          onClick={playerState === "playing" || playerState === "paused" ? togglePlayPause : undefined}
         />
 
         {/* Debug Overlay */}
@@ -344,36 +595,58 @@ export default function BasicVideoPlayer({
           onToggle={() => setShowDebug(v => !v)}
         />
 
-        {isLoading && !hasError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-              <p className="text-muted-foreground text-sm">Loading stream…</p>
+        {/* READY STATE - Centered Play Button */}
+        {playerState === "ready" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+            <button
+              onClick={handlePlayClick}
+              className="group relative w-24 h-24 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50"
+            >
+              <Play className="w-12 h-12 text-white ml-1 transition-transform group-hover:scale-110" fill="white" />
+            </button>
+            <p className="mt-6 text-white/80 text-lg font-medium">Ready to Play</p>
+            <p className="mt-2 text-white/50 text-sm">Click to start in fullscreen</p>
+          </div>
+        )}
+
+        {/* LOADING STATE - Soft Pulsing Animation */}
+        {playerState === "loading" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="flex flex-col items-center gap-4">
+              {/* Pulsing loader */}
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-white/10 animate-pulse" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                </div>
+              </div>
+              <p className="text-white/70 text-sm animate-pulse">Loading stream…</p>
             </div>
           </div>
         )}
 
-        {hasError && (
+        {/* ERROR STATE */}
+        {playerState === "error" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6">
-            <div className="max-w-md w-full rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center">
-              <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
-              <p className="text-foreground font-semibold mb-1">Playback Error</p>
-              <p className="text-muted-foreground text-sm mb-4">{errorMessage}</p>
+            <div className="max-w-md w-full rounded-2xl border border-red-500/30 bg-red-500/10 backdrop-blur-md p-6 text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-white font-semibold text-lg mb-2">Playback Error</p>
+              <p className="text-white/70 text-sm mb-6">{errorMessage}</p>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setHasError(false);
-                    setErrorMessage("");
-                    setReloadKey((k) => k + 1);
-                  }}
-                  className="gap-2"
+                  onClick={handleRetry}
+                  className="gap-2 border-white/20 text-white hover:bg-white/10"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Try Again
                 </Button>
-                <Button variant="ghost" onClick={onClose}>
+                <Button 
+                  variant="ghost" 
+                  onClick={onClose}
+                  className="text-white/70 hover:text-white hover:bg-white/10"
+                >
                   Close
                 </Button>
               </div>
@@ -381,6 +654,95 @@ export default function BasicVideoPlayer({
           </div>
         )}
       </div>
+
+      {/* Bottom Controls - Auto-hide after 2s */}
+      {(playerState === "playing" || playerState === "paused") && (
+        <div 
+          className={cn(
+            "absolute bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-16 transition-opacity duration-300",
+            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+        >
+          {/* Progress bar */}
+          <div className="mb-3">
+            <div className="relative h-1 group">
+              {/* Buffered progress */}
+              <div 
+                className="absolute inset-y-0 left-0 bg-white/30 rounded-full"
+                style={{ width: `${(buffered / duration) * 100 || 0}%` }}
+              />
+              {/* Seek slider */}
+              <Slider
+                value={[currentTime]}
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                onValueChange={handleSeek}
+                className="absolute inset-0"
+              />
+            </div>
+          </div>
+
+          {/* Control buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Play/Pause */}
+              <button
+                onClick={togglePlayPause}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                {playerState === "playing" ? (
+                  <Pause className="w-5 h-5 text-white" fill="white" />
+                ) : (
+                  <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+                )}
+              </button>
+
+              {/* Volume */}
+              <div className="flex items-center gap-2 group">
+                <button
+                  onClick={toggleMute}
+                  className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-4 h-4 text-white" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-white" />
+                  )}
+                </button>
+                <div className="w-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Slider
+                    value={[isMuted ? 0 : volume]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={handleVolumeChange}
+                  />
+                </div>
+              </div>
+
+              {/* Time display */}
+              <span className="text-white/80 text-sm font-mono ml-2">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Fullscreen toggle */}
+              <button
+                onClick={toggleFullscreen}
+                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"
+              >
+                {isFullscreen ? (
+                  <Minimize className="w-4 h-4 text-white" />
+                ) : (
+                  <Maximize className="w-4 h-4 text-white" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
