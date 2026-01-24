@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
-import { AlertCircle, RefreshCw, X } from "lucide-react";
+import { AlertCircle, RefreshCw, X, Bug, ChevronDown, ChevronUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
-import { forceHttps, prepareStreamUrl } from "@/lib/streamUtils";
+import { 
+  forceHttps, 
+  prepareStreamUrlWithDebug, 
+  maskUrlForDebug,
+  StreamDebugInfo 
+} from "@/lib/streamUtils";
 
 interface Media {
   id: string;
@@ -26,16 +31,75 @@ interface BasicVideoPlayerProps {
   onPlaybackError?: () => void;
 }
 
-function isHlsUrl(url: string) {
-  const u = url.toLowerCase();
-  return u.includes(".m3u8") || u.includes("m3u8");
+/**
+ * Debug Overlay Component - shows stream analysis info
+ */
+function DebugOverlay({ 
+  debugInfo, 
+  isExpanded, 
+  onToggle 
+}: { 
+  debugInfo: StreamDebugInfo | null; 
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  if (!debugInfo) return null;
+  
+  return (
+    <div className="absolute top-14 right-2 z-30">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1 px-2 py-1 bg-black/70 hover:bg-black/90 text-xs text-muted-foreground rounded border border-border/50 transition-colors"
+      >
+        <Bug className="w-3 h-3" />
+        Debug
+        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+      </button>
+      
+      {isExpanded && (
+        <div className="mt-1 p-3 bg-black/90 rounded-lg border border-border/50 text-xs font-mono space-y-2 max-w-xs">
+          <div>
+            <span className="text-muted-foreground">URL: </span>
+            <span className="text-foreground break-all">{maskUrlForDebug(debugInfo.originalUrl)}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className={`px-1.5 py-0.5 rounded ${
+              debugInfo.sourceType === 'real-debrid' ? 'bg-green-500/20 text-green-400' :
+              debugInfo.sourceType === 'hls' ? 'bg-blue-500/20 text-blue-400' :
+              debugInfo.sourceType === 'direct' ? 'bg-yellow-500/20 text-yellow-400' :
+              'bg-muted text-muted-foreground'
+            }`}>
+              {debugInfo.sourceType}
+            </span>
+            {debugInfo.isHls && (
+              <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
+                HLS
+              </span>
+            )}
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">CORS Proxy:</span>
+              <span className={debugInfo.usedCorsProxy ? 'text-green-400' : 'text-yellow-400'}>
+                {debugInfo.usedCorsProxy ? 'Yes' : 'No'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Player Mode:</span>
+              <span className="text-foreground">{debugInfo.playerMode}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
  * BasicVideoPlayer
  * - Plain <video> element
  * - Uses hls.js only when the browser can't play HLS natively
- * Designed to be simpler than Video.js (avoid VHS 2004/2002 path).
+ * - Debug overlay for stream diagnostics
  */
 export default function BasicVideoPlayer({
   media,
@@ -53,15 +117,22 @@ export default function BasicVideoPlayer({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [showDebug, setShowDebug] = useState(false);
 
   const src = media.source_url;
 
-  const preparedUrl = useMemo(() => {
+  // Use smart URL preparation with debug info
+  const debugInfo = useMemo<StreamDebugInfo | null>(() => {
     if (!src) return null;
-    return settings.useCorsProxy ? prepareStreamUrl(src, true) : forceHttps(src);
-  }, [src, settings.useCorsProxy]);
+    return prepareStreamUrlWithDebug(
+      src, 
+      settings.useCorsProxy, 
+      settings.useSmartProxy ?? true
+    );
+  }, [src, settings.useCorsProxy, settings.useSmartProxy]);
 
-  const isHls = useMemo(() => (src ? isHlsUrl(src) : false), [src]);
+  const preparedUrl = debugInfo?.preparedUrl ?? null;
+  const isHls = debugInfo?.isHls ?? false;
 
   const teardown = useCallback(() => {
     if (hlsRef.current) {
@@ -185,6 +256,13 @@ export default function BasicVideoPlayer({
           playsInline
           autoPlay
           muted
+        />
+
+        {/* Debug Overlay */}
+        <DebugOverlay 
+          debugInfo={debugInfo} 
+          isExpanded={showDebug}
+          onToggle={() => setShowDebug(v => !v)}
         />
 
         {isLoading && !hasError && (

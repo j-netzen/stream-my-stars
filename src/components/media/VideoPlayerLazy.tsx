@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect, useState, ComponentType } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { useNativePlayer } from "@/hooks/useNativePlayer";
+import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { toast } from "sonner";
 
 // Retry wrapper for dynamic imports that handles chunk loading failures
@@ -51,8 +52,9 @@ function lazyWithRetry<T extends ComponentType<unknown>>(
   });
 }
 
-// Lazy load the basic web player with retry logic for chunk failures
-const VideoPlayerComponent = lazyWithRetry(() => import("./BasicVideoPlayer"));
+// Lazy load both player options
+const BasicPlayerComponent = lazyWithRetry(() => import("./BasicVideoPlayer"));
+const VideoJsPlayerComponent = lazyWithRetry(() => import("./VideoPlayer").then(m => ({ default: m.VideoPlayer })));
 
 interface Media {
   id: string;
@@ -142,6 +144,7 @@ export function VideoPlayerLazy(props: VideoPlayerLazyProps) {
     playWithVLC, 
     getCompatibilityWarning 
   } = useNativePlayer();
+  const { settings } = usePlaybackSettings();
   
   const [useNativeVLC, setUseNativeVLC] = useState(false);
   const [isNativePlayerActive, setIsNativePlayerActive] = useState(false);
@@ -222,14 +225,18 @@ export function VideoPlayerLazy(props: VideoPlayerLazyProps) {
     );
   }
 
-  // Use web player with Video.js
+  // Select player based on settings
+  const PlayerComponent = settings.playerEngine === 'videojs' 
+    ? VideoJsPlayerComponent 
+    : BasicPlayerComponent;
+
   return (
     <Suspense fallback={<VideoPlayerLoading />}>
       <ErrorBoundaryForChunk 
         onError={() => setChunkLoadError(true)}
-        key={retryKey}
+        key={`${retryKey}-${settings.playerEngine}`}
       >
-        <VideoPlayerComponent 
+        <PlayerComponent 
           media={media}
           onClose={onClose}
           streamQuality={streamQuality}

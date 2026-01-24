@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
+export type PlayerEngine = 'basic' | 'videojs';
+
 export interface PlaybackSettings {
   // Buffer settings
   bufferAhead: number; // seconds to buffer ahead (5-60)
@@ -7,12 +9,14 @@ export interface PlaybackSettings {
   
   // Playback
   limitFps30: boolean; // optional 30 fps limit for slower devices
+  playerEngine: PlayerEngine; // which video player to use
   
   // Stream filtering
   onlyShowCachedStreams: boolean; // hide uncached streams in selection dialog
   
   // Network settings
   useCorsProxy: boolean; // route streams through CORS proxy to bypass restrictions
+  useSmartProxy: boolean; // automatically detect when to use backend vs public proxy
   
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
@@ -23,8 +27,10 @@ const DEFAULT_SETTINGS: PlaybackSettings = {
   bufferAhead: 30,
   autoQualityDowngrade: true,
   limitFps30: false,
+  playerEngine: 'basic', // basic player by default
   onlyShowCachedStreams: false,
   useCorsProxy: true, // enabled by default
+  useSmartProxy: true, // smart detection by default
   connectionSpeedMbps: null,
   isSlowConnection: false,
 };
