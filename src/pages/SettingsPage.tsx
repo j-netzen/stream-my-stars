@@ -9,34 +9,26 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Link2, Globe, Mouse, Gamepad2, Bug, Trash2, Shield, Play, Clapperboard, Server, Cloud } from "lucide-react";
-import { getRealDebridUser, listDownloads, RealDebridUser, RealDebridUnrestrictedLink } from "@/lib/realDebrid";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Mouse, Gamepad2, Bug, Trash2, Shield, Play, Clapperboard, Server, Cloud, Box } from "lucide-react";
+import { getTorBoxUser, listDownloads, TorBoxUser, TorBoxTorrent } from "@/lib/torbox";
 import { getDebugLogs, clearDebugLogs, formatLogTime, getErrorTypeInfo, StreamDebugEntry } from "@/lib/streamDebugLog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import { RealDebridPairingDialog } from "@/components/RealDebridPairingDialog";
-import { hasOAuthTokens, clearStoredTokens } from "@/lib/realDebridOAuth";
 import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
-import { RealDebridHealthCheck } from "@/components/settings/RealDebridHealthCheck";
+import { TorBoxHealthCheck } from "@/components/settings/TorBoxHealthCheck";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset, inputMode, setInputMode } = useTVMode();
   const { settings: playbackSettings, updateSetting: updatePlaybackSetting, measureConnectionSpeed } = usePlaybackSettings();
   const { checkForUpdates, forceRefresh, isChecking, lastChecked } = useServiceWorkerUpdate();
-  const [rdUser, setRdUser] = useState<RealDebridUser | null>(null);
-  const [rdDownloads, setRdDownloads] = useState<RealDebridUnrestrictedLink[]>([]);
-  const [isLoadingRd, setIsLoadingRd] = useState(false);
-  const [rdError, setRdError] = useState<string | null>(null);
+  const [tbUser, setTbUser] = useState<TorBoxUser | null>(null);
+  const [tbDownloads, setTbDownloads] = useState<TorBoxTorrent[]>([]);
+  const [isLoadingTb, setIsLoadingTb] = useState(false);
+  const [tbError, setTbError] = useState<string | null>(null);
   const [isTestingSpeed, setIsTestingSpeed] = useState(false);
-  const [clientRdApiKey, setClientRdApiKey] = useState(() => 
-    localStorage.getItem("realDebridApiKey") || ""
-  );
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [showPairingDialog, setShowPairingDialog] = useState(false);
-  const [isOAuthConnected, setIsOAuthConnected] = useState(() => hasOAuthTokens());
   const [torrentioAddonUrl, setTorrentioAddonUrl] = useState(() => 
     localStorage.getItem("torrentioAddonUrl") || ""
   );
@@ -52,52 +44,52 @@ export default function SettingsPage() {
     toast.success("Debug logs cleared");
   };
 
-  const fetchRealDebridData = async (retryCount = 0) => {
+  const fetchTorBoxData = async (retryCount = 0) => {
     const maxRetries = 2;
-    setIsLoadingRd(true);
-    setRdError(null);
+    setIsLoadingTb(true);
+    setTbError(null);
     try {
       const [userData, downloads] = await Promise.all([
-        getRealDebridUser(),
+        getTorBoxUser(),
         listDownloads(),
       ]);
-      setRdUser(userData);
-      setRdDownloads(downloads.slice(0, 10)); // Show last 10 downloads
+      setTbUser(userData);
+      setTbDownloads(downloads.slice(0, 10));
     } catch (error: any) {
-      console.error("Failed to fetch Real-Debrid data:", error);
+      console.error("Failed to fetch TorBox data:", error);
       const errorMsg = error.message || "";
       
-      // Check if it's a transient error and retry
       const isTransient = errorMsg.includes("502") || errorMsg.includes("504") || 
                           errorMsg.includes("tls") || errorMsg.includes("non-2xx") ||
                           errorMsg.includes("failed to fetch") || errorMsg.includes("network");
       
       if (isTransient && retryCount < maxRetries) {
-        console.log(`Retrying Real-Debrid fetch (attempt ${retryCount + 1}/${maxRetries})...`);
+        console.log(`Retrying TorBox fetch (attempt ${retryCount + 1}/${maxRetries})...`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        setIsLoadingRd(false);
-        return fetchRealDebridData(retryCount + 1);
+        setIsLoadingTb(false);
+        return fetchTorBoxData(retryCount + 1);
       }
       
-      // Provide user-friendly error messages
       if (isTransient) {
-        setRdError("Connection issue with Real-Debrid. Please try again.");
-      } else if (errorMsg.includes("expired") || errorMsg.includes("token") || errorMsg.includes("401")) {
-        setRdError("Session expired. Please re-link your Real-Debrid account.");
+        setTbError("Connection issue with TorBox. Please try again.");
+      } else if (errorMsg.includes("401") || errorMsg.includes("403") || errorMsg.includes("unauthorized")) {
+        setTbError("Invalid API key. Please check your TorBox API key.");
       } else if (errorMsg.includes("503") || errorMsg.includes("overloaded")) {
-        setRdError("Real-Debrid servers are busy. Please wait and try again.");
+        setTbError("TorBox servers are busy. Please wait and try again.");
       } else {
-        setRdError(errorMsg || "Failed to connect to Real-Debrid");
+        setTbError(errorMsg || "Failed to connect to TorBox");
       }
     }
-    setIsLoadingRd(false);
+    setIsLoadingTb(false);
   };
 
   useEffect(() => {
-    fetchRealDebridData();
+    fetchTorBoxData();
   }, []);
 
-  const isPremium = rdUser?.premium && new Date(rdUser.expiration) > new Date();
+  const isSubscribed = tbUser?.is_subscribed;
+  const premiumExpires = tbUser?.premium_expires_at ? new Date(tbUser.premium_expires_at) : null;
+  const isPremiumActive = isSubscribed && premiumExpires && premiumExpires > new Date();
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 B";
@@ -117,7 +109,6 @@ export default function SettingsPage() {
     toast.success(`UI scale set to ${SCALE_PRESETS[preset].label} (${SCALE_PRESETS[preset].value}%)`);
   };
 
-
   const handleCheckForUpdates = async () => {
     toast.info("Checking for updates...");
     
@@ -125,7 +116,6 @@ export default function SettingsPage() {
     
     if (result.hasUpdate) {
       toast.success(result.message);
-      // Small delay before reload to show the toast
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -379,7 +369,7 @@ export default function SettingsPage() {
               </div>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
                 {playbackSettings.onlyShowCachedStreams 
-                  ? "Only streams already cached on Real-Debrid are shown for instant playback" 
+                  ? "Only streams already cached on TorBox are shown for instant playback" 
                   : "All available streams are shown, including uncached ones"}
               </p>
             </div>
@@ -410,8 +400,8 @@ export default function SettingsPage() {
               </div>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
                 {playbackSettings.limitFps30 
-                  ? "Capped at 30fps to reduce CPU usage on slower devices" 
-                  : "Allows up to 60fps for smoother playback when available"}
+                  ? "Limits to 30fps transcoded streams for smoother playback on slower devices" 
+                  : "Uses highest available quality including 60fps when available"}
               </p>
             </div>
             <Switch
@@ -433,7 +423,7 @@ export default function SettingsPage() {
                   variant={playbackSettings.useCorsProxy ? "default" : "secondary"}
                   className={cn(
                     "text-xs",
-                    playbackSettings.useCorsProxy && "bg-green-500/20 text-green-500 border-green-500/30"
+                    playbackSettings.useCorsProxy && "bg-blue-500/20 text-blue-500 border-blue-500/30"
                   )}
                 >
                   {playbackSettings.useCorsProxy ? "Enabled" : "Off"}
@@ -441,8 +431,8 @@ export default function SettingsPage() {
               </div>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
                 {playbackSettings.useCorsProxy 
-                  ? "Routes streams through a proxy to bypass CORS/copyright restrictions" 
-                  : "Direct stream access without proxy (may fail on some providers)"}
+                  ? "Routes streams through a proxy to bypass CORS restrictions" 
+                  : "Streams directly from source (faster but may fail on some sources)"}
               </p>
             </div>
             <Switch
@@ -453,7 +443,7 @@ export default function SettingsPage() {
             />
           </div>
 
-          {/* Proxy Mode Selector (only shown when CORS proxy is enabled) */}
+          {/* Proxy Mode Selector */}
           {playbackSettings.useCorsProxy && (
             <div className="space-y-3 pl-4 border-l-2 border-primary/30">
               <div className="flex items-center gap-2">
@@ -523,7 +513,7 @@ export default function SettingsPage() {
                     </Badge>
                   </div>
                   <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
-                    Skip proxy for Real-Debrid (has native CORS support)
+                    Skip proxy for TorBox (has native CORS support)
                   </p>
                 </div>
                 <Switch
@@ -751,48 +741,48 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Real-Debrid */}
+      {/* TorBox */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-                <Zap className={cn("text-green-500", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                Real-Debrid
+                <Box className={cn("text-blue-500", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+                TorBox
               </CardTitle>
-              <CardDescription className={isTVMode ? "text-base" : ""}>Premium link unrestriction service</CardDescription>
+              <CardDescription className={isTVMode ? "text-base" : ""}>Premium debrid service</CardDescription>
             </div>
             <Button 
               variant="outline" 
               size={isTVMode ? "lg" : "sm"} 
-              onClick={() => fetchRealDebridData()} 
-              disabled={isLoadingRd}
+              onClick={() => fetchTorBoxData()} 
+              disabled={isLoadingTb}
             >
-              {isLoadingRd ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              {isLoadingTb ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {rdError ? (
+          {tbError ? (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-destructive flex-1">
                 <XCircle className="w-4 h-4" />
-                <span className={cn(isTVMode ? "text-base" : "text-sm")}>{rdError}</span>
+                <span className={cn(isTVMode ? "text-base" : "text-sm")}>{tbError}</span>
               </div>
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => fetchRealDebridData()}
+                onClick={() => fetchTorBoxData()}
               >
                 Retry
               </Button>
             </div>
-          ) : isLoadingRd && !rdUser ? (
+          ) : isLoadingTb && !tbUser ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className={cn(isTVMode ? "text-base" : "text-sm")}>Loading account info...</span>
             </div>
-          ) : rdUser ? (
+          ) : tbUser ? (
             <>
               {/* Account Status */}
               <div className={cn(
@@ -800,20 +790,16 @@ export default function SettingsPage() {
                 isTVMode ? "p-4" : "p-3"
               )}>
                 <div className="flex items-center gap-3">
-                  {rdUser.avatar && (
-                    <img 
-                      src={rdUser.avatar} 
-                      alt="Avatar" 
-                      className={cn("rounded-full", isTVMode ? "w-14 h-14" : "w-10 h-10")} 
-                    />
-                  )}
+                  <Box className={cn("text-blue-500", isTVMode ? "w-10 h-10" : "w-8 h-8")} />
                   <div>
-                    <p className={cn("font-medium", isTVMode && "text-lg")}>{rdUser.username}</p>
-                    <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>{rdUser.email}</p>
+                    <p className={cn("font-medium", isTVMode && "text-lg")}>{tbUser.email}</p>
+                    <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                      Plan: {tbUser.plan === 0 ? "Free" : `Premium (Plan ${tbUser.plan})`}
+                    </p>
                   </div>
                 </div>
-                <Badge variant={isPremium ? "default" : "secondary"} className={cn(isPremium ? "bg-green-500" : "", isTVMode && "text-base px-3 py-1")}>
-                  {isPremium ? (
+                <Badge variant={isPremiumActive ? "default" : "secondary"} className={cn(isPremiumActive ? "bg-green-500" : "", isTVMode && "text-base px-3 py-1")}>
+                  {isPremiumActive ? (
                     <><CheckCircle className="w-3 h-3 mr-1" /> Premium</>
                   ) : (
                     <><XCircle className="w-3 h-3 mr-1" /> Free</>
@@ -822,167 +808,73 @@ export default function SettingsPage() {
               </div>
 
               {/* Premium Expiration */}
-              {rdUser.expiration && (
+              {premiumExpires && (
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-muted-foreground" />
                   <span className={cn(isTVMode ? "text-base" : "text-sm")}>
-                    {isPremium ? (
-                      <>Premium expires {formatDistanceToNow(new Date(rdUser.expiration), { addSuffix: true })} ({format(new Date(rdUser.expiration), "PPP")})</>
+                    {isPremiumActive ? (
+                      <>Premium expires {formatDistanceToNow(premiumExpires, { addSuffix: true })} ({format(premiumExpires, "PPP")})</>
                     ) : (
-                      <>Premium expired on {format(new Date(rdUser.expiration), "PPP")}</>
+                      <>Premium expired on {format(premiumExpires, "PPP")}</>
                     )}
                   </span>
                 </div>
               )}
 
-              {/* Points */}
+              {/* Total Downloaded */}
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-yellow-500" />
-                <span className={cn(isTVMode ? "text-base" : "text-sm")}>{rdUser.points} fidelity points</span>
+                <Download className="w-4 h-4 text-muted-foreground" />
+                <span className={cn(isTVMode ? "text-base" : "text-sm")}>
+                  {formatBytes(tbUser.total_downloaded)} downloaded
+                </span>
               </div>
 
               {/* Recent Downloads */}
-              {rdDownloads.length > 0 && (
+              {tbDownloads.length > 0 && (
                 <div className="space-y-2">
                   <p className={cn("font-medium flex items-center gap-2", isTVMode ? "text-base" : "text-sm")}>
                     <Download className="w-4 h-4" />
                     Recent Downloads
                   </p>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {rdDownloads.map((dl) => (
+                    {tbDownloads.map((dl) => (
                       <div key={dl.id} className={cn(
                         "flex items-center justify-between bg-secondary/20 rounded",
                         isTVMode ? "p-3 text-base" : "p-2 text-sm"
                       )}>
-                        <span className="truncate flex-1 mr-2">{dl.filename}</span>
-                        <span className="text-muted-foreground whitespace-nowrap">{formatBytes(dl.filesize)}</span>
+                        <span className="truncate flex-1 mr-2">{dl.name}</span>
+                        <span className="text-muted-foreground flex-shrink-0">
+                          {formatBytes(dl.size)}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+
+              {/* API Health Check */}
+              <div className="pt-4 border-t border-border/50">
+                <TorBoxHealthCheck isTVMode={isTVMode} />
+              </div>
             </>
           ) : (
-            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-              Real-Debrid API key not configured or invalid.
-            </p>
+            <div className="text-center py-4">
+              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+                TorBox API key is configured in Lovable Cloud secrets.
+              </p>
+              <p className={cn("text-muted-foreground mt-2", isTVMode ? "text-sm" : "text-xs")}>
+                Get your API key from{" "}
+                <a 
+                  href="https://torbox.app/settings" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  torbox.app/settings
+                </a>
+              </p>
+            </div>
           )}
-
-          {/* API Health Check */}
-          <div className="pt-4 border-t border-border/50">
-            <RealDebridHealthCheck isTVMode={isTVMode} />
-          </div>
-
-          {/* OAuth Device Pairing */}
-          <div className="pt-4 border-t border-border/50 space-y-3">
-            <div className="flex items-start gap-2">
-              <Link2 className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
-              <div className="space-y-1 flex-1">
-                <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
-                  Device Authorization
-                </Label>
-                <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
-                  Link your Real-Debrid account using the TV-style device pairing flow. No API key needed.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {isOAuthConnected ? (
-                <>
-                  <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30 gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    Device Linked
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size={isTVMode ? "lg" : "sm"}
-                    onClick={() => {
-                      clearStoredTokens();
-                      setIsOAuthConnected(false);
-                      setClientRdApiKey("");
-                      toast.success("Device unlinked");
-                      fetchRealDebridData();
-                    }}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    Unlink Device
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="default"
-                  size={isTVMode ? "lg" : "default"}
-                  onClick={() => setShowPairingDialog(true)}
-                  className="gap-2"
-                >
-                  <Link2 className="w-4 h-4" />
-                  Link Device
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Client-side API Key for fallback */}
-          <div className="pt-4 border-t border-border/50 space-y-3">
-            <div className="flex items-start gap-2">
-              <Key className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
-              <div className="space-y-1 flex-1">
-                <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
-                  Manual API Key (Alternative)
-                </Label>
-                <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
-                  Or enter your API key manually from{" "}
-                  <a 
-                    href="https://real-debrid.com/apitoken" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    real-debrid.com/apitoken
-                  </a>
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  placeholder="Enter Real-Debrid API key..."
-                  value={clientRdApiKey}
-                  onChange={(e) => setClientRdApiKey(e.target.value)}
-                  className={cn("pr-10", isTVMode && "text-base h-12")}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
-                  {showApiKey ? (
-                    <EyeOff className="w-4 h-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-muted-foreground" />
-                  )}
-                </Button>
-              </div>
-              <Button
-                variant="outline"
-                size={isTVMode ? "lg" : "default"}
-                onClick={() => {
-                  if (clientRdApiKey.trim()) {
-                    localStorage.setItem("realDebridApiKey", clientRdApiKey.trim());
-                    toast.success("API key saved");
-                  } else {
-                    localStorage.removeItem("realDebridApiKey");
-                    toast.success("API key removed");
-                  }
-                }}
-              >
-                Save
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -1010,7 +902,7 @@ export default function SettingsPage() {
               >
                 torrentio.strem.fun/configure
               </a>
-              {" "}with your Real-Debrid key, then paste the manifest URL here. This creates a personalized endpoint that avoids rate limiting.
+              {" "}then paste the manifest URL here. This creates a personalized endpoint that avoids rate limiting.
             </p>
           </div>
           
@@ -1021,7 +913,7 @@ export default function SettingsPage() {
             <div className="flex gap-2">
               <Input
                 type="url"
-                placeholder="https://torrentio.strem.fun/realdebrid=YOUR_KEY/manifest.json"
+                placeholder="https://torrentio.strem.fun/manifest.json"
                 value={torrentioAddonUrl}
                 onChange={(e) => setTorrentioAddonUrl(e.target.value)}
                 className={cn(isTVMode && "text-base h-12")}
@@ -1032,7 +924,6 @@ export default function SettingsPage() {
                 onClick={() => {
                   const url = torrentioAddonUrl.trim();
                   if (url) {
-                    // Validate URL format
                     if (!url.includes("torrentio.strem.fun")) {
                       toast.error("Invalid URL - must be a torrentio.strem.fun URL");
                       return;
@@ -1057,18 +948,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Real-Debrid Pairing Dialog */}
-      <RealDebridPairingDialog
-        open={showPairingDialog}
-        onOpenChange={setShowPairingDialog}
-        onSuccess={() => {
-          setIsOAuthConnected(true);
-          setClientRdApiKey(localStorage.getItem("realDebridApiKey") || "");
-          fetchRealDebridData();
-        }}
-        isTVMode={isTVMode}
-      />
-
       {/* Storage Info */}
       <Card>
         <CardHeader>
@@ -1091,46 +970,6 @@ export default function SettingsPage() {
             <div>
               <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Max Bitrate</p>
               <p className={cn("font-medium", isTVMode && "text-lg")}>50 Mbps</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Cache Limit</p>
-              <p className={cn("font-medium", isTVMode && "text-lg")}>128 MB</p>
-            </div>
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Preload Mode</p>
-              <p className={cn("font-medium", isTVMode && "text-lg")}>Auto (Full Buffer)</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Hardware Acceleration</p>
-              <p className={cn("font-medium text-green-500", isTVMode && "text-lg")}>Enabled (GPU)</p>
-            </div>
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Rendering</p>
-              <p className={cn("font-medium", isTVMode && "text-lg")}>GPU Compositing</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Audio Sync</p>
-              <p className={cn("font-medium text-green-500", isTVMode && "text-lg")}>Low Latency</p>
-            </div>
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Pitch Preservation</p>
-              <p className={cn("font-medium text-green-500", isTVMode && "text-lg")}>Enabled</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Audio Buffer</p>
-              <p className={cn("font-medium", isTVMode && "text-lg")}>Optimized (50ms)</p>
-            </div>
-            <div>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Sync Tolerance</p>
-              <p className={cn("font-medium", isTVMode && "text-lg")}>±25ms</p>
             </div>
           </div>
           <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
@@ -1164,7 +1003,7 @@ export default function SettingsPage() {
           
           <div className="flex flex-wrap gap-3">
             <Button 
-              size={isTVMode ? "tv" : "default"} 
+              size={isTVMode ? "lg" : "default"} 
               onClick={handleCheckForUpdates}
               disabled={isChecking}
               className="gap-2"
@@ -1184,7 +1023,7 @@ export default function SettingsPage() {
             
             <Button 
               variant="outline"
-              size={isTVMode ? "tv" : "default"} 
+              size={isTVMode ? "lg" : "default"} 
               onClick={handleForceRefresh}
               disabled={isChecking}
               className="gap-2"
@@ -1196,120 +1035,76 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* App Version */}
-      <Card>
-        <CardHeader>
-          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-            <Info className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            App Version
-          </CardTitle>
-          <CardDescription className={isTVMode ? "text-base" : ""}>
-            Current build information
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Version</span>
-            <Badge variant="secondary" className={isTVMode ? "text-base px-3 py-1" : ""}>
-              {import.meta.env.VITE_APP_VERSION || "1.0.0"}
-            </Badge>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Build Date</span>
-            <span className={cn("text-foreground font-medium", isTVMode ? "text-base" : "text-sm")}>
-              {import.meta.env.VITE_BUILD_DATE || new Date().toLocaleDateString()}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>Environment</span>
-            <Badge variant={import.meta.env.MODE === "production" ? "default" : "outline"} className={isTVMode ? "text-base px-3 py-1" : ""}>
-              {import.meta.env.MODE}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Network Debug Logs */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="space-y-1">
+            <div>
               <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
                 <Bug className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
                 Network Debug Logs
               </CardTitle>
               <CardDescription className={isTVMode ? "text-base" : ""}>
-                Recent network/stream failures for debugging ({debugLogs.length} entries)
+                Recent stream connection attempts and errors
               </CardDescription>
             </div>
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
-                size="sm" 
+                size={isTVMode ? "lg" : "sm"} 
                 onClick={refreshDebugLogs}
-                className="gap-1"
               >
-                <RefreshCw className="w-3 h-3" />
-                Refresh
+                <RefreshCw className="w-4 h-4" />
               </Button>
-              {debugLogs.length > 0 && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleClearDebugLogs}
-                  className="gap-1 text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Clear
-                </Button>
-              )}
+              <Button 
+                variant="outline" 
+                size={isTVMode ? "lg" : "sm"} 
+                onClick={handleClearDebugLogs}
+                disabled={debugLogs.length === 0}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {debugLogs.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-4">
-              No stream failures logged yet. Errors will appear here when streams fail to load.
+            <p className={cn("text-muted-foreground text-center py-4", isTVMode ? "text-base" : "text-sm")}>
+              No debug logs yet. Logs appear when stream connections fail.
             </p>
           ) : (
-            <ScrollArea className="h-[200px] rounded-md border border-border/50 bg-muted/30">
-              <div className="p-3 space-y-2">
-                {debugLogs.map((log) => {
-                  const typeInfo = getErrorTypeInfo(log.errorType);
+            <ScrollArea className="h-64">
+              <div className="space-y-2">
+                {debugLogs.map((log, index) => {
+                  const errorInfo = getErrorTypeInfo(log.errorType);
                   return (
                     <div 
-                      key={log.id} 
-                      className="p-2 rounded-lg bg-background/60 border border-border/30 text-sm space-y-1"
+                      key={index} 
+                      className={cn(
+                        "p-3 rounded-lg border",
+                        log.success ? "bg-green-500/10 border-green-500/20" : "bg-destructive/10 border-destructive/20"
+                      )}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className={cn("px-1.5 py-0.5 rounded text-xs font-medium shrink-0", typeInfo.color)}>
-                            {typeInfo.label}
-                          </span>
-                          <span className="font-medium truncate">{log.mediaTitle}</span>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={log.success ? "default" : "destructive"} className="text-xs">
+                              {log.success ? "Success" : errorInfo.label}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {formatLogTime(log.timestamp)}
+                            </span>
+                          </div>
+                          <p className={cn("font-mono text-xs truncate", log.success ? "text-green-500" : "text-destructive")}>
+                            {log.url}
+                          </p>
+                          {log.error && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {log.error}
+                            </p>
+                          )}
                         </div>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {formatLogTime(log.timestamp)}
-                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {log.errorMessage}
-                      </p>
-                      {log.streamTitle && (
-                        <p className="text-xs text-muted-foreground/70 truncate">
-                          Stream: {log.streamTitle}
-                        </p>
-                      )}
-                      {log.errorDetails && (
-                        <details className="text-xs">
-                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                            Details
-                          </summary>
-                          <pre className="mt-1 p-2 bg-muted/50 rounded text-[10px] overflow-x-auto whitespace-pre-wrap break-all">
-                            {log.errorDetails}
-                          </pre>
-                        </details>
-                      )}
                     </div>
                   );
                 })}
@@ -1320,20 +1115,10 @@ export default function SettingsPage() {
       </Card>
 
       {/* Sign Out */}
-      <Card>
-        <CardHeader>
-          <CardTitle className={cn("flex items-center gap-2 text-destructive", isTVMode && "text-xl")}>
-            <LogOut className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            Sign Out
-          </CardTitle>
-          <CardDescription className={isTVMode ? "text-base" : ""}>Sign out of your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" size={isTVMode ? "tv" : "default"} onClick={signOut}>
-            Sign Out
-          </Button>
-        </CardContent>
-      </Card>
+      <Button variant="destructive" className={cn("w-full gap-2", isTVMode && "h-14 text-lg")} onClick={signOut}>
+        <LogOut className="w-4 h-4" />
+        Sign Out
+      </Button>
     </div>
   );
 }
