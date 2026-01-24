@@ -3,7 +3,7 @@ project_id = "azrfvjecmcloaqidrspi"
 [functions.tmdb]
 verify_jwt = true
 
-[functions.real-debrid]
+[functions.torbox]
 verify_jwt = true
 
 [functions.categorize-media]

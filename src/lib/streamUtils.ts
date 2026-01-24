@@ -20,7 +20,7 @@ export type ProxyMode = 'none' | 'public' | 'backend';
 /**
  * Stream source types for smart proxy decision
  */
-export type StreamSourceType = 'real-debrid' | 'hls' | 'direct' | 'unknown';
+export type StreamSourceType = 'torbox' | 'hls' | 'direct' | 'unknown';
 
 /**
  * Debug info for stream URL analysis
@@ -43,14 +43,14 @@ export function detectStreamSourceType(url: string): StreamSourceType {
   
   const lowerUrl = url.toLowerCase();
   
-  // Real-Debrid URLs
+  // TorBox URLs
   if (
-    lowerUrl.includes('real-debrid.com') || 
-    lowerUrl.includes('rdb.so') ||
-    lowerUrl.includes('rd.') ||
-    lowerUrl.includes('/d/') && lowerUrl.includes('debrid')
+    lowerUrl.includes('torbox.app') || 
+    lowerUrl.includes('api.torbox') ||
+    lowerUrl.includes('.torbox.') ||
+    lowerUrl.includes('/torbox/')
   ) {
-    return 'real-debrid';
+    return 'torbox';
   }
   
   // HLS manifests
@@ -136,12 +136,12 @@ export function shouldUseCorsProxy(url: string, forceCorsProxy: boolean, useSmar
   const sourceType = detectStreamSourceType(url);
   
   // Smart proxy decisions:
-  // - Real-Debrid: No proxy needed (they set proper CORS headers)
+  // - TorBox: No proxy needed (they set proper CORS headers)
   // - HLS: Usually needs proxy for fragment requests
   // - Direct: Often needs proxy for cross-origin
   switch (sourceType) {
-    case 'real-debrid':
-      return false; // RD has proper CORS
+    case 'torbox':
+      return false; // TorBox has proper CORS
     case 'hls':
       return true; // HLS typically needs proxy
     case 'direct':
