@@ -212,36 +212,39 @@ export function VideoPlayerLazy(props: VideoPlayerLazyProps) {
     );
   }
 
-  // Handle chunk load errors
-  if (chunkLoadError) {
-    return (
-      <VideoPlayerError 
-        onClose={onClose}
-        onRetry={() => {
-          setChunkLoadError(false);
-          setRetryKey(k => k + 1);
-        }}
-      />
-    );
-  }
-
-  // Select player based on settings
-  const PlayerComponent = settings.playerEngine === 'videojs' 
-    ? VideoJsPlayerComponent 
-    : BasicPlayerComponent;
-
-  return (
-    <Suspense fallback={<VideoPlayerLoading />}>
-      <ErrorBoundaryForChunk 
-        onError={() => setChunkLoadError(true)}
-        key={`${retryKey}-${settings.playerEngine}`}
-      >
-        <PlayerComponent 
+  // Select player based on settings - Default to Basic (HLS.js) player for stability
+  const useVideoJs = settings.playerEngine === 'videojs';
+  
+  // Render the appropriate player
+  const renderPlayer = () => {
+    if (useVideoJs) {
+      return (
+        <VideoJsPlayerComponent 
           media={media}
           onClose={onClose}
           streamQuality={streamQuality}
           onPlaybackError={onPlaybackError}
         />
+      );
+    }
+    
+    return (
+      <BasicPlayerComponent 
+        media={media}
+        onClose={onClose}
+        streamQuality={streamQuality}
+        onPlaybackError={onPlaybackError}
+      />
+    );
+  };
+
+  return (
+    <Suspense fallback={<VideoPlayerLoading />}>
+      <ErrorBoundaryForChunk 
+        onError={() => setChunkLoadError(true)}
+        key={`player-${retryKey}-${settings.playerEngine}`}
+      >
+        {renderPlayer()}
       </ErrorBoundaryForChunk>
     </Suspense>
   );
