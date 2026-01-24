@@ -32,7 +32,7 @@ function lazyWithRetry<T extends ComponentType<unknown>>(
               const cache = await caches.open(name);
               const keys = await cache.keys();
               for (const key of keys) {
-                if (key.url.includes('VideoPlayer')) {
+                if (key.url.includes('VideoPlayer') || key.url.includes('BasicVideoPlayer')) {
                   await cache.delete(key);
                   console.log('[VideoPlayerLazy] Cleared stale cache entry:', key.url);
                 }
@@ -51,8 +51,8 @@ function lazyWithRetry<T extends ComponentType<unknown>>(
   });
 }
 
-// Lazy load the VideoPlayer component with retry logic for chunk failures
-const VideoPlayerComponent = lazyWithRetry(() => import("./VideoPlayer"));
+// Lazy load the basic web player with retry logic for chunk failures
+const VideoPlayerComponent = lazyWithRetry(() => import("./BasicVideoPlayer"));
 
 interface Media {
   id: string;
