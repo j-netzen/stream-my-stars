@@ -62,22 +62,22 @@ const qualityRanking: Record<string, number> = {
 };
 
 // Check if URL is already a direct Real-Debrid download link or cached debrid link
-export function isDirectRdLink(url: string): boolean {
+export function isDirectDebridLink(url: string): boolean {
   // NEVER treat Torrentio resolve URLs as direct - they need to be resolved first
   if (url.includes("torrentio.strem.fun/resolve/") || 
       url.includes("torrentio.strem.fun/stream/")) {
     return false;
   }
   
-  // Common Real-Debrid direct download patterns
-  if (url.includes("real-debrid.com/d/") || 
-      url.includes("rdb.so/") ||
-      url.includes(".rdeb.io/") ||
-      url.includes("download.real-debrid.com/")) {
+  // TorBox direct download patterns
+  if (url.includes("torbox.app") || 
+      url.includes("api.torbox") ||
+      url.includes(".torbox.") ||
+      url.includes("/torbox/")) {
     return true;
   }
   
-  // Torrentio RD cached links - they use debrid.io or contain debrid patterns
+  // Common debrid direct download patterns (generic)
   if (url.includes("debrid.io/") || 
       url.includes("/debrid/") ||
       url.includes("debrid-link")) {
@@ -154,8 +154,8 @@ export function parseStreamInfo(stream: TorrentioStream): {
   // Get quality rank for sorting
   const qualityRank = qualityRanking[quality] || qualityRanking["UNKNOWN"];
   
-  // Check if it's a direct RD link
-  const isDirectLink = isDirectRdLink(url);
+  // Check if it's a direct debrid link (cached)
+  const isDirectLink = isDirectDebridLink(url);
   
   return { quality, size, seeds, source, qualityRank, isDirectLink };
 }

@@ -111,7 +111,7 @@ function DebugOverlay({
           {/* Source Type Badges */}
           <div className="flex flex-wrap gap-2">
             <span className={`px-1.5 py-0.5 rounded ${
-              debugInfo.sourceType === 'real-debrid' ? 'bg-green-500/20 text-green-400' :
+              debugInfo.sourceType === 'torbox' ? 'bg-green-500/20 text-green-400' :
               debugInfo.sourceType === 'hls' ? 'bg-blue-500/20 text-blue-400' :
               debugInfo.sourceType === 'direct' ? 'bg-yellow-500/20 text-yellow-400' :
               'bg-muted text-muted-foreground'

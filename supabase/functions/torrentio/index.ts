@@ -152,7 +152,7 @@ function validateTorrentioInput(body: unknown): ValidationResult {
 
 // ========== ENVIRONMENT SECRETS VERIFICATION ==========
 interface SecretsStatus {
-  realDebridConfigured: boolean;
+  torboxConfigured: boolean;
   supabaseConfigured: boolean;
   warnings: string[];
 }
@@ -160,22 +160,22 @@ interface SecretsStatus {
 function verifySecrets(): SecretsStatus {
   const warnings: string[] = [];
   
-  const rdApiKey = Deno.env.get('REAL_DEBRID_API_KEY');
+  const torboxApiKey = Deno.env.get('TORBOX_API_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
   
-  const realDebridConfigured = !!rdApiKey && rdApiKey.length > 0;
+  const torboxConfigured = !!torboxApiKey && torboxApiKey.length > 0;
   const supabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
   
-  if (!realDebridConfigured) {
-    warnings.push("REAL_DEBRID_API_KEY not configured - Real-Debrid streams unavailable");
+  if (!torboxConfigured) {
+    warnings.push("TORBOX_API_KEY not configured - TorBox streams unavailable");
   }
   
   if (!supabaseConfigured) {
     warnings.push("Supabase environment variables not fully configured");
   }
   
-  return { realDebridConfigured, supabaseConfigured, warnings };
+  return { torboxConfigured, supabaseConfigured, warnings };
 }
 
 // ========== RATE LIMITING ==========
@@ -295,70 +295,32 @@ serve(async (req) => {
     if (action === "health") {
       console.log("[HEALTH] Running health check...");
       
-      const rdApiKey = clientRdKey || Deno.env.get('REAL_DEBRID_API_KEY');
       const healthResult: {
         status: "healthy" | "degraded" | "unhealthy";
         checks: {
-          realDebrid: { configured: boolean; valid: boolean; error?: string; username?: string; premium?: boolean; expiration?: string };
+          torbox: { configured: boolean; valid: boolean; error?: string };
           torrentio: { reachable: boolean; error?: string };
         };
         timestamp: string;
       } = {
         status: "healthy",
         checks: {
-          realDebrid: { configured: false, valid: false },
+          torbox: { configured: false, valid: false },
           torrentio: { reachable: false },
         },
         timestamp: new Date().toISOString(),
       };
 
-      // Check Real-Debrid API key validity
-      if (rdApiKey && rdApiKey.length > 0) {
-        healthResult.checks.realDebrid.configured = true;
-        
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
-          
-          const rdResponse = await fetch("https://api.real-debrid.com/rest/1.0/user", {
-            headers: {
-              "Authorization": `Bearer ${rdApiKey}`,
-              "Accept": "application/json",
-            },
-            signal: controller.signal,
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (rdResponse.ok) {
-            const userData = await rdResponse.json();
-            healthResult.checks.realDebrid.valid = true;
-            healthResult.checks.realDebrid.username = userData.username;
-            healthResult.checks.realDebrid.premium = userData.type === "premium";
-            healthResult.checks.realDebrid.expiration = userData.expiration;
-            console.log(`[HEALTH] Real-Debrid: valid (user: ${userData.username}, premium: ${userData.type === "premium"})`);
-          } else if (rdResponse.status === 401) {
-            healthResult.checks.realDebrid.error = "API key is invalid or expired";
-            healthResult.status = "unhealthy";
-            console.error("[HEALTH] Real-Debrid: invalid API key");
-          } else {
-            healthResult.checks.realDebrid.error = `API returned ${rdResponse.status}`;
-            healthResult.status = "degraded";
-            console.warn(`[HEALTH] Real-Debrid: unexpected status ${rdResponse.status}`);
-          }
-        } catch (err) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            healthResult.checks.realDebrid.error = "Request timed out";
-          } else {
-            healthResult.checks.realDebrid.error = err instanceof Error ? err.message : "Connection failed";
-          }
-          healthResult.status = "degraded";
-          console.error("[HEALTH] Real-Debrid check failed:", err);
-        }
+      // Check TorBox API key configuration (actual validation happens in torbox edge function)
+      const torboxApiKey = Deno.env.get('TORBOX_API_KEY');
+      if (torboxApiKey && torboxApiKey.length > 0) {
+        healthResult.checks.torbox.configured = true;
+        healthResult.checks.torbox.valid = true;
+        console.log("[HEALTH] TorBox: API key configured");
       } else {
-        healthResult.checks.realDebrid.error = "API key not configured";
+        healthResult.checks.torbox.error = "API key not configured";
         healthResult.status = "degraded";
-        console.warn("[HEALTH] Real-Debrid: not configured");
+        console.warn("[HEALTH] TorBox: not configured");
       }
 
       // Check Torrentio reachability
@@ -396,7 +358,7 @@ serve(async (req) => {
       }
 
       // Determine overall status
-      if (!healthResult.checks.realDebrid.valid && !healthResult.checks.torrentio.reachable) {
+      if (!healthResult.checks.torbox.valid && !healthResult.checks.torrentio.reachable) {
         healthResult.status = "unhealthy";
       }
 

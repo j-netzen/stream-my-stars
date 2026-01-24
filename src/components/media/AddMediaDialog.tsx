@@ -654,12 +654,12 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
       };
 
       await addMedia.mutateAsync(input);
-      toast.success("Media added via Real-Debrid!");
+      toast.success("Media added via TorBox!");
       resetForm();
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Real-Debrid error:", error);
-      toast.error(error.message || "Failed to process with Real-Debrid");
+      console.error("TorBox error:", error);
+      toast.error(error.message || "Failed to process with TorBox");
       setRdStatus(null);
     }
     setIsUnrestricting(false);
@@ -974,21 +974,21 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
           </TabsContent>
 
           <TabsContent value="debrid" className="space-y-4 mt-4">
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm">
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm">
               <p className="font-medium text-foreground mb-1 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-green-500" />
-                Real-Debrid Integration
+                <Zap className="w-4 h-4 text-blue-500" />
+                TorBox Integration
               </p>
               <p className="text-muted-foreground">
-                Search TMDB for metadata to stream via Real-Debrid.
+                Search TMDB for metadata to stream via TorBox.
               </p>
             </div>
 
-            {/* Progress indicator for Real-Debrid processing */}
+            {/* Progress indicator for TorBox processing */}
             {isUnrestricting && rdStatus && (
               <div className="space-y-2 p-3 bg-secondary/30 rounded-lg">
                 <div className="flex items-center gap-2 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                   <span>{rdStatus}</span>
                 </div>
                 {rdProgress > 0 && (
