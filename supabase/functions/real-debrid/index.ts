@@ -125,12 +125,19 @@ async function rdFetch(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       
-      // Check if it's a retryable error
+      // Check if it's a retryable error - include TLS/connection issues
+      const errorMsg = lastError.message.toLowerCase();
       const isRetryable = 
         lastError.name === 'AbortError' || // Timeout
-        lastError.message.includes('connection') ||
-        lastError.message.includes('http2') ||
-        lastError.message.includes('network');
+        errorMsg.includes('connection') ||
+        errorMsg.includes('http2') ||
+        errorMsg.includes('network') ||
+        errorMsg.includes('tls') ||
+        errorMsg.includes('handshake') ||
+        errorMsg.includes('eof') ||
+        errorMsg.includes('reset') ||
+        errorMsg.includes('socket') ||
+        errorMsg.includes('connect');
       
       if (!isRetryable || attempt === maxRetries) {
         throw lastError;
@@ -603,9 +610,19 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMsgLower = errorMessage.toLowerCase();
     const isTimeout = error instanceof Error && error.name === 'AbortError';
-    const isConnectionError = error instanceof Error && 
-      (errorMessage.includes('connection') || errorMessage.includes('http2') || errorMessage.includes('network'));
+    const isConnectionError = error instanceof Error && (
+      errorMsgLower.includes('connection') || 
+      errorMsgLower.includes('http2') || 
+      errorMsgLower.includes('network') ||
+      errorMsgLower.includes('tls') ||
+      errorMsgLower.includes('handshake') ||
+      errorMsgLower.includes('eof') ||
+      errorMsgLower.includes('reset') ||
+      errorMsgLower.includes('socket') ||
+      errorMsgLower.includes('connect')
+    );
     
     console.error("Error in real-debrid function:", {
       message: errorMessage,
