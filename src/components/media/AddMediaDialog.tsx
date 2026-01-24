@@ -590,7 +590,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
   };
 
   // TorBox handler (for manual magnet/URL entry)
-  const handleRealDebrid = async () => {
+  const handleTorBoxMagnet = async () => {
     if (!rdLink.trim()) {
       toast.error("Please enter a link or magnet");
       return;
