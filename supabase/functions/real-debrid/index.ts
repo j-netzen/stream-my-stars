@@ -572,10 +572,18 @@ serve(async (req) => {
         });
       }
       
+      // Actions where bad_token/error_code 8 means "file unavailable" (not auth error)
+      const streamRelatedActions = ["unrestrict", "streaming", "add_magnet", "add_torrent", "select_files", "torrent_info"];
+      const isStreamAction = streamRelatedActions.includes(action);
+      
       // Determine if this is a "skip stream" error (file/stream unavailable)
-      // These should return 410 (Gone) so client knows to try next stream
-      const isSkipStreamError = [7, 8, 35].includes(errorCode) || 
-        ["infringing_file", "hoster_unavailable", "file_unavailable", "bad_token"].includes(data.error);
+      // bad_token is only a "skip stream" error for stream-related actions
+      // For user/downloads/torrents actions, bad_token is an auth error
+      const isSkipStreamError = (
+        [35].includes(errorCode) || // infringing_file
+        ["infringing_file", "hoster_unavailable", "file_unavailable"].includes(data.error) ||
+        (isStreamAction && (errorCode === 7 || errorCode === 8 || data.error === "bad_token"))
+      );
       
       if (data.error === "service_unavailable" || errorCode === 25) {
         userMessage = "Real-Debrid servers are temporarily overloaded. Please wait a moment and try again.";
@@ -583,9 +591,12 @@ serve(async (req) => {
         userMessage = "This content is unavailable due to copyright restrictions. Please try a different stream.";
       } else if (data.error === "hoster_unavailable" || errorCode === 7) {
         userMessage = "The file host is temporarily unavailable. Please try again later or choose a different stream.";
-      } else if (data.error === "file_unavailable" || data.error === "bad_token" || errorCode === 8) {
-        // Note: bad_token with error_code 8 means the file/link is no longer valid, not auth error
+      } else if (isStreamAction && (data.error === "file_unavailable" || data.error === "bad_token" || errorCode === 8)) {
+        // bad_token with error_code 8 on stream actions = file/link expired
         userMessage = "The file is no longer available. Please try a different stream.";
+      } else if (!isStreamAction && (data.error === "bad_token" || errorCode === 8)) {
+        // bad_token on non-stream actions (like /user) = auth error
+        userMessage = "Invalid or expired API token. Please re-link your Real-Debrid account.";
       } else if (data.error === "torrent_too_big" || errorCode === 19) {
         userMessage = "This torrent is too large for your account. Please try a smaller file.";
       } else if (data.error === "magnet_conversion" || errorCode === 28) {
@@ -599,12 +610,15 @@ serve(async (req) => {
       // Choose appropriate status code:
       // - 410 (Gone) for skip-stream errors: tells client to try next stream
       // - 200 for service_unavailable (with error in body)
+      // - 401 for auth errors
       // - Original status for other errors
       let returnStatus = response.status;
       if (data.error === "service_unavailable" || errorCode === 25) {
         returnStatus = 200;
       } else if (isSkipStreamError) {
         returnStatus = 410; // Gone - signals client to try next stream
+      } else if (!isStreamAction && (data.error === "bad_token" || errorCode === 8)) {
+        returnStatus = 401; // Auth error
       }
 
       return new Response(
