@@ -25,8 +25,12 @@ import {
   Loader2,
   AlertCircle,
   Radio,
+  Box,
+  ServerCrash,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -376,7 +380,7 @@ export function Sidebar({
           "relative z-10 p-2 border-t border-border/50 space-y-1",
           isTVMode && "p-2 space-y-0.5"
         )}>
-          {/* TorBox Status Indicator */}
+          {/* TorBox Status Indicator with Badge */}
           {collapsed && !mobileOpen ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -384,25 +388,43 @@ export function Sidebar({
                   onClick={refreshTbStatus}
                   disabled={tbStatus === "loading"}
                   className={cn(
-                    "flex items-center justify-center rounded-lg text-sm transition-colors hover:bg-secondary/50",
-                    isTVMode ? "px-2 py-2.5 min-h-[44px]" : "px-2 py-2",
-                    tbStatus === "connected" && "text-green-500",
-                    tbStatus === "disconnected" && "text-yellow-500",
-                    tbStatus === "error" && "text-destructive",
-                    tbStatus === "loading" && "text-muted-foreground"
+                    "w-full flex items-center justify-center rounded-lg transition-colors hover:bg-secondary/50",
+                    isTVMode ? "px-2 py-2.5 min-h-[44px]" : "px-2 py-2"
                   )}
                 >
-                  {tbStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                  {tbStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                  {tbStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                  {tbStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
+                  <div className="relative">
+                    {tbStatus === "loading" && <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />}
+                    {tbStatus === "connected" && <Box className="w-5 h-5 text-blue-500" />}
+                    {tbStatus === "disconnected" && <CloudOff className="w-5 h-5 text-yellow-500" />}
+                    {tbStatus === "error" && <AlertCircle className="w-5 h-5 text-destructive" />}
+                    {tbStatus === "service_unavailable" && <ServerCrash className="w-5 h-5 text-orange-500" />}
+                    {/* Status dot */}
+                    {tbStatus !== "loading" && (
+                      <span className={cn(
+                        "absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-card",
+                        tbStatus === "connected" && "bg-green-500",
+                        tbStatus === "disconnected" && "bg-yellow-500",
+                        tbStatus === "error" && "bg-destructive",
+                        tbStatus === "service_unavailable" && "bg-orange-500"
+                      )} />
+                    )}
+                  </div>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right">
+              <TooltipContent side="right" className="max-w-[200px]">
                 {tbStatus === "loading" && "Checking TorBox..."}
-                {tbStatus === "connected" && `TorBox: ${tbUser?.email || "Connected"} (Click to refresh)`}
-                {tbStatus === "disconnected" && "TorBox: Not Subscribed (Click to refresh)"}
-                {tbStatus === "error" && "TorBox: Connection Error (Click to retry)"}
+                {tbStatus === "connected" && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                      <span className="font-medium">TorBox Connected</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{tbUser?.email}</p>
+                  </div>
+                )}
+                {tbStatus === "disconnected" && "TorBox: Not Subscribed"}
+                {tbStatus === "error" && "TorBox: Connection Error"}
+                {tbStatus === "service_unavailable" && "TorBox: Servers Busy"}
               </TooltipContent>
             </Tooltip>
           ) : (
@@ -410,29 +432,44 @@ export function Sidebar({
               onClick={refreshTbStatus}
               disabled={tbStatus === "loading"}
               className={cn(
-                "w-full flex items-center justify-between gap-2 rounded-lg font-medium transition-colors",
-                isTVMode ? "px-3 py-2 min-h-[40px] text-xs" : "px-4 py-2 text-xs",
-                tbStatus === "connected" && "text-green-500 bg-green-500/10 hover:bg-green-500/20",
-                tbStatus === "disconnected" && "text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20",
-                tbStatus === "error" && "text-destructive bg-destructive/10 hover:bg-destructive/20",
-                tbStatus === "loading" && "text-muted-foreground bg-secondary/50"
+                "w-full flex items-center gap-2 rounded-lg font-medium transition-colors",
+                isTVMode ? "px-3 py-2 min-h-[40px]" : "px-3 py-2",
+                "bg-secondary/30 hover:bg-secondary/50"
               )}
             >
-              <div className="flex items-center gap-2">
-                {tbStatus === "loading" && <Loader2 className={cn("animate-spin", isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                {tbStatus === "connected" && <Cloud className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                {tbStatus === "disconnected" && <CloudOff className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                {tbStatus === "error" && <AlertCircle className={cn(isTVMode ? "w-4 h-4" : "w-4 h-4")} />}
-                <span>
-                  {tbStatus === "loading" && "Checking TB..."}
-                  {tbStatus === "connected" && `TB: ${tbUser?.email?.split('@')[0] || "Connected"}`}
-                  {tbStatus === "disconnected" && "TB: Not Subscribed"}
-                  {tbStatus === "error" && "TB: Error"}
-                </span>
+              <div className="relative">
+                {tbStatus === "loading" && <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />}
+                {tbStatus === "connected" && <Box className="w-4 h-4 text-blue-500" />}
+                {tbStatus === "disconnected" && <CloudOff className="w-4 h-4 text-yellow-500" />}
+                {tbStatus === "error" && <AlertCircle className="w-4 h-4 text-destructive" />}
+                {tbStatus === "service_unavailable" && <ServerCrash className="w-4 h-4 text-orange-500" />}
               </div>
-              {tbStatus !== "loading" && (
-                <span className={cn("opacity-60", isTVMode ? "text-[10px]" : "text-[10px]")}>Refresh</span>
-              )}
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span className={cn("truncate", isTVMode ? "text-xs" : "text-xs")}>
+                  {tbStatus === "loading" && "Checking..."}
+                  {tbStatus === "connected" && (tbUser?.email?.split('@')[0] || "Connected")}
+                  {tbStatus === "disconnected" && "Not Subscribed"}
+                  {tbStatus === "error" && "Error"}
+                  {tbStatus === "service_unavailable" && "Servers Busy"}
+                </span>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-[10px] px-1.5 py-0 h-4 flex-shrink-0",
+                    tbStatus === "connected" && "border-green-500/50 text-green-500 bg-green-500/10",
+                    tbStatus === "disconnected" && "border-yellow-500/50 text-yellow-500 bg-yellow-500/10",
+                    tbStatus === "error" && "border-destructive/50 text-destructive bg-destructive/10",
+                    tbStatus === "service_unavailable" && "border-orange-500/50 text-orange-500 bg-orange-500/10",
+                    tbStatus === "loading" && "border-muted-foreground/50 text-muted-foreground"
+                  )}
+                >
+                  {tbStatus === "loading" && "..."}
+                  {tbStatus === "connected" && "OK"}
+                  {tbStatus === "disconnected" && "FREE"}
+                  {tbStatus === "error" && "ERR"}
+                  {tbStatus === "service_unavailable" && "BUSY"}
+                </Badge>
+              </div>
             </button>
           )}
           
