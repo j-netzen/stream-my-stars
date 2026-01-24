@@ -158,7 +158,14 @@ export class StreamUnavailableError extends Error {
  */
 function isTransientGatewayError(error: unknown): boolean {
   if (!error) return false;
-  const message = String(error).toLowerCase();
+  
+  // Handle error objects with status/code properties
+  const errorObj = error as { status?: number; code?: number; message?: string };
+  if (errorObj.status === 502 || errorObj.status === 504 || errorObj.code === 502 || errorObj.code === 504) {
+    return true;
+  }
+  
+  const message = (errorObj.message || String(error)).toLowerCase();
   return (
     message.includes("502") ||
     message.includes("504") ||
@@ -169,7 +176,11 @@ function isTransientGatewayError(error: unknown): boolean {
     message.includes("connection") ||
     message.includes("eof") ||
     message.includes("reset") ||
-    message.includes("socket")
+    message.includes("socket") ||
+    message.includes("non-2xx status code") ||
+    message.includes("failed to fetch") ||
+    message.includes("network") ||
+    message.includes("functionshttp")
   );
 }
 

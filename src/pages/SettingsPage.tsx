@@ -52,7 +52,8 @@ export default function SettingsPage() {
     toast.success("Debug logs cleared");
   };
 
-  const fetchRealDebridData = async () => {
+  const fetchRealDebridData = async (retryCount = 0) => {
+    const maxRetries = 2;
     setIsLoadingRd(true);
     setRdError(null);
     try {
@@ -64,7 +65,30 @@ export default function SettingsPage() {
       setRdDownloads(downloads.slice(0, 10)); // Show last 10 downloads
     } catch (error: any) {
       console.error("Failed to fetch Real-Debrid data:", error);
-      setRdError(error.message || "Failed to connect to Real-Debrid");
+      const errorMsg = error.message || "";
+      
+      // Check if it's a transient error and retry
+      const isTransient = errorMsg.includes("502") || errorMsg.includes("504") || 
+                          errorMsg.includes("tls") || errorMsg.includes("non-2xx") ||
+                          errorMsg.includes("failed to fetch") || errorMsg.includes("network");
+      
+      if (isTransient && retryCount < maxRetries) {
+        console.log(`Retrying Real-Debrid fetch (attempt ${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        setIsLoadingRd(false);
+        return fetchRealDebridData(retryCount + 1);
+      }
+      
+      // Provide user-friendly error messages
+      if (isTransient) {
+        setRdError("Connection issue with Real-Debrid. Please try again.");
+      } else if (errorMsg.includes("expired") || errorMsg.includes("token") || errorMsg.includes("401")) {
+        setRdError("Session expired. Please re-link your Real-Debrid account.");
+      } else if (errorMsg.includes("503") || errorMsg.includes("overloaded")) {
+        setRdError("Real-Debrid servers are busy. Please wait and try again.");
+      } else {
+        setRdError(errorMsg || "Failed to connect to Real-Debrid");
+      }
     }
     setIsLoadingRd(false);
   };
@@ -741,7 +765,7 @@ export default function SettingsPage() {
             <Button 
               variant="outline" 
               size={isTVMode ? "lg" : "sm"} 
-              onClick={fetchRealDebridData} 
+              onClick={() => fetchRealDebridData()} 
               disabled={isLoadingRd}
             >
               {isLoadingRd ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -750,9 +774,18 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {rdError ? (
-            <div className="flex items-center gap-2 text-destructive">
-              <XCircle className="w-4 h-4" />
-              <span className={cn(isTVMode ? "text-base" : "text-sm")}>{rdError}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-destructive flex-1">
+                <XCircle className="w-4 h-4" />
+                <span className={cn(isTVMode ? "text-base" : "text-sm")}>{rdError}</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => fetchRealDebridData()}
+              >
+                Retry
+              </Button>
             </div>
           ) : isLoadingRd && !rdUser ? (
             <div className="flex items-center gap-2 text-muted-foreground">
