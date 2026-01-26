@@ -5,6 +5,68 @@ import { useVideoPlayerOrientation } from "@/hooks/useScreenOrientation";
 import { prepareStreamUrlWithDebug, StreamDebugInfo } from "@/lib/streamUtils";
 import { getTorrentInfo, getStreamableUrl, findLargestVideoFile, TorBoxTorrent } from "@/lib/torbox";
 
+/**
+ * Get MIME type from URL or filename
+ */
+const getMimeType = (url: string): string => {
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  
+  // HLS/DASH streaming formats
+  if (cleanUrl.includes('.m3u8') || cleanUrl.includes('m3u8')) {
+    return 'application/x-mpegURL';
+  }
+  if (cleanUrl.includes('.mpd')) {
+    return 'application/dash+xml';
+  }
+  
+  // Extract extension
+  const extension = cleanUrl.split('.').pop() || '';
+  
+  const mimeTypes: Record<string, string> = {
+    // Standard video containers
+    'mp4': 'video/mp4',
+    'm4v': 'video/mp4',
+    'mov': 'video/mp4',
+    'webm': 'video/webm',
+    'ogv': 'video/ogg',
+    'ogg': 'video/ogg',
+    
+    // MKV/Matroska - use x-matroska for broader support
+    'mkv': 'video/x-matroska',
+    'mk3d': 'video/x-matroska',
+    'mka': 'audio/x-matroska',
+    
+    // AVI and legacy formats
+    'avi': 'video/x-msvideo',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv',
+    'f4v': 'video/x-f4v',
+    
+    // MPEG formats
+    'mpeg': 'video/mpeg',
+    'mpg': 'video/mpeg',
+    'mpe': 'video/mpeg',
+    'mpv': 'video/mpeg',
+    'm2v': 'video/mpeg',
+    
+    // Transport streams
+    'ts': 'video/mp2t',
+    'mts': 'video/mp2t',
+    'm2ts': 'video/mp2t',
+    
+    // 3GPP mobile formats
+    '3gp': 'video/3gpp',
+    '3g2': 'video/3gpp2',
+    
+    // Raw video
+    'h264': 'video/h264',
+    'h265': 'video/h265',
+    'hevc': 'video/hevc',
+  };
+  
+  return mimeTypes[extension] || 'video/mp4'; // Default to mp4 for unknown
+};
+
 export type PlayerState = "checking" | "preparing" | "ready" | "loading" | "playing" | "paused" | "error";
 
 interface Media {
@@ -15,6 +77,7 @@ interface Media {
   backdrop_path?: string | null;
   torboxTorrentId?: number;
   torboxFileId?: number;
+  torboxFileName?: string; // Store filename for MIME type detection
 }
 
 interface UseVideoPlayerOptions {
@@ -63,6 +126,7 @@ export function useVideoPlayer({
   // TorBox preparation state
   const [preparingTorrentId, setPreparingTorrentId] = useState<number | null>(null);
   const [resolvedStreamUrl, setResolvedStreamUrl] = useState<string | null>(null);
+  const [detectedMimeType, setDetectedMimeType] = useState<string | null>(null);
 
   // Derived values
   const effectiveSrc = resolvedStreamUrl || media.source_url;
@@ -158,6 +222,12 @@ export function useVideoPlayer({
     setErrorMessage("");
     recoveryAttemptRef.current = 0;
     teardownHls();
+
+    // Detect MIME type from URL or stored filename
+    const mimeType = detectedMimeType || 
+                     (media.torboxFileName ? getMimeType(media.torboxFileName) : getMimeType(preparedUrl));
+    
+    console.log('[Player] Initializing with MIME type:', mimeType, 'for URL:', preparedUrl.substring(0, 80));
 
     // Event handlers
     const onPlaying = () => {
@@ -258,10 +328,22 @@ export function useVideoPlayer({
         hls.loadSource(preparedUrl);
         hls.attachMedia(video);
       } else {
-        video.src = preparedUrl;
+        // Set source with MIME type for better compatibility
+        const source = document.createElement('source');
+        source.src = preparedUrl;
+        source.type = mimeType;
+        video.innerHTML = '';
+        video.appendChild(source);
+        video.load();
       }
     } else {
-      video.src = preparedUrl;
+      // Set source with MIME type for better compatibility
+      const source = document.createElement('source');
+      source.src = preparedUrl;
+      source.type = mimeType;
+      video.innerHTML = '';
+      video.appendChild(source);
+      video.load();
     }
 
     return () => {
@@ -275,7 +357,7 @@ export function useVideoPlayer({
       video.removeEventListener("error", onNativeError);
       teardownHls();
     };
-  }, [preparedUrl, isHls, usesBackendProxy, authToken, teardownHls, resetControlsTimeout, onPlaybackError, playerState]);
+  }, [preparedUrl, isHls, usesBackendProxy, authToken, teardownHls, resetControlsTimeout, onPlaybackError, playerState, detectedMimeType, media.torboxFileName]);
 
   // Play click handler - Fixed to handle HLS.js manifest loading
   const handlePlayClick = useCallback(() => {
@@ -419,10 +501,20 @@ export function useVideoPlayer({
           const torrent = await getTorrentInfo(media.torboxTorrentId);
           
           if (torrent.download_present || torrent.progress === 1) {
-            const fileId = media.torboxFileId || findLargestVideoFile(torrent)?.id;
-            if (fileId) {
+            const videoFile = media.torboxFileId 
+              ? torrent.files.find(f => f.id === media.torboxFileId)
+              : findLargestVideoFile(torrent);
+            
+            if (videoFile) {
+              const fileId = videoFile.id;
               const url = await getStreamableUrl(media.torboxTorrentId, fileId);
               setResolvedStreamUrl(url);
+              
+              // Store MIME type from filename
+              const mimeType = getMimeType(videoFile.name || videoFile.short_name);
+              setDetectedMimeType(mimeType);
+              console.log('[Player] Detected TorBox file MIME type:', mimeType, 'from:', videoFile.name);
+              
               setPlayerState("ready");
             } else {
               setPlayerState("error");
