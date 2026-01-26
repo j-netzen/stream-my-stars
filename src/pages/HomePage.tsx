@@ -5,7 +5,7 @@ import { useTVMode } from "@/hooks/useTVMode";
 import { MediaRow } from "@/components/media/MediaRow";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
-import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
+import { StreamSelectionDialog, EpisodeContext } from "@/components/media/StreamSelectionDialog";
 import { VideoPlayerWrapper } from "@/components/media/player";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { PageSkeleton } from "@/components/ui/media-skeleton";
@@ -20,21 +20,44 @@ export default function HomePage() {
   const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
+  const [activeEpisodeContext, setActiveEpisodeContext] = useState<EpisodeContext | null>(null);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
+  const [nextEpisodeRequest, setNextEpisodeRequest] = useState<{ media: Media; season: number; episode: number } | null>(null);
 
   // Handle stream selection - store both media and URL
-  const handleStreamSelected = (updatedMedia: Media, streamUrl: string) => {
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, _qualityInfo?: any, _tryNext?: any, episodeContext?: EpisodeContext) => {
     setActiveMedia(updatedMedia);
     setActiveStreamUrl(streamUrl);
-    console.log("[HomePage] Stream selected:", streamUrl.substring(0, 50) + "...");
+    setActiveEpisodeContext(episodeContext || null);
+    console.log("[HomePage] Stream selected:", streamUrl.substring(0, 50) + "...", episodeContext);
   };
 
   // Close player
   const handleClosePlayer = () => {
     setActiveMedia(null);
     setActiveStreamUrl(null);
+    setActiveEpisodeContext(null);
+  };
+
+  // Handle play next episode
+  const handlePlayNextEpisode = () => {
+    if (!activeMedia || !activeEpisodeContext) return;
+    
+    // Queue up the next episode to be selected
+    const nextEpisode = activeEpisodeContext.episodeNumber + 1;
+    setNextEpisodeRequest({
+      media: activeMedia,
+      season: activeEpisodeContext.seasonNumber,
+      episode: nextEpisode,
+    });
+    
+    // Close current player and open stream dialog for next episode
+    setActiveMedia(null);
+    setActiveStreamUrl(null);
+    setActiveEpisodeContext(null);
+    setStreamSelectMedia(activeMedia);
   };
 
   const continueWatching = getContinueWatching();
@@ -234,8 +257,15 @@ export default function HomePage() {
       <StreamSelectionDialog
         media={streamSelectMedia}
         open={!!streamSelectMedia}
-        onOpenChange={(open) => !open && setStreamSelectMedia(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setStreamSelectMedia(null);
+            setNextEpisodeRequest(null);
+          }
+        }}
         onStreamSelected={handleStreamSelected}
+        defaultSeason={nextEpisodeRequest?.season}
+        defaultEpisode={nextEpisodeRequest?.episode}
       />
 
       {/* Media Details Dialog */}
@@ -259,6 +289,9 @@ export default function HomePage() {
           media={activeMedia}
           streamUrl={activeStreamUrl}
           onClose={handleClosePlayer}
+          episodeNumber={activeEpisodeContext?.episodeNumber}
+          seasonNumber={activeEpisodeContext?.seasonNumber}
+          onPlayNextEpisode={activeMedia.media_type === "tv" ? handlePlayNextEpisode : undefined}
         />
       )}
     </PullToRefresh>

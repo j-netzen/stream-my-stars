@@ -15,6 +15,7 @@ interface VideoPlayerWrapperProps {
   onClose: () => void;
   episodeNumber?: number;
   seasonNumber?: number;
+  onPlayNextEpisode?: () => void;
 }
 
 export function VideoPlayerWrapper({ 
@@ -22,7 +23,8 @@ export function VideoPlayerWrapper({
   streamUrl, 
   onClose,
   episodeNumber,
-  seasonNumber 
+  seasonNumber,
+  onPlayNextEpisode,
 }: VideoPlayerWrapperProps) {
   const { settings } = usePlaybackSettings();
 
@@ -48,6 +50,7 @@ export function VideoPlayerWrapper({
       onClose={onClose}
       episodeNumber={episodeNumber}
       seasonNumber={seasonNumber}
+      onPlayNextEpisode={onPlayNextEpisode}
     />
   );
 }
