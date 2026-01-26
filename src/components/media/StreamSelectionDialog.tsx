@@ -1010,7 +1010,7 @@ export function StreamSelectionDialog({
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="w-screen h-screen max-w-none max-h-none p-0 rounded-none border-none overflow-hidden bg-[#0a0a0f]"
+        className="fixed inset-0 w-screen h-screen max-w-none max-h-none p-0 rounded-none border-none overflow-hidden bg-[#0a0a0f] translate-x-0 translate-y-0 left-0 top-0"
         onKeyDown={(e) => {
           if (isResolving) return;
           if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
