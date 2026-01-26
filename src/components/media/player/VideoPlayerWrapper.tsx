@@ -13,9 +13,17 @@ interface VideoPlayerWrapperProps {
   media: Media;
   streamUrl: string;
   onClose: () => void;
+  episodeNumber?: number;
+  seasonNumber?: number;
 }
 
-export function VideoPlayerWrapper({ media, streamUrl, onClose }: VideoPlayerWrapperProps) {
+export function VideoPlayerWrapper({ 
+  media, 
+  streamUrl, 
+  onClose,
+  episodeNumber,
+  seasonNumber 
+}: VideoPlayerWrapperProps) {
   const { settings } = usePlaybackSettings();
 
   console.log(`[VideoPlayerWrapper] Using player: ${settings.playerType}, URL: ${streamUrl.substring(0, 50)}...`);
@@ -26,6 +34,8 @@ export function VideoPlayerWrapper({ media, streamUrl, onClose }: VideoPlayerWra
         media={media}
         streamUrl={streamUrl}
         onClose={onClose}
+        episodeNumber={episodeNumber}
+        seasonNumber={seasonNumber}
       />
     );
   }
@@ -36,6 +46,8 @@ export function VideoPlayerWrapper({ media, streamUrl, onClose }: VideoPlayerWra
       media={media}
       streamUrl={streamUrl}
       onClose={onClose}
+      episodeNumber={episodeNumber}
+      seasonNumber={seasonNumber}
     />
   );
 }
