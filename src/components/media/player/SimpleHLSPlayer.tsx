@@ -9,7 +9,7 @@
  * 5. Includes debug panel for diagnostics
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Media } from "@/hooks/useMedia";
@@ -74,6 +74,24 @@ export function SimpleHLSPlayer({
     },
   });
 
+  // Keep latest callbacks in refs so fullscreen listeners don't re-subscribe on every render.
+  // This prevents a render -> effect cleanup -> cleanup() -> state update -> render loop.
+  const cleanupRef = useRef(cleanup);
+  const stopTrackingRef = useRef(stopTracking);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    cleanupRef.current = cleanup;
+  }, [cleanup]);
+
+  useEffect(() => {
+    stopTrackingRef.current = stopTracking;
+  }, [stopTracking]);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // Sync video ref with progress tracker (runs once after mount)
   useEffect(() => {
     if (videoRef.current) {
@@ -89,17 +107,6 @@ export function SimpleHLSPlayer({
     return () => clearInterval(interval);
   }, [isPlaying, updateBufferInfo]);
 
-  // Exit fullscreen handler
-  const handleFullscreenChange = useCallback(() => {
-    if (isInitializingRef.current) return;
-    if (!document.fullscreenElement) {
-      stopTracking();
-      cleanup();
-      setIsPlaying(false);
-      onClose();
-    }
-  }, [cleanup, stopTracking, onClose]);
-
   // Lock body scroll
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -109,15 +116,28 @@ export function SimpleHLSPlayer({
     };
   }, []);
 
-  // Fullscreen listener
+  // Fullscreen listener (subscribe once; use refs to access latest callbacks)
   useEffect(() => {
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      stopTracking();
-      cleanup();
+    const onFullscreenChange = () => {
+      if (isInitializingRef.current) return;
+
+      if (!document.fullscreenElement) {
+        stopTrackingRef.current();
+        // Avoid state resets here; the player is about to close/unmount.
+        cleanupRef.current(false);
+        setIsPlaying(false);
+        onCloseRef.current();
+      }
     };
-  }, [handleFullscreenChange, cleanup, stopTracking]);
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      stopTrackingRef.current();
+      cleanupRef.current(false);
+    };
+  }, []);
 
   // Seamless stream switching
   useEffect(() => {
@@ -138,18 +158,22 @@ export function SimpleHLSPlayer({
 
     try {
       isInitializingRef.current = true;
-      
-      if (container.requestFullscreen) {
-        await container.requestFullscreen();
-      } else if ((container as any).webkitRequestFullscreen) {
-        await (container as any).webkitRequestFullscreen();
-      }
-      
+
+      // Start loading immediately while we still have a user gesture, then enter fullscreen.
+      // (Some browsers drop autoplay permission if we wait on the fullscreen promise first.)
+      loadSource(streamUrl, resumeTime);
+
+      const fullscreenPromise = container.requestFullscreen
+        ? container.requestFullscreen()
+        : (container as any).webkitRequestFullscreen
+          ? (container as any).webkitRequestFullscreen()
+          : null;
+
+      await (fullscreenPromise ?? Promise.resolve());
+
       setTimeout(() => {
         isInitializingRef.current = false;
       }, 100);
-
-      loadSource(streamUrl, resumeTime);
     } catch (e) {
       console.error('[SimpleHLSPlayer] Fullscreen/load error:', e);
       isInitializingRef.current = false;
