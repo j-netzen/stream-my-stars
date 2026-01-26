@@ -38,11 +38,18 @@ export interface StreamQualityInfo {
   qualityRank?: number;
 }
 
+export interface EpisodeContext {
+  seasonNumber: number;
+  episodeNumber: number;
+}
+
 interface StreamSelectionDialogProps {
   media: Media | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStreamSelected: (media: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void) => void;
+  onStreamSelected: (media: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void, episodeContext?: EpisodeContext) => void;
+  defaultSeason?: number;
+  defaultEpisode?: number;
 }
 
 export function StreamSelectionDialog({
@@ -50,6 +57,8 @@ export function StreamSelectionDialog({
   open,
   onOpenChange,
   onStreamSelected,
+  defaultSeason,
+  defaultEpisode,
 }: StreamSelectionDialogProps) {
   const { updateMedia } = useMedia();
   const { isTVMode } = useTVMode();
@@ -573,8 +582,9 @@ export function StreamSelectionDialog({
     if (open && media) {
       setStreams([]);
       setError(null);
-      setSelectedSeason(1);
-      setSelectedEpisode(1);
+      // Use default values if provided (for "play next episode")
+      setSelectedSeason(defaultSeason ?? 1);
+      setSelectedEpisode(defaultEpisode ?? 1);
       setQualityFilter("best");
       setActiveTab("streams");
       setDownloadSearchQuery("");
@@ -582,7 +592,7 @@ export function StreamSelectionDialog({
       handleSearch();
       loadDownloadsInBackground();
     }
-  }, [open, media?.id]);
+  }, [open, media?.id, defaultSeason, defaultEpisode]);
 
   // Load downloads in background (non-blocking)
   const loadDownloadsInBackground = async () => {
@@ -790,7 +800,10 @@ export function StreamSelectionDialog({
       
       setTimeout(() => {
         onOpenChange(false);
-        onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream());
+        const episodeContext = media.media_type === "tv" 
+          ? { seasonNumber: selectedSeason, episodeNumber: selectedEpisode }
+          : undefined;
+        onStreamSelected(media, streamUrl, qualityInfo, createTryNextStream(), episodeContext);
       }, 300);
       
     } catch (err: any) {
@@ -893,7 +906,10 @@ export function StreamSelectionDialog({
       
       setTimeout(() => {
         onOpenChange(false);
-        onStreamSelected(media, streamUrl, qualityInfo);
+        const episodeContext = media.media_type === "tv" 
+          ? { seasonNumber: selectedSeason, episodeNumber: selectedEpisode }
+          : undefined;
+        onStreamSelected(media, streamUrl, qualityInfo, undefined, episodeContext);
       }, 300);
       
     } catch (err: any) {
@@ -1147,7 +1163,10 @@ export function StreamSelectionDialog({
                     const episode = media.media_type === "tv" ? selectedEpisode : undefined;
                     quickPlay(media, (streamUrl, qualityInfo, tryNextStream) => {
                       const updatedMedia = { ...media, source_url: streamUrl };
-                      onStreamSelected(updatedMedia, streamUrl, qualityInfo, tryNextStream);
+                      const episodeContext = media.media_type === "tv" 
+                        ? { seasonNumber: selectedSeason, episodeNumber: selectedEpisode }
+                        : undefined;
+                      onStreamSelected(updatedMedia, streamUrl, qualityInfo, tryNextStream, episodeContext);
                       onOpenChange(false);
                     }, season, episode);
                   }}

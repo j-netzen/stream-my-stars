@@ -17,6 +17,7 @@ import { useHlsPlayback } from "./hooks/useHlsPlayback";
 import { useProgressTracker } from "./hooks/useProgressTracker";
 import { PlayerPosterOverlay } from "./components/PlayerPosterOverlay";
 import { PlayerDebugPanel } from "./components/PlayerDebugPanel";
+import { NextEpisodeOverlay } from "./components/NextEpisodeOverlay";
 
 interface SimpleHLSPlayerProps {
   media: Media;
@@ -25,6 +26,7 @@ interface SimpleHLSPlayerProps {
   onChangeStream?: () => void;
   episodeNumber?: number;
   seasonNumber?: number;
+  onPlayNextEpisode?: () => void;
 }
 
 export function SimpleHLSPlayer({
@@ -34,12 +36,17 @@ export function SimpleHLSPlayer({
   onChangeStream,
   episodeNumber,
   seasonNumber,
+  onPlayNextEpisode,
 }: SimpleHLSPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitializingRef = useRef(false);
   const currentStreamUrlRef = useRef<string>(streamUrl);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showNextEpisode, setShowNextEpisode] = useState(false);
+  
+  // Determine if this is a TV show with episode context
+  const isTVShow = media.media_type === "tv" && episodeNumber !== undefined && seasonNumber !== undefined;
 
   // Progress tracking
   const {
@@ -218,16 +225,38 @@ export function SimpleHLSPlayer({
         ref={videoRef}
         className={cn(
           "w-full h-full object-contain",
-          !isPlaying && "hidden"
+          (!isPlaying || showNextEpisode) && "hidden"
         )}
         controls
         playsInline
         onPause={saveProgress}
-        onEnded={stopTracking}
+        onEnded={() => {
+          stopTracking();
+          // Show next episode overlay for TV shows
+          if (isTVShow && onPlayNextEpisode) {
+            setShowNextEpisode(true);
+          }
+        }}
       />
 
+      {/* Next Episode Overlay (shown at end of TV episode) */}
+      {showNextEpisode && isTVShow && onPlayNextEpisode && (
+        <NextEpisodeOverlay
+          showTitle={media.title}
+          currentSeason={seasonNumber!}
+          currentEpisode={episodeNumber!}
+          totalEpisodes={media.episodes || undefined}
+          onPlayNext={() => {
+            setShowNextEpisode(false);
+            cleanup();
+            onPlayNextEpisode();
+          }}
+          onClose={handleClose}
+        />
+      )}
+
       {/* Poster overlay (shown before playback) */}
-      {!isPlaying && (
+      {!isPlaying && !showNextEpisode && (
         <PlayerPosterOverlay
           media={media}
           resumeTime={resumeTime}
