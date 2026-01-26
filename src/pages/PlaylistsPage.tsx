@@ -3,7 +3,7 @@ import { usePlaylists } from "@/hooks/usePlaylists";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "@/components/media/MediaCard";
-import { VideoPlayerLazy as VideoPlayer } from "@/components/media/VideoPlayerLazy";
+// VideoPlayer removed - will be rebuilt from scratch
 import { StreamSelectionDialog, StreamQualityInfo } from "@/components/media/StreamSelectionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,8 +48,6 @@ export default function PlaylistsPage() {
   const { progress } = useWatchProgress();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
-  const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>();
-  const [activeTryNextStream, setActiveTryNextStream] = useState<(() => void) | undefined>();
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
   const [newPlaylistPublic, setNewPlaylistPublic] = useState(false);
@@ -151,10 +149,10 @@ export default function PlaylistsPage() {
     }
   };
 
-  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void) => {
-    setActiveStreamQuality(qualityInfo);
-    setActiveTryNextStream(() => tryNextStream);
+  // Video player removed - handleStreamSelected now just sets activeMedia
+  const handleStreamSelected = (updatedMedia: Media, _streamUrl: string) => {
     setActiveMedia(updatedMedia);
+    console.log("[PlaylistsPage] Video player removed. Stream URL:", _streamUrl);
   };
 
   const handlePickForMe = () => {
@@ -402,18 +400,20 @@ export default function PlaylistsPage() {
         onStreamSelected={handleStreamSelected}
       />
 
-      {/* Video Player */}
+      {/* Video Player - Removed, will be rebuilt from scratch */}
       {activeMedia && (
-        <VideoPlayer 
-          media={activeMedia} 
-          onClose={() => {
-            setActiveMedia(null);
-            setActiveStreamQuality(undefined);
-            setActiveTryNextStream(undefined);
-          }}
-          streamQuality={activeStreamQuality}
-          onPlaybackError={activeTryNextStream}
-        />
+        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+          <div className="text-center p-6">
+            <p className="text-white text-xl mb-4">Video Player Removed</p>
+            <p className="text-white/60 mb-4">A new player will be built from scratch.</p>
+            <button 
+              onClick={() => setActiveMedia(null)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Public Confirmation Dialog */}

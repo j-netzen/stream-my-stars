@@ -9,9 +9,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Mouse, Gamepad2, Bug, Trash2, Shield, Play, Clapperboard, Server, Cloud, Box } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Mouse, Gamepad2, Trash2, Shield, Server, Cloud, Box } from "lucide-react";
 import { getTorBoxUser, listDownloads, TorBoxUser, TorBoxTorrent } from "@/lib/torbox";
-import { getDebugLogs, clearDebugLogs, formatLogTime, getErrorTypeInfo, StreamDebugEntry } from "@/lib/streamDebugLog";
+// Debug logs functionality removed with video player cleanup
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
@@ -33,18 +33,8 @@ export default function SettingsPage() {
   const [torrentioAddonUrl, setTorrentioAddonUrl] = useState(() => 
     localStorage.getItem("torrentioAddonUrl") || ""
   );
-  const [debugLogs, setDebugLogs] = useState<StreamDebugEntry[]>(() => getDebugLogs());
+  // Debug logs removed with video player cleanup
   const [showPairingDialog, setShowPairingDialog] = useState(false);
-  
-  const refreshDebugLogs = () => {
-    setDebugLogs(getDebugLogs());
-  };
-  
-  const handleClearDebugLogs = () => {
-    clearDebugLogs();
-    setDebugLogs([]);
-    toast.success("Debug logs cleared");
-  };
 
   const fetchTorBoxData = async (retryCount = 0) => {
     const maxRetries = 2;
@@ -300,57 +290,7 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Player Engine Selection */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Label className={cn("font-medium", isTVMode && "text-lg")}>
-                Player Engine
-              </Label>
-              <Badge 
-                variant="secondary"
-                className="text-xs"
-              >
-                {playbackSettings.playerEngine === 'basic' ? 'Basic (Recommended)' : 'Video.js'}
-              </Badge>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant={playbackSettings.playerEngine === 'basic' ? "default" : "outline"}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2",
-                  playbackSettings.playerEngine === 'basic' && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                  isTVMode && "h-14 text-lg"
-                )}
-                onClick={() => {
-                  updatePlaybackSetting('playerEngine', 'basic');
-                  toast.success("Switched to Basic player");
-                }}
-              >
-                <Play className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                Basic
-              </Button>
-              <Button
-                variant={playbackSettings.playerEngine === 'videojs' ? "default" : "outline"}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-2",
-                  playbackSettings.playerEngine === 'videojs' && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                  isTVMode && "h-14 text-lg"
-                )}
-                onClick={() => {
-                  updatePlaybackSetting('playerEngine', 'videojs');
-                  toast.success("Switched to Video.js player");
-                }}
-              >
-                <Clapperboard className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                Video.js
-              </Button>
-            </div>
-            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-              {playbackSettings.playerEngine === 'basic' 
-                ? "Lightweight HTML5 player with hls.js. More reliable for most streams." 
-                : "Full-featured Video.js player with VHS. Better for complex adaptive streams."}
-            </p>
-          </div>
+          {/* Player Engine removed - video player will be rebuilt from scratch */}
 
           {/* Only Show Cached Streams Toggle */}
           <div className="flex items-center justify-between">
@@ -1053,89 +993,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Network Debug Logs */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-                <Bug className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                Network Debug Logs
-              </CardTitle>
-              <CardDescription className={isTVMode ? "text-base" : ""}>
-                Recent stream connection attempts and errors
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size={isTVMode ? "lg" : "sm"} 
-                onClick={refreshDebugLogs}
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size={isTVMode ? "lg" : "sm"} 
-                onClick={handleClearDebugLogs}
-                disabled={debugLogs.length === 0}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {debugLogs.length === 0 ? (
-            <p className={cn("text-muted-foreground text-center py-4", isTVMode ? "text-base" : "text-sm")}>
-              No debug logs yet. Logs appear when stream connections fail.
-            </p>
-          ) : (
-            <ScrollArea className="h-64">
-              <div className="space-y-2">
-                {debugLogs.map((log, index) => {
-                  const errorInfo = getErrorTypeInfo(log.errorType);
-                  const isFailed = log.action === 'failed';
-                  return (
-                    <div 
-                      key={log.id || index} 
-                      className={cn(
-                        "p-3 rounded-lg border",
-                        isFailed ? "bg-destructive/10 border-destructive/20" : "bg-yellow-500/10 border-yellow-500/20"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge className={cn("text-xs", errorInfo.color)}>
-                              {errorInfo.label}
-                            </Badge>
-                            <Badge variant={isFailed ? "destructive" : "outline"} className="text-xs">
-                              {log.action === 'skipped' ? 'Skipped' : log.action === 'retry' ? 'Retried' : 'Failed'}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {formatLogTime(log.timestamp)}
-                            </span>
-                          </div>
-                          <p className="font-medium text-sm truncate">{log.mediaTitle}</p>
-                          {log.streamTitle && (
-                            <p className="font-mono text-xs truncate text-muted-foreground">
-                              {log.streamTitle}
-                            </p>
-                          )}
-                          <p className="text-xs text-destructive mt-1 line-clamp-2">
-                            {log.errorMessage}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+      {/* Network Debug Logs removed - video player will be rebuilt from scratch */}
 
       {/* Sign Out */}
       <Button variant="destructive" className={cn("w-full gap-2", isTVMode && "h-14 text-lg")} onClick={signOut}>
