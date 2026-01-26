@@ -3,7 +3,7 @@ import { usePlaylists } from "@/hooks/usePlaylists";
 import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { MediaCard } from "@/components/media/MediaCard";
-// VideoPlayer removed - will be rebuilt from scratch
+import { VideoPlayerWrapper } from "@/components/media/player";
 import { StreamSelectionDialog, StreamQualityInfo } from "@/components/media/StreamSelectionDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ export default function PlaylistsPage() {
   const { media, deleteMedia } = useMedia();
   const { progress } = useWatchProgress();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
+  const [activeStreamUrl, setActiveStreamUrl] = useState<string | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
@@ -149,10 +150,17 @@ export default function PlaylistsPage() {
     }
   };
 
-  // Video player removed - handleStreamSelected now just sets activeMedia
-  const handleStreamSelected = (updatedMedia: Media, _streamUrl: string) => {
+  // Handle stream selection - store both media and URL
+  const handleStreamSelected = (updatedMedia: Media, streamUrl: string) => {
     setActiveMedia(updatedMedia);
-    console.log("[PlaylistsPage] Video player removed. Stream URL:", _streamUrl);
+    setActiveStreamUrl(streamUrl);
+    console.log("[PlaylistsPage] Stream selected:", streamUrl.substring(0, 50) + "...");
+  };
+
+  // Close player
+  const handleClosePlayer = () => {
+    setActiveMedia(null);
+    setActiveStreamUrl(null);
   };
 
   const handlePickForMe = () => {
@@ -400,20 +408,13 @@ export default function PlaylistsPage() {
         onStreamSelected={handleStreamSelected}
       />
 
-      {/* Video Player - Removed, will be rebuilt from scratch */}
-      {activeMedia && (
-        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
-          <div className="text-center p-6">
-            <p className="text-white text-xl mb-4">Video Player Removed</p>
-            <p className="text-white/60 mb-4">A new player will be built from scratch.</p>
-            <button 
-              onClick={() => setActiveMedia(null)}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+      {/* Video Player */}
+      {activeMedia && activeStreamUrl && (
+        <VideoPlayerWrapper
+          media={activeMedia}
+          streamUrl={activeStreamUrl}
+          onClose={handleClosePlayer}
+        />
       )}
 
       {/* Public Confirmation Dialog */}
