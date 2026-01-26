@@ -155,19 +155,7 @@ export default function HomePage() {
           ? "space-y-10 mt-6 mx-[5%]" // TV overscan margins
           : "space-y-6 mt-2 landscape:space-y-4 landscape:-mt-4"
       )}>
-        {movies.length > 0 && (
-          <MediaRow
-            title="Movies"
-            media={movies}
-            progress={progress}
-            showContinue={false}
-            onPlay={handlePlay}
-            onDelete={handleDelete}
-            onMoreInfo={setDetailsMedia}
-            onAddToPlaylist={setPlaylistMedia}
-          />
-        )}
-
+        {/* Continue Watching - First priority */}
         {continueWatchingMedia.length > 0 && (
           <MediaRow
             title="Continue Watching"
@@ -184,6 +172,19 @@ export default function HomePage() {
           <MediaRow
             title="Recently Added"
             media={recentlyAdded}
+            progress={progress}
+            showContinue={false}
+            onPlay={handlePlay}
+            onDelete={handleDelete}
+            onMoreInfo={setDetailsMedia}
+            onAddToPlaylist={setPlaylistMedia}
+          />
+        )}
+
+        {movies.length > 0 && (
+          <MediaRow
+            title="Movies"
+            media={movies}
             progress={progress}
             showContinue={false}
             onPlay={handlePlay}
