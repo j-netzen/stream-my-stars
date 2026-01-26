@@ -42,6 +42,7 @@ export function SimpleHLSPlayer({
   const progressIntervalRef = useRef<number | null>(null);
   const loadTimeoutRef = useRef<number | null>(null);
   const currentStreamUrlRef = useRef<string>(streamUrl);
+  const isInitializingRef = useRef(false); // Guard against fullscreen race condition
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -137,8 +138,13 @@ export function SimpleHLSPlayer({
     }
   }, [stopProgressTracking, clearLoadTimeout]);
 
-  // Exit fullscreen handler
+  // Exit fullscreen handler - only cleanup when exiting, not during initialization
   const handleFullscreenChange = useCallback(() => {
+    // Skip if we're in the middle of initializing (entering fullscreen)
+    if (isInitializingRef.current) {
+      return;
+    }
+    // Only cleanup when exiting fullscreen (not when entering)
     if (!document.fullscreenElement) {
       cleanupHls();
       onClose();
@@ -188,6 +194,8 @@ export function SimpleHLSPlayer({
     const container = containerRef.current;
     if (!video || !container) return;
 
+    console.log('[SimpleHLSPlayer] Initializing playback for:', url);
+    
     setIsLoading(true);
     setError(null);
     setTimeoutMessage(null);
@@ -199,10 +207,18 @@ export function SimpleHLSPlayer({
     try {
       // Request fullscreen if needed
       if (enterFullscreen && !document.fullscreenElement) {
-        if (container.requestFullscreen) {
-          await container.requestFullscreen();
-        } else if ((container as any).webkitRequestFullscreen) {
-          await (container as any).webkitRequestFullscreen();
+        isInitializingRef.current = true; // Guard against fullscreenchange handler
+        try {
+          if (container.requestFullscreen) {
+            await container.requestFullscreen();
+          } else if ((container as any).webkitRequestFullscreen) {
+            await (container as any).webkitRequestFullscreen();
+          }
+        } finally {
+          // Small delay to ensure fullscreen is stable before clearing guard
+          setTimeout(() => {
+            isInitializingRef.current = false;
+          }, 100);
         }
       }
 
