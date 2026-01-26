@@ -92,13 +92,28 @@ export function SimpleHLSPlayer({
     saveProgress(); // Save one final time
   }, [saveProgress]);
 
-  // Cleanup HLS instance
+  // Cleanup HLS instance and video element
   const cleanupHls = useCallback(() => {
     stopProgressTracking();
+    
+    // Destroy HLS instance first
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    
+    // Reset video element completely
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load(); // Reset the video element state
+    }
+    
+    // Reset player state
+    setIsPlaying(false);
+    setIsLoading(false);
+    setError(null);
   }, [stopProgressTracking]);
 
   // Exit fullscreen handler
