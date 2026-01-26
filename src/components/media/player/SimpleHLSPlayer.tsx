@@ -5,11 +5,13 @@
  * 1. Shows a poster image with play button on load
  * 2. Goes fullscreen and autoplays when play is clicked
  * 3. Uses HLS.js for streaming support
+ * 4. Tracks watch progress and supports resume
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Hls from "hls.js";
 import { Media } from "@/hooks/useMedia";
+import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { getImageUrl } from "@/lib/tmdb";
 import { Play, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,16 +20,31 @@ interface SimpleHLSPlayerProps {
   media: Media;
   streamUrl: string;
   onClose: () => void;
+  episodeNumber?: number;
+  seasonNumber?: number;
 }
 
-export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerProps) {
+export function SimpleHLSPlayer({ 
+  media, 
+  streamUrl, 
+  onClose,
+  episodeNumber,
+  seasonNumber 
+}: SimpleHLSPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const progressIntervalRef = useRef<number | null>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { getProgressForMedia, updateProgress } = useWatchProgress();
+
+  // Get saved progress for this media
+  const savedProgress = getProgressForMedia(media.id, episodeNumber, seasonNumber);
+  const resumeTime = savedProgress?.progress_seconds || 0;
 
   // Get poster image
   const posterUrl = media.backdrop_path 
@@ -39,18 +56,54 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
   // Check if URL is HLS
   const isHLS = streamUrl.includes('.m3u8') || streamUrl.includes('m3u8');
 
+  // Save progress periodically
+  const saveProgress = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || video.paused) return;
+
+    const currentTime = Math.floor(video.currentTime);
+    const duration = Math.floor(video.duration) || null;
+    const completed = duration ? currentTime >= duration - 30 : false;
+
+    if (currentTime > 10) { // Only save if watched more than 10 seconds
+      updateProgress.mutate({
+        mediaId: media.id,
+        progressSeconds: currentTime,
+        durationSeconds: duration || undefined,
+        completed,
+        episodeNumber,
+        seasonNumber,
+      });
+    }
+  }, [media.id, episodeNumber, seasonNumber, updateProgress]);
+
+  // Start progress tracking interval
+  const startProgressTracking = useCallback(() => {
+    if (progressIntervalRef.current) return;
+    progressIntervalRef.current = window.setInterval(saveProgress, 15000); // Save every 15 seconds
+  }, [saveProgress]);
+
+  // Stop progress tracking
+  const stopProgressTracking = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    saveProgress(); // Save one final time
+  }, [saveProgress]);
+
   // Cleanup HLS instance
   const cleanupHls = useCallback(() => {
+    stopProgressTracking();
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-  }, []);
+  }, [stopProgressTracking]);
 
   // Exit fullscreen handler
   const handleFullscreenChange = useCallback(() => {
     if (!document.fullscreenElement) {
-      // User exited fullscreen, close the player
       cleanupHls();
       onClose();
     }
@@ -83,7 +136,6 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
 
       // Setup video source
       if (isHLS && Hls.isSupported()) {
-        // Use HLS.js
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
@@ -113,10 +165,15 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('[SimpleHLSPlayer] Manifest parsed, starting playback');
+          // Resume from saved position
+          if (resumeTime > 0) {
+            video.currentTime = resumeTime;
+          }
           video.play()
             .then(() => {
               setIsPlaying(true);
               setIsLoading(false);
+              startProgressTracking();
             })
             .catch((e) => {
               console.error('[SimpleHLSPlayer] Play failed:', e);
@@ -131,10 +188,14 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
         // Native HLS support (Safari)
         video.src = streamUrl;
         video.addEventListener('loadedmetadata', () => {
+          if (resumeTime > 0) {
+            video.currentTime = resumeTime;
+          }
           video.play()
             .then(() => {
               setIsPlaying(true);
               setIsLoading(false);
+              startProgressTracking();
             })
             .catch((e) => {
               console.error('[SimpleHLSPlayer] Native HLS play failed:', e);
@@ -146,10 +207,14 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
         // Direct video source
         video.src = streamUrl;
         video.addEventListener('canplay', () => {
+          if (resumeTime > 0) {
+            video.currentTime = resumeTime;
+          }
           video.play()
             .then(() => {
               setIsPlaying(true);
               setIsLoading(false);
+              startProgressTracking();
             })
             .catch((e) => {
               console.error('[SimpleHLSPlayer] Direct play failed:', e);
@@ -181,10 +246,22 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
     }
   };
 
+  // Format time for display
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    if (mins >= 60) {
+      const hours = Math.floor(mins / 60);
+      const remainingMins = mins % 60;
+      return `${hours}h ${remainingMins}m`;
+    }
+    return `${mins}m ${secs}s`;
+  };
+
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+      className="fixed inset-0 z-[100] bg-black"
     >
       {/* Close button */}
       <button
@@ -203,26 +280,36 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
         )}
         controls
         playsInline
+        onPause={saveProgress}
+        onEnded={stopProgressTracking}
       />
 
       {/* Poster with play button (shown before playback starts) */}
       {!isPlaying && (
         <div 
-          className="absolute inset-0 flex flex-col items-center justify-center"
+          className="absolute inset-0"
           style={{
             backgroundImage: posterUrl ? `url(${posterUrl})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
         >
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-black/60" />
+          {/* Gradient overlay - stronger at bottom */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
-          {/* Content */}
-          <div className="relative z-10 flex flex-col items-center gap-6">
-            <h2 className="text-2xl font-bold text-white text-center max-w-lg px-4">
+          {/* Content positioned at bottom center */}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-16 px-4">
+            {/* Title */}
+            <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-6 drop-shadow-lg">
               {media.title}
             </h2>
+
+            {/* Resume indicator */}
+            {resumeTime > 0 && !error && !isLoading && (
+              <p className="text-white/70 text-sm mb-3">
+                Resume from {formatTime(resumeTime)}
+              </p>
+            )}
 
             {error ? (
               <div className="text-center">
@@ -242,9 +329,9 @@ export function SimpleHLSPlayer({ media, streamUrl, onClose }: SimpleHLSPlayerPr
             ) : (
               <button
                 onClick={handlePlayClick}
-                className="group flex items-center justify-center w-24 h-24 bg-primary/90 hover:bg-primary rounded-full transition-all hover:scale-110"
+                className="group flex items-center justify-center w-20 h-20 bg-primary/90 hover:bg-primary rounded-full transition-all hover:scale-110 shadow-xl"
               >
-                <Play className="w-12 h-12 text-primary-foreground fill-current ml-1" />
+                <Play className="w-10 h-10 text-primary-foreground fill-current ml-1" />
               </button>
             )}
           </div>
