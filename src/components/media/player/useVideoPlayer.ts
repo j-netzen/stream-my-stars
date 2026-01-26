@@ -283,13 +283,20 @@ export function useVideoPlayer({
     if (!video) return;
 
     if (playerState === "ready") {
+      // Set up one-time listener for when video is ready to play
+      const handleCanPlay = () => {
+        video.removeEventListener("canplay", handleCanPlay);
+        video.play().catch(console.warn);
+      };
+      
+      video.addEventListener("canplay", handleCanPlay);
       initializePlayer();
-    }
-
-    enterFullscreen();
-    setTimeout(() => {
+      enterFullscreen();
+    } else {
+      // Already initialized, just play
+      enterFullscreen();
       video.play().catch(console.warn);
-    }, 100);
+    }
   }, [playerState, initializePlayer, enterFullscreen]);
 
   // Toggle play/pause
