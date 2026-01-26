@@ -287,7 +287,7 @@ export function SimpleHLSPlayer({
       {/* Poster with play button (shown before playback starts) */}
       {!isPlaying && (
         <div 
-          className="absolute inset-0"
+          className="absolute inset-0 flex flex-col overflow-hidden"
           style={{
             backgroundImage: posterUrl ? `url(${posterUrl})` : undefined,
             backgroundSize: 'cover',
@@ -295,12 +295,15 @@ export function SimpleHLSPlayer({
           }}
         >
           {/* Gradient overlay - stronger at bottom */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
-          {/* Content positioned at bottom center */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-16 px-4">
+          {/* Spacer to push content to bottom third */}
+          <div className="flex-1" />
+
+          {/* Content - vertically centered in bottom portion */}
+          <div className="flex flex-col items-center justify-center pb-[10vh] px-4">
             {/* Title */}
-            <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-6 drop-shadow-lg">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white text-center mb-4 drop-shadow-lg max-w-2xl">
               {media.title}
             </h2>
 
