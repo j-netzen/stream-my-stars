@@ -20,14 +20,19 @@ interface SimpleHLSPlayerProps {
   media: Media;
   streamUrl: string;
   onClose: () => void;
+  onChangeStream?: () => void; // Callback to open stream selection
   episodeNumber?: number;
   seasonNumber?: number;
 }
+
+const LOAD_TIMEOUT_MS = 25000; // 25 second timeout
+const MAX_RETRY_ATTEMPTS = 3;
 
 export function SimpleHLSPlayer({ 
   media, 
   streamUrl, 
   onClose,
+  onChangeStream,
   episodeNumber,
   seasonNumber 
 }: SimpleHLSPlayerProps) {
@@ -35,10 +40,14 @@ export function SimpleHLSPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
+  const loadTimeoutRef = useRef<number | null>(null);
+  const currentStreamUrlRef = useRef<string>(streamUrl);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [timeoutMessage, setTimeoutMessage] = useState<string | null>(null);
 
   const { getProgressForMedia, updateProgress } = useWatchProgress();
 
@@ -92,9 +101,18 @@ export function SimpleHLSPlayer({
     saveProgress(); // Save one final time
   }, [saveProgress]);
 
+  // Clear load timeout
+  const clearLoadTimeout = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+  }, []);
+
   // Cleanup HLS instance and video element
-  const cleanupHls = useCallback(() => {
+  const cleanupHls = useCallback((resetState = true) => {
     stopProgressTracking();
+    clearLoadTimeout();
     
     // Destroy HLS instance first
     if (hlsRef.current) {
@@ -111,10 +129,13 @@ export function SimpleHLSPlayer({
     }
     
     // Reset player state
-    setIsPlaying(false);
-    setIsLoading(false);
-    setError(null);
-  }, [stopProgressTracking]);
+    if (resetState) {
+      setIsPlaying(false);
+      setIsLoading(false);
+      setError(null);
+      setTimeoutMessage(null);
+    }
+  }, [stopProgressTracking, clearLoadTimeout]);
 
   // Exit fullscreen handler
   const handleFullscreenChange = useCallback(() => {
@@ -141,25 +162,54 @@ export function SimpleHLSPlayer({
     };
   }, [handleFullscreenChange, cleanupHls]);
 
-  // Play button handler - enters fullscreen and starts playback
-  const handlePlayClick = async () => {
+  // Start load timeout
+  const startLoadTimeout = useCallback(() => {
+    clearLoadTimeout();
+    loadTimeoutRef.current = window.setTimeout(() => {
+      if (retryCount < MAX_RETRY_ATTEMPTS - 1) {
+        console.log(`[SimpleHLSPlayer] Load timeout, retrying (${retryCount + 1}/${MAX_RETRY_ATTEMPTS})...`);
+        setTimeoutMessage(`Stream taking too long. Retrying (${retryCount + 2}/${MAX_RETRY_ATTEMPTS})...`);
+        setRetryCount(prev => prev + 1);
+        // Trigger retry by cleaning up and restarting
+        cleanupHls(false);
+        setIsLoading(true);
+      } else {
+        console.error('[SimpleHLSPlayer] Load timeout after all retries');
+        setTimeoutMessage(null);
+        setError('Stream failed to load. The source may be unavailable or too slow.');
+        setIsLoading(false);
+      }
+    }, LOAD_TIMEOUT_MS);
+  }, [clearLoadTimeout, retryCount, cleanupHls]);
+
+  // Core playback initialization (extracted for reuse)
+  const initializePlayback = useCallback(async (url: string, enterFullscreen = false) => {
     const video = videoRef.current;
     const container = containerRef.current;
     if (!video || !container) return;
 
     setIsLoading(true);
     setError(null);
+    setTimeoutMessage(null);
+    currentStreamUrlRef.current = url;
+
+    // Start timeout for this load attempt
+    startLoadTimeout();
 
     try {
-      // Request fullscreen first
-      if (container.requestFullscreen) {
-        await container.requestFullscreen();
-      } else if ((container as any).webkitRequestFullscreen) {
-        await (container as any).webkitRequestFullscreen();
+      // Request fullscreen if needed
+      if (enterFullscreen && !document.fullscreenElement) {
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        }
       }
 
+      const urlIsHLS = url.includes('.m3u8') || url.includes('m3u8');
+
       // Setup video source
-      if (isHLS && Hls.isSupported()) {
+      if (urlIsHLS && Hls.isSupported()) {
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
@@ -180,6 +230,7 @@ export function SimpleHLSPlayer({
                 hls.recoverMediaError();
                 break;
               default:
+                clearLoadTimeout();
                 setError('Playback error. Try another stream.');
                 setIsLoading(false);
                 break;
@@ -189,6 +240,7 @@ export function SimpleHLSPlayer({
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('[SimpleHLSPlayer] Manifest parsed, starting playback');
+          clearLoadTimeout();
           // Resume from saved position
           if (resumeTime > 0) {
             video.currentTime = resumeTime;
@@ -197,6 +249,8 @@ export function SimpleHLSPlayer({
             .then(() => {
               setIsPlaying(true);
               setIsLoading(false);
+              setTimeoutMessage(null);
+              setRetryCount(0);
               startProgressTracking();
             })
             .catch((e) => {
@@ -206,12 +260,13 @@ export function SimpleHLSPlayer({
             });
         });
 
-        hls.loadSource(streamUrl);
+        hls.loadSource(url);
         hls.attachMedia(video);
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         // Native HLS support (Safari)
-        video.src = streamUrl;
+        video.src = url;
         video.addEventListener('loadedmetadata', () => {
+          clearLoadTimeout();
           if (resumeTime > 0) {
             video.currentTime = resumeTime;
           }
@@ -219,6 +274,8 @@ export function SimpleHLSPlayer({
             .then(() => {
               setIsPlaying(true);
               setIsLoading(false);
+              setTimeoutMessage(null);
+              setRetryCount(0);
               startProgressTracking();
             })
             .catch((e) => {
@@ -229,8 +286,9 @@ export function SimpleHLSPlayer({
         }, { once: true });
       } else {
         // Direct video source
-        video.src = streamUrl;
+        video.src = url;
         video.addEventListener('canplay', () => {
+          clearLoadTimeout();
           if (resumeTime > 0) {
             video.currentTime = resumeTime;
           }
@@ -238,6 +296,8 @@ export function SimpleHLSPlayer({
             .then(() => {
               setIsPlaying(true);
               setIsLoading(false);
+              setTimeoutMessage(null);
+              setRetryCount(0);
               startProgressTracking();
             })
             .catch((e) => {
@@ -248,16 +308,48 @@ export function SimpleHLSPlayer({
         }, { once: true });
 
         video.addEventListener('error', () => {
+          clearLoadTimeout();
           console.error('[SimpleHLSPlayer] Video error:', video.error);
           setError('Source not supported. Try another stream.');
           setIsLoading(false);
         }, { once: true });
       }
     } catch (e) {
+      clearLoadTimeout();
       console.error('[SimpleHLSPlayer] Setup error:', e);
       setError('Failed to initialize player');
       setIsLoading(false);
     }
+  }, [resumeTime, startProgressTracking, startLoadTimeout, clearLoadTimeout]);
+
+  // Handle retry after timeout
+  useEffect(() => {
+    if (retryCount > 0 && isLoading) {
+      initializePlayback(currentStreamUrlRef.current, false);
+    }
+  }, [retryCount]);
+
+  // Seamless stream switching - watch for streamUrl changes
+  useEffect(() => {
+    if (streamUrl !== currentStreamUrlRef.current && isPlaying) {
+      console.log('[SimpleHLSPlayer] Stream URL changed, switching...');
+      cleanupHls(false);
+      setRetryCount(0);
+      initializePlayback(streamUrl, false);
+    }
+  }, [streamUrl, isPlaying, cleanupHls, initializePlayback]);
+
+  // Play button handler - enters fullscreen and starts playback
+  const handlePlayClick = async () => {
+    setRetryCount(0);
+    await initializePlayback(streamUrl, true);
+  };
+
+  // Retry handler
+  const handleRetry = async () => {
+    setRetryCount(0);
+    setError(null);
+    await initializePlayback(currentStreamUrlRef.current, false);
   };
 
   // Close button handler
@@ -342,17 +434,40 @@ export function SimpleHLSPlayer({
             {error ? (
               <div className="text-center">
                 <p className="text-red-400 mb-4">{error}</p>
-                <button
-                  onClick={handleClose}
-                  className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
-                >
-                  Close
-                </button>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={handleRetry}
+                    className="px-6 py-3 bg-primary hover:bg-primary/80 text-primary-foreground rounded-lg transition-colors"
+                  >
+                    Retry
+                  </button>
+                  {onChangeStream && (
+                    <button
+                      onClick={onChangeStream}
+                      className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+                    >
+                      Try Another Stream
+                    </button>
+                  )}
+                  <button
+                    onClick={handleClose}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white/80 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             ) : isLoading ? (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-16 h-16 text-white animate-spin" />
-                <p className="text-white/80">Loading stream...</p>
+                <p className="text-white/80">
+                  {timeoutMessage || 'Loading stream...'}
+                </p>
+                {retryCount > 0 && (
+                  <p className="text-white/60 text-sm">
+                    Attempt {retryCount + 1} of {MAX_RETRY_ATTEMPTS}
+                  </p>
+                )}
               </div>
             ) : (
               <button
