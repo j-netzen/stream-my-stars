@@ -74,10 +74,12 @@ export function SimpleHLSPlayer({
     },
   });
 
-  // Sync video ref with progress tracker
+  // Sync video ref with progress tracker (runs once after mount)
   useEffect(() => {
-    setVideoElement(videoRef.current);
-  }, [videoRef.current, setVideoElement]);
+    if (videoRef.current) {
+      setVideoElement(videoRef.current);
+    }
+  }, [setVideoElement]);
 
   // Update buffer info periodically when playing
   useEffect(() => {
