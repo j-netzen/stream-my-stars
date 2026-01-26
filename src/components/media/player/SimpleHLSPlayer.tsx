@@ -109,6 +109,15 @@ export function SimpleHLSPlayer({
     }
   }, [cleanupHls, onClose]);
 
+  // Lock body scroll when player is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   useEffect(() => {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
@@ -261,7 +270,8 @@ export function SimpleHLSPlayer({
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-[100] bg-black"
+      className="fixed inset-0 z-[100] bg-black overflow-hidden"
+      style={{ height: '100vh', width: '100vw' }}
     >
       {/* Close button */}
       <button
