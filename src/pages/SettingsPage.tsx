@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Mouse, Gamepad2, Trash2, Shield, Server, Cloud, Box } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Mouse, Gamepad2, Trash2, Shield, Server, Cloud, Box, Play } from "lucide-react";
 import { getTorBoxUser, listDownloads, TorBoxUser, TorBoxTorrent } from "@/lib/torbox";
 // Debug logs functionality removed with video player cleanup
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -290,7 +290,81 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Player Engine removed - video player will be rebuilt from scratch */}
+          {/* Player Type Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label className={cn("font-medium", isTVMode && "text-lg")}>
+                Video Player
+              </Label>
+              <Badge 
+                variant="secondary"
+                className={cn(
+                  "text-xs",
+                  playbackSettings.playerType === 'simple-hls' && "bg-primary/20 text-primary border-primary/30"
+                )}
+              >
+                {playbackSettings.playerType === 'simple-hls' ? 'Simple HLS' : 'Minimal'}
+              </Badge>
+            </div>
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+              Choose which video player to use. Select before streaming.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant={playbackSettings.playerType === 'simple-hls' ? "default" : "outline"}
+                size={isTVMode ? "lg" : "default"}
+                className={cn(
+                  "flex-1 gap-2",
+                  playbackSettings.playerType === 'simple-hls' && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                )}
+                onClick={() => updatePlaybackSetting('playerType', 'simple-hls')}
+              >
+                <Play className={cn(isTVMode ? "w-5 h-5" : "w-4 h-4")} />
+                Simple HLS
+              </Button>
+              <Button
+                variant={playbackSettings.playerType === 'minimal' ? "default" : "outline"}
+                size={isTVMode ? "lg" : "default"}
+                className={cn(
+                  "flex-1 gap-2",
+                  playbackSettings.playerType === 'minimal' && "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                )}
+                onClick={() => updatePlaybackSetting('playerType', 'minimal')}
+              >
+                <Film className={cn(isTVMode ? "w-5 h-5" : "w-4 h-4")} />
+                Minimal
+              </Button>
+            </div>
+            <div className={cn(
+              "p-3 rounded-lg",
+              playbackSettings.playerType === 'simple-hls' ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
+            )}>
+              {playbackSettings.playerType === 'simple-hls' ? (
+                <div className="flex items-start gap-2">
+                  <Play className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className={cn("font-medium", isTVMode && "text-base")}>Simple HLS Player</p>
+                    <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                      Shows poster with play button. Click to go fullscreen and autoplay. Uses HLS.js for streaming.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <Film className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className={cn("font-medium", isTVMode && "text-base")}>Minimal Player</p>
+                    <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
+                      Basic HTML5 video with native browser controls. Most compatible, autoplays immediately.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border" />
 
           {/* Only Show Cached Streams Toggle */}
           <div className="flex items-center justify-between">

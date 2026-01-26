@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export type ProxyMode = 'none' | 'public' | 'backend';
+export type PlayerType = 'simple-hls' | 'minimal';
 
 export interface PlaybackSettings {
+  // Player selection
+  playerType: PlayerType; // which video player to use
+  
   // Stream filtering
   onlyShowCachedStreams: boolean; // hide uncached streams in selection dialog
   
@@ -22,6 +26,7 @@ export interface PlaybackSettings {
 }
 
 const DEFAULT_SETTINGS: PlaybackSettings = {
+  playerType: 'simple-hls',
   onlyShowCachedStreams: false,
   useCorsProxy: true,
   useSmartProxy: true,
