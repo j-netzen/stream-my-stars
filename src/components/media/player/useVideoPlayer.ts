@@ -277,21 +277,53 @@ export function useVideoPlayer({
     };
   }, [preparedUrl, isHls, usesBackendProxy, authToken, teardownHls, resetControlsTimeout, onPlaybackError, playerState]);
 
-  // Play click handler
+  // Play click handler - Fixed to handle HLS.js manifest loading
   const handlePlayClick = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
 
     if (playerState === "ready") {
-      // Set up one-time listener for when video is ready to play
+      // Set up listeners for when video is ready to play
       const handleCanPlay = () => {
         video.removeEventListener("canplay", handleCanPlay);
+        video.removeEventListener("loadeddata", handleCanPlay);
         video.play().catch(console.warn);
       };
       
       video.addEventListener("canplay", handleCanPlay);
-      initializePlayer();
+      video.addEventListener("loadeddata", handleCanPlay);
+      
+      // For HLS.js, also listen for manifest parsed
+      const cleanup = initializePlayer();
+      
+      // If HLS.js is used, listen to MANIFEST_PARSED
+      if (hlsRef.current) {
+        hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
+          // HLS is ready, video should start loading
+          console.log("[HLS] Manifest parsed, stream ready");
+        });
+      }
+      
       enterFullscreen();
+      
+      // Fallback: If nothing fires within 3 seconds, try playing anyway
+      const fallbackTimeout = setTimeout(() => {
+        video.removeEventListener("canplay", handleCanPlay);
+        video.removeEventListener("loadeddata", handleCanPlay);
+        if (video.readyState >= 2) {
+          video.play().catch(console.warn);
+        } else {
+          console.warn("[Player] Fallback play triggered");
+          video.play().catch(console.warn);
+        }
+      }, 3000);
+      
+      // Clear fallback if canplay fires
+      const clearFallback = () => {
+        clearTimeout(fallbackTimeout);
+        video.removeEventListener("canplay", clearFallback);
+      };
+      video.addEventListener("canplay", clearFallback);
     } else {
       // Already initialized, just play
       enterFullscreen();
