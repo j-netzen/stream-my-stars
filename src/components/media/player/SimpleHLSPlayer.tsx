@@ -319,14 +319,14 @@ export function SimpleHLSPlayer({
             backgroundPosition: 'center',
           }}
         >
-          {/* Gradient overlay - stronger at bottom */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+          {/* Gradient overlay - stronger at bottom (must not block clicks) */}
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
           {/* Spacer to push content to bottom third */}
           <div className="flex-1" />
 
           {/* Content - vertically centered in bottom portion */}
-          <div className="flex flex-col items-center justify-center pb-[10vh] px-4">
+          <div className="relative z-10 flex flex-col items-center justify-center pb-[10vh] px-4">
             {/* Title */}
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white text-center mb-4 drop-shadow-lg max-w-2xl">
               {media.title}
