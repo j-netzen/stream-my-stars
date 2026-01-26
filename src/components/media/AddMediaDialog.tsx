@@ -30,7 +30,7 @@ import { Search, Loader2, Film, Tv, Link as LinkIcon, FolderOpen, ListPlus, File
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { NetworkPathHelper } from "./NetworkPathHelper";
-import { StreamResolutionOverlay } from "./StreamResolutionOverlay";
+// StreamResolutionOverlay removed with video player cleanup
 import {
   storeFileHandle,
   isFileSystemAccessSupported,
@@ -994,13 +994,13 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
               </p>
             </div>
 
-            {/* Animated progress overlay for TorBox processing */}
-            <StreamResolutionOverlay
-              isVisible={isUnrestricting}
-              currentStep={torboxStep}
-              progress={torboxProgress}
-              statusMessage={torboxStatus || undefined}
-            />
+            {/* StreamResolutionOverlay was removed - show simple loading instead */}
+            {isUnrestricting && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10 rounded-lg">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                <p className="text-sm text-muted-foreground">{torboxStatus || "Processing..."}</p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Title *</Label>

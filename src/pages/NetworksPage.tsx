@@ -3,7 +3,7 @@ import { useMedia, Media, WatchProviderInfo } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
 import { MediaCard } from "@/components/media/MediaCard";
-import { VideoPlayerLazy as VideoPlayer } from "@/components/media/VideoPlayerLazy";
+// VideoPlayer removed - will be rebuilt from scratch
 import { TrendingNetworkRow } from "@/components/networks/TrendingNetworkRow";
 import { HeroCarousel } from "@/components/media/HeroCarousel";
 import { AddFromDiscoverDialog } from "@/components/media/AddFromDiscoverDialog";
@@ -369,8 +369,20 @@ export default function NetworksPage() {
         </div>
         </div>
 
+        {/* Video Player - Removed, will be rebuilt from scratch */}
         {activeMedia && (
-          <VideoPlayer media={activeMedia} onClose={() => setActiveMedia(null)} />
+          <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+            <div className="text-center p-6">
+              <p className="text-white text-xl mb-4">Video Player Removed</p>
+              <p className="text-white/60 mb-4">A new player will be built from scratch.</p>
+              <button 
+                onClick={() => setActiveMedia(null)}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Add to Library Dialog */}

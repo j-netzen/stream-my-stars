@@ -1,17 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type PlayerEngine = 'basic' | 'videojs';
 export type ProxyMode = 'none' | 'public' | 'backend';
 
 export interface PlaybackSettings {
-  // Buffer settings
-  bufferAhead: number; // seconds to buffer ahead (5-60)
-  autoQualityDowngrade: boolean; // auto switch to lower quality on slow connection
-  
-  // Playback
-  limitFps30: boolean; // optional 30 fps limit for slower devices
-  playerEngine: PlayerEngine; // which video player to use
-  
   // Stream filtering
   onlyShowCachedStreams: boolean; // hide uncached streams in selection dialog
   
@@ -23,19 +14,23 @@ export interface PlaybackSettings {
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
   isSlowConnection: boolean;
+  
+  // Legacy settings kept for compatibility
+  bufferAhead: number;
+  autoQualityDowngrade: boolean;
+  limitFps30: boolean;
 }
 
 const DEFAULT_SETTINGS: PlaybackSettings = {
+  onlyShowCachedStreams: false,
+  useCorsProxy: true,
+  useSmartProxy: true,
+  proxyMode: 'public',
+  connectionSpeedMbps: null,
+  isSlowConnection: false,
   bufferAhead: 30,
   autoQualityDowngrade: true,
   limitFps30: false,
-  playerEngine: 'basic', // basic player by default
-  onlyShowCachedStreams: false,
-  useCorsProxy: true, // enabled by default
-  useSmartProxy: true, // smart detection by default
-  proxyMode: 'public', // use public proxy by default
-  connectionSpeedMbps: null,
-  isSlowConnection: false,
 };
 
 const STORAGE_KEY = 'playback-settings';
@@ -60,7 +55,7 @@ export function usePlaybackSettings() {
     const updateConnectionInfo = () => {
       if (connection) {
         const speedMbps = connection.downlink || null;
-        const isSlowConnection = speedMbps !== null && speedMbps < 5; // Less than 5 Mbps considered slow
+        const isSlowConnection = speedMbps !== null && speedMbps < 5;
         
         setSettings(prev => ({
           ...prev,
@@ -99,10 +94,9 @@ export function usePlaybackSettings() {
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
-  // Measure actual connection speed by downloading a test file
+  // Measure actual connection speed
   const measureConnectionSpeed = useCallback(async (): Promise<number | null> => {
     try {
-      // Use a reliable CDN file for speed test (Cloudflare's 1MB test file)
       const testUrl = 'https://speed.cloudflare.com/__down?bytes=500000';
       const startTime = performance.now();
       
@@ -132,7 +126,6 @@ export function usePlaybackSettings() {
     } catch (e) {
       console.warn('Failed to measure connection speed:', e);
       
-      // Fallback: use Navigator.connection API if available
       const connection = (navigator as any).connection;
       if (connection?.downlink) {
         const speedMbps = connection.downlink;

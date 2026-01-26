@@ -3,7 +3,7 @@ import { useMedia, Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
 import { useTVMode } from "@/hooks/useTVMode";
 import { MediaRow } from "@/components/media/MediaRow";
-import { VideoPlayerLazy as VideoPlayer, StreamQualityInfo } from "@/components/media/VideoPlayerLazy";
+// VideoPlayer removed - will be rebuilt from scratch
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog } from "@/components/media/StreamSelectionDialog";
@@ -19,16 +19,16 @@ export default function HomePage() {
   const { progress, getContinueWatching } = useWatchProgress();
   const { isTVMode } = useTVMode();
   const [activeMedia, setActiveMedia] = useState<Media | null>(null);
-  const [activeStreamQuality, setActiveStreamQuality] = useState<StreamQualityInfo | undefined>(undefined);
-  const [activeTryNextStream, setActiveTryNextStream] = useState<(() => void) | undefined>(undefined);
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
 
-  const handleStreamSelected = (updatedMedia: Media, streamUrl: string, qualityInfo?: StreamQualityInfo, tryNextStream?: () => void) => {
-    setActiveStreamQuality(qualityInfo);
-    setActiveTryNextStream(() => tryNextStream);
+  // Video player removed - handleStreamSelected now just sets activeMedia
+  // A new video player will be built from scratch
+  const handleStreamSelected = (updatedMedia: Media, _streamUrl: string) => {
     setActiveMedia(updatedMedia);
+    // TODO: Add new video player here
+    console.log("[HomePage] Video player removed. Stream URL:", _streamUrl);
   };
 
   const continueWatching = getContinueWatching();
@@ -246,18 +246,20 @@ export default function HomePage() {
         onOpenChange={(open) => !open && setPlaylistMedia(null)}
       />
 
-      {/* Video Player */}
+      {/* Video Player - Removed, will be rebuilt from scratch */}
       {activeMedia && (
-        <VideoPlayer 
-          media={activeMedia} 
-          onClose={() => {
-            setActiveMedia(null);
-            setActiveStreamQuality(undefined);
-            setActiveTryNextStream(undefined);
-          }}
-          streamQuality={activeStreamQuality}
-          onPlaybackError={activeTryNextStream}
-        />
+        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center">
+          <div className="text-center p-6">
+            <p className="text-white text-xl mb-4">Video Player Removed</p>
+            <p className="text-white/60 mb-4">A new player will be built from scratch.</p>
+            <button 
+              onClick={() => setActiveMedia(null)}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </PullToRefresh>
   );
