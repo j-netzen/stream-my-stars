@@ -25,7 +25,7 @@ dependencies {
 
 ### 2. Update `android/app/src/main/AndroidManifest.xml`
 
-Add the VLCPlayerActivity and required permissions:
+Add the Android TV features, VLCPlayerActivity, and required permissions:
 
 ```xml
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -34,8 +34,18 @@ Add the VLCPlayerActivity and required permissions:
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
-    <application ...>
-        <!-- Existing activities -->
+    <!-- Android TV Compatibility -->
+    <!-- Touchscreen not required (for TV devices without touch) -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    
+    <!-- Leanback (Android TV interface) support -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    
+    <application 
+        android:banner="@mipmap/ic_launcher"
+        ...>
+        
+        <!-- Existing MainActivity -->
         
         <!-- Add VLC Player Activity -->
         <activity
@@ -48,21 +58,21 @@ Add the VLCPlayerActivity and required permissions:
 </manifest>
 ```
 
-### 3. Register the Plugin in MainActivity
+**Note**: Set `android:required="false"` for leanback if you want the app to work on both phones and TVs. Set to `true` if it's TV-only.
 
-Update `android/app/src/main/java/.../MainActivity.java`:
+### 3. Use the provided MainActivity
 
-```java
-import app.lovable.vlc.VLCPlayerPlugin;
-
-public class MainActivity extends BridgeActivity {
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(VLCPlayerPlugin.class);
-        super.onCreate(savedInstanceState);
-    }
-}
+The project includes a pre-configured `MainActivity.java` at:
 ```
+android/app/src/main/java/app/lovable/MainActivity.java
+```
+
+This MainActivity:
+- Registers the VLC plugin
+- Configures WebView for Android TV with `setFocusable(true)` and `setFocusableInTouchMode(true)`
+- Requests focus for proper D-pad/air mouse navigation
+
+**Copy this file** to your local Android project after running `npx cap add android`.
 
 ### 4. Create Package Directory
 
