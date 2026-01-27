@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <!-- Base cosmic background gradient -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="600dp"
+                android:centerX="0.5"
+                android:centerY="0.3"
+                android:startColor="#2d1b4e"
+                android:endColor="#0a0a14" />
+        </shape>
+    </item>
+    
+    <!-- Secondary cosmic glow effect -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="400dp"
+                android:centerX="0.7"
+                android:centerY="0.6"
+                android:startColor="#1a1a4e"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+    
+    <!-- Accent purple glow -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="300dp"
+                android:centerX="0.3"
+                android:centerY="0.4"
+                android:startColor="#3d2066"
+                android:endColor="@android:color/transparent" />
+        </shape>
+    </item>
+    
+    <!-- App icon centered -->
+    <item
+        android:drawable="@mipmap/ic_launcher"
+        android:gravity="center"
+        android:width="144dp"
+        android:height="144dp" />
+    
+</layer-list>

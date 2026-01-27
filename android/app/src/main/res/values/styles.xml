@@ -11,12 +11,22 @@
         <item name="android:textColorSecondary">@color/cosmic_text_secondary</item>
     </style>
 
-    <!-- Launch theme with no action bar -->
+    <!-- Launch theme with splash screen -->
     <style name="AppTheme.NoActionBarLaunch" parent="AppTheme">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+    </style>
+
+    <!-- TV Launch theme with cosmic splash -->
+    <style name="AppTheme.TVLaunch" parent="Theme.Leanback">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@drawable/splash_screen</item>
+        <item name="colorPrimary">@color/cosmic_primary</item>
+        <item name="colorAccent">@color/cosmic_accent</item>
     </style>
 
     <!-- Leanback theme for Android TV -->
