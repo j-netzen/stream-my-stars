@@ -174,48 +174,115 @@
     box-shadow: 0 0 24px hsl(var(--tv-focus-ring) / 0.6) !important;
   }
 
-  /* Android TV Mouse / Air Pointer optimizations (ONN boxes, etc.) */
-  .android-tv-mouse {
-    /* Ensure pointer events work properly */
+  /* Android TV Box Mode (ONN, Fire TV Stick, etc.) - COMPACT layout for air mouse */
+  .android-tv-box {
+    /* Compact sizing - smaller than default TV mode */
+    --tv-card-width: 9rem;
+    --tv-min-target: 40px;
+    --tv-focus-ring-width: 2px;
+    font-size: 14px;
+    
+    /* Smaller card widths */
+    --card-width-xs: 7rem;
+    --card-width-sm: 8rem;
+    --card-width-md: 9rem;
+    --card-width-lg: 10rem;
+    --card-width-xl: 11rem;
+    --card-width-2xl: 12rem;
+    
+    /* Compact sidebar */
+    --tv-sidebar-width: 180px;
+    --tv-sidebar-collapsed: 48px;
+    
+    /* Disable smooth scrolling */
+    scroll-behavior: auto;
     touch-action: auto;
     -webkit-tap-highlight-color: transparent;
   }
 
-  .android-tv-mouse * {
-    /* Ensure all elements receive pointer events properly */
-    cursor: pointer;
-  }
-
-  .android-tv-mouse button,
-  .android-tv-mouse a,
-  .android-tv-mouse [role="button"],
-  .android-tv-mouse [tabindex="0"] {
-    /* Ensure clickable elements respond to pointer */
+  /* Compact buttons and links for Android TV box */
+  .android-tv-box button,
+  .android-tv-box a,
+  .android-tv-box [role="button"],
+  .android-tv-box [tabindex="0"] {
+    min-height: 36px;
+    min-width: 36px;
     pointer-events: auto !important;
     cursor: pointer !important;
-    /* Larger tap targets for air mouse accuracy */
-    min-height: 48px;
-    min-width: 48px;
   }
 
-  /* Ensure hover states work for air mouse feedback */
-  .android-tv-mouse button:hover,
-  .android-tv-mouse a:hover,
-  .android-tv-mouse [role="button"]:hover,
-  .android-tv-mouse [tabindex="0"]:hover {
-    opacity: 0.9;
-    transform: scale(1.02);
-    transition: transform 0.1s ease, opacity 0.1s ease;
+  /* Compact text sizing */
+  .android-tv-box .tv-title {
+    font-size: 1.5rem;
+    line-height: 1.2;
   }
 
-  /* Visible focus ring on click/touch for air mouse */
-  .android-tv-mouse button:active,
-  .android-tv-mouse a:active,
-  .android-tv-mouse [role="button"]:active,
-  .android-tv-mouse [tabindex="0"]:active {
-    outline: 3px solid hsl(var(--tv-focus-ring)) !important;
-    outline-offset: 2px !important;
+  .android-tv-box .tv-subtitle {
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+
+  .android-tv-box .tv-row-title {
+    font-size: 0.9rem;
+  }
+
+  /* Compact row spacing */
+  .android-tv-box .space-y-6 {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
+  }
+
+  /* Compact padding */
+  .android-tv-box .px-12 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .android-tv-box .gap-6 {
+    gap: 0.5rem;
+  }
+
+  .android-tv-box .pb-6 {
+    padding-bottom: 0.5rem;
+  }
+
+  /* Quick hover feedback for air mouse */
+  .android-tv-box button:hover,
+  .android-tv-box a:hover,
+  .android-tv-box [role="button"]:hover,
+  .android-tv-box [tabindex="0"]:hover {
+    opacity: 0.85;
+    transition: opacity 0.1s ease;
+  }
+
+  /* Visible active state */
+  .android-tv-box button:active,
+  .android-tv-box a:active,
+  .android-tv-box [role="button"]:active,
+  .android-tv-box [tabindex="0"]:active {
+    outline: 2px solid hsl(var(--tv-focus-ring)) !important;
     transform: scale(0.98);
+  }
+
+  /* Compact media cards */
+  .android-tv-box .media-card {
+    transition: transform 0.1s ease-out;
+  }
+
+  .android-tv-box .media-card:hover {
+    transform: scale(1.03);
+    z-index: 10;
+  }
+
+  /* Simplified hero section */
+  .android-tv-box .hero-section {
+    max-height: 35vh;
+  }
+
+  /* Hide less important UI in compact mode */
+  .android-tv-box .atv-hide {
+    display: none !important;
   }
 
   /* TV Mode overscan safe zone - 5% margin for TV bezels */

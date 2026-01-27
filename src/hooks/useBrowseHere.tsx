@@ -77,13 +77,14 @@ export function BrowseHereProvider({ children }: { children: ReactNode }) {
       userAgent: navigator.userAgent,
     });
 
-    // Auto-enable TV mode for BrowseHere/Android TV
+    // Auto-enable compact Android TV box mode for ONN/Fire TV/etc.
     if (isBrowseHere || isAndroidTV) {
       document.documentElement.classList.add("tv-mode");
-      document.documentElement.classList.add("browsehere-mode");
-      document.documentElement.classList.add("android-tv-mouse");
-      localStorage.setItem("tv-mode", "true");
+      document.documentElement.classList.add("android-tv-box");
       // Use mouse mode for air mouse/pointer on Android TV
+      document.documentElement.classList.add("mouse-mode");
+      document.documentElement.classList.remove("dpad-mode");
+      localStorage.setItem("tv-mode", "true");
       localStorage.setItem("input-mode", "mouse");
     }
   }, []);
