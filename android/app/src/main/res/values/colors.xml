@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    
+    <!-- Cosmic Theme Colors - Matching the app's star/cosmic design system -->
+    
+    <!-- Primary colors - Deep space blues -->
+    <color name="cosmic_primary">#1a1a2e</color>
+    <color name="cosmic_primary_dark">#0f0f1a</color>
+    <color name="cosmic_primary_light">#252540</color>
+    
+    <!-- Accent colors - Purple/violet cosmic tones -->
+    <color name="cosmic_accent">#7c3aed</color>
+    <color name="cosmic_accent_bright">#a855f7</color>
+    <color name="cosmic_accent_muted">#6366f1</color>
+    
+    <!-- Background colors -->
+    <color name="cosmic_background">#0a0a14</color>
+    <color name="cosmic_surface">#16162a</color>
+    <color name="cosmic_card">#1e1e3a</color>
+    
+    <!-- Text colors -->
+    <color name="cosmic_text_primary">#f8fafc</color>
+    <color name="cosmic_text_secondary">#94a3b8</color>
+    <color name="cosmic_text_muted">#64748b</color>
+    
+    <!-- Focus and highlight colors for TV navigation -->
+    <color name="cosmic_focus">#7c3aed</color>
+    <color name="cosmic_focus_glow">#8b5cf6</color>
+    <color name="cosmic_selected">#a855f7</color>
+    
+    <!-- Star accent colors -->
+    <color name="star_gold">#fbbf24</color>
+    <color name="star_white">#f1f5f9</color>
+    <color name="star_blue">#60a5fa</color>
+    
+    <!-- Gradient colors for cosmic effects -->
+    <color name="gradient_start">#1a1a2e</color>
+    <color name="gradient_middle">#2d1b4e</color>
+    <color name="gradient_end">#0f0f1a</color>
+    
+</resources>
