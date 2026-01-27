@@ -9,18 +9,20 @@ function detectBrowseHere(): boolean {
   // BrowseHere browser detection
   const isBrowseHere = ua.includes("browsehere") || ua.includes("browse here");
   
-  // Also detect Android TV environment
+  // Also detect Android TV environment (including ONN boxes)
   const isAndroidTV = ua.includes("android") && (
     ua.includes("tv") || 
     ua.includes("aft") || // Amazon Fire TV
     ua.includes("silk") || // Silk browser on Fire TV
-    ua.includes("crkey") // Chromecast
+    ua.includes("crkey") || // Chromecast
+    ua.includes("onn") || // ONN Android TV boxes
+    ua.includes("atv") // Generic Android TV
   );
   
   // Check for leanback (Android TV interface)
   const isLeanback = ua.includes("leanback");
   
-  return isBrowseHere || isLeanback;
+  return isBrowseHere || isLeanback || isAndroidTV;
 }
 
 // Detect if we should use native video controls
@@ -63,7 +65,9 @@ export function BrowseHereProvider({ children }: { children: ReactNode }) {
     const isAndroidTV = ua.includes("android") && (
       ua.includes("tv") || 
       ua.includes("aft") || 
-      ua.includes("leanback")
+      ua.includes("leanback") ||
+      ua.includes("onn") ||
+      ua.includes("atv")
     );
     
     setState({
@@ -73,11 +77,14 @@ export function BrowseHereProvider({ children }: { children: ReactNode }) {
       userAgent: navigator.userAgent,
     });
 
-    // Auto-enable TV mode for BrowseHere
+    // Auto-enable TV mode for BrowseHere/Android TV
     if (isBrowseHere || isAndroidTV) {
       document.documentElement.classList.add("tv-mode");
       document.documentElement.classList.add("browsehere-mode");
+      document.documentElement.classList.add("android-tv-mouse");
       localStorage.setItem("tv-mode", "true");
+      // Use mouse mode for air mouse/pointer on Android TV
+      localStorage.setItem("input-mode", "mouse");
     }
   }, []);
 
