@@ -71,15 +71,15 @@ export function MediaHero({ featured, onPlay }: MediaHeroProps) {
 
       {/* Content */}
       <div className={cn(
-        "relative z-40 h-full flex flex-col justify-end",
-        isTVMode ? "pb-20 px-16" : "pb-8 px-6 landscape:pb-6 landscape:px-8"
+        "relative z-40 h-full flex flex-col justify-center items-center text-center",
+        isTVMode ? "px-16" : "px-6 landscape:px-8"
       )}>
         <div className={cn(
-          "flex flex-col space-y-3",
+          "flex flex-col items-center space-y-3",
           isTVMode ? "max-w-4xl space-y-5" : "max-w-xl landscape:max-w-2xl"
         )}>
           {/* Meta info */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <span className={cn(
               "px-3 py-1 rounded text-xs font-medium uppercase",
               featured.media_type === "movie" ? "bg-blue-500/80" : "bg-green-500/80"
@@ -124,7 +124,7 @@ export function MediaHero({ featured, onPlay }: MediaHeroProps) {
           
           {/* Genres */}
           {featured.genres && featured.genres.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap justify-center">
               {featured.genres.slice(0, 3).map((genre) => (
                 <span 
                   key={genre} 
@@ -137,7 +137,7 @@ export function MediaHero({ featured, onPlay }: MediaHeroProps) {
           )}
           
           {/* Button row */}
-          <div className={cn("flex flex-row flex-wrap", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
+          <div className={cn("flex flex-row flex-wrap justify-center", isTVMode ? "gap-2 mt-1" : "gap-2 landscape:gap-3")}>
             <Button
               size={isTVMode ? "tv" : "lg"}
               className={cn("gap-1.5", isTVMode && "h-10 px-4 text-sm")}
