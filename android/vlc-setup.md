@@ -45,7 +45,32 @@ Add the Android TV features, VLCPlayerActivity, and required permissions:
         android:banner="@mipmap/ic_launcher"
         ...>
         
-        <!-- Existing MainActivity -->
+        <!-- Existing MainActivity (keep as-is, just ensure it's NOT the LEANBACK_LAUNCHER) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:label="@string/app_name"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Leanback Launcher Activity for Android TV home screen -->
+        <activity
+            android:name=".LeanbackActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Leanback"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
         
         <!-- Add VLC Player Activity -->
         <activity
