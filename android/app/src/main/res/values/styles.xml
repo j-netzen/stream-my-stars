@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme -->
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/cosmic_primary</item>
+        <item name="colorPrimaryDark">@color/cosmic_primary_dark</item>
+        <item name="colorAccent">@color/cosmic_accent</item>
+        <item name="android:windowBackground">@color/cosmic_background</item>
+        <item name="android:textColorPrimary">@color/cosmic_text_primary</item>
+        <item name="android:textColorSecondary">@color/cosmic_text_secondary</item>
+    </style>
+
+    <!-- Launch theme with no action bar -->
+    <style name="AppTheme.NoActionBarLaunch" parent="AppTheme">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+
+    <!-- Leanback theme for Android TV -->
+    <style name="Theme.Leanback" parent="Theme.Leanback.Browse">
+        <!-- Cosmic color palette matching the app's design system -->
+        <item name="colorPrimary">@color/cosmic_primary</item>
+        <item name="colorPrimaryDark">@color/cosmic_primary_dark</item>
+        <item name="colorAccent">@color/cosmic_accent</item>
+        
+        <!-- Background colors -->
+        <item name="android:windowBackground">@color/cosmic_background</item>
+        <item name="defaultBrandColor">@color/cosmic_primary</item>
+        <item name="defaultBrandColorDark">@color/cosmic_primary_dark</item>
+        
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">@color/cosmic_text_primary</item>
+        <item name="android:textColorSecondary">@color/cosmic_text_secondary</item>
+        
+        <!-- Search orb styling -->
+        <item name="searchOrbColor">@color/cosmic_accent</item>
+        <item name="searchOrbBrightColor">@color/cosmic_accent_bright</item>
+        
+        <!-- Browse row styling -->
+        <item name="browseRowsMarginTop">60dp</item>
+        <item name="browseRowsMarginStart">48dp</item>
+        <item name="browsePaddingStart">48dp</item>
+        <item name="browsePaddingEnd">48dp</item>
+        
+        <!-- Focus states -->
+        <item name="android:colorFocusedHighlight">@color/cosmic_focus</item>
+    </style>
+
+    <!-- Leanback details theme -->
+    <style name="Theme.Leanback.Details" parent="Theme.Leanback.Details">
+        <item name="colorPrimary">@color/cosmic_primary</item>
+        <item name="colorPrimaryDark">@color/cosmic_primary_dark</item>
+        <item name="colorAccent">@color/cosmic_accent</item>
+        <item name="android:windowBackground">@color/cosmic_background</item>
+    </style>
+
+    <!-- Card styling for Leanback -->
+    <style name="Widget.Leanback.ImageCardView" parent="Widget.Leanback.ImageCardViewStyle">
+        <item name="leanback_selected_transition_duration">200</item>
+    </style>
+
+</resources>
