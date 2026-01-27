@@ -13,9 +13,10 @@ interface PlayerDebugPanelProps {
   debugState: HlsDebugState;
   streamUrl: string;
   isPlaying: boolean;
+  controlsVisible?: boolean;
 }
 
-export function PlayerDebugPanel({ debugState, streamUrl, isPlaying }: PlayerDebugPanelProps) {
+export function PlayerDebugPanel({ debugState, streamUrl, isPlaying, controlsVisible = true }: PlayerDebugPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -45,8 +46,9 @@ export function PlayerDebugPanel({ debugState, streamUrl, isPlaying }: PlayerDeb
       <button
         onClick={() => setIsVisible(!isVisible)}
         className={cn(
-          "absolute top-4 left-4 z-50 p-2 rounded-full transition-colors",
-          isVisible ? "bg-primary text-primary-foreground" : "bg-black/50 hover:bg-black/70 text-white"
+          "absolute top-4 left-4 z-50 p-2 rounded-full transition-all duration-500",
+          isVisible ? "bg-primary text-primary-foreground" : "bg-black/50 hover:bg-black/70 text-white",
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         title="Toggle debug panel"
       >
