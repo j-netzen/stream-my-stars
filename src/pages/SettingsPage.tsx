@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTVMode, SCALE_PRESETS, ScalePreset, InputMode } from "@/hooks/useTVMode";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
+import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset, inputMode, setInputMode } = useTVMode();
   const { settings: playbackSettings, updateSetting: updatePlaybackSetting, measureConnectionSpeed } = usePlaybackSettings();
+  const { isAndroidTV, userAgent } = useBrowseHere();
   const { checkForUpdates, forceRefresh, isChecking, lastChecked } = useServiceWorkerUpdate();
   const [tbUser, setTbUser] = useState<TorBoxUser | null>(null);
   const [tbDownloads, setTbDownloads] = useState<TorBoxTorrent[]>([]);
@@ -35,6 +37,9 @@ export default function SettingsPage() {
   );
   // Debug logs removed with video player cleanup
   const [showPairingDialog, setShowPairingDialog] = useState(false);
+  const [androidTVBoxMode, setAndroidTVBoxMode] = useState(() => 
+    document.documentElement.classList.contains("android-tv-box")
+  );
 
   const fetchTorBoxData = async (retryCount = 0) => {
     const maxRetries = 2;
@@ -94,6 +99,19 @@ export default function SettingsPage() {
   const handleTVModeChange = (enabled: boolean) => {
     setTVMode(enabled);
     toast.success(enabled ? "TV mode enabled" : "TV mode disabled");
+  };
+
+  const handleAndroidTVBoxMode = (enabled: boolean) => {
+    setAndroidTVBoxMode(enabled);
+    if (enabled) {
+      document.documentElement.classList.add("android-tv-box");
+      localStorage.setItem("android-tv-box", "true");
+      toast.success("Android TV Box mode enabled - compact layout active");
+    } else {
+      document.documentElement.classList.remove("android-tv-box");
+      localStorage.setItem("android-tv-box", "false");
+      toast.success("Android TV Box mode disabled");
+    }
   };
 
   const handleScaleChange = (preset: ScalePreset) => {
@@ -275,6 +293,74 @@ export default function SettingsPage() {
               </>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Android TV Box Mode */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Box className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            Android TV Box Mode
+            {isAndroidTV && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                Detected
+              </Badge>
+            )}
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Compact layout optimized for ONN, Fire TV Stick, and similar devices
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="android-tv-box" className={cn("font-medium", isTVMode && "text-sm")}>
+                Enable Compact Mode
+              </Label>
+              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-sm")}>
+                Smaller UI elements, tighter spacing for easier air mouse navigation
+              </p>
+            </div>
+            <Switch
+              id="android-tv-box"
+              checked={androidTVBoxMode}
+              onCheckedChange={handleAndroidTVBoxMode}
+            />
+          </div>
+          
+          <div className={cn(
+            "flex items-center gap-4 p-4 rounded-lg",
+            androidTVBoxMode ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
+          )}>
+            {androidTVBoxMode ? (
+              <>
+                <Box className="w-8 h-8 text-primary" />
+                <div>
+                  <p className="font-medium text-base">Compact Mode Active</p>
+                  <p className="text-muted-foreground text-sm">
+                    Smaller cards, tighter rows, and streamlined navigation for TV boxes.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Tv className="w-6 h-6 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Standard TV Layout</p>
+                  <p className="text-sm text-muted-foreground">
+                    Default sizing optimized for large screens and D-pad remotes.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+
+          {isAndroidTV && (
+            <p className={cn("text-muted-foreground text-xs p-2 bg-secondary/30 rounded")}>
+              Device: Android TV detected. Compact mode is recommended for air mouse navigation.
+            </p>
+          )}
         </CardContent>
       </Card>
 
