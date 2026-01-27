@@ -12,7 +12,7 @@ This document describes how to set up the native VLC player for your Capacitor A
 
 ### 1. Update `android/app/build.gradle`
 
-Add LibVLC dependency to your `dependencies` block:
+Add LibVLC and Leanback dependencies to your `dependencies` block:
 
 ```gradle
 dependencies {
@@ -20,6 +20,10 @@ dependencies {
     
     // LibVLC for native video playback
     implementation 'org.videolan.android:libvlc-all:3.5.1'
+    
+    // Android TV Leanback library for full TV support
+    implementation 'androidx.leanback:leanback:1.0.0'
+    implementation 'androidx.leanback:leanback-preference:1.0.0'
 }
 ```
 
