@@ -9,7 +9,7 @@
  * 5. Includes debug panel for diagnostics
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Media } from "@/hooks/useMedia";
@@ -44,7 +44,44 @@ export function SimpleHLSPlayer({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Auto-hide controls after 10 seconds
+  const resetControlsTimer = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) {
+        setControlsVisible(false);
+      }
+    }, 10000);
+  }, [isPlaying]);
+
+  // Handle mouse/touch activity
+  const handleUserActivity = useCallback(() => {
+    resetControlsTimer();
+  }, [resetControlsTimer]);
+
+  // Start timer when playback begins, clear on unmount
+  useEffect(() => {
+    if (isPlaying) {
+      resetControlsTimer();
+    } else {
+      setControlsVisible(true);
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    }
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isPlaying, resetControlsTimer]);
+
   // Determine if this is a TV show with episode context
   const isTVShow = media.media_type === "tv" && episodeNumber !== undefined && seasonNumber !== undefined;
 
@@ -204,11 +241,17 @@ export function SimpleHLSPlayer({
       ref={containerRef}
       className="fixed inset-0 z-[100] bg-black overflow-hidden"
       style={{ height: '100vh', width: '100vw' }}
+      onMouseMove={handleUserActivity}
+      onTouchStart={handleUserActivity}
+      onClick={handleUserActivity}
     >
       {/* Close button */}
       <button
         onClick={handleClose}
-        className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+        className={cn(
+          "absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-500",
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
       >
         <X className="w-6 h-6 text-white" />
       </button>
@@ -218,6 +261,7 @@ export function SimpleHLSPlayer({
         debugState={debugState}
         streamUrl={streamUrl}
         isPlaying={isPlaying}
+        controlsVisible={controlsVisible}
       />
 
       {/* Video element */}
