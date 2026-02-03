@@ -8,7 +8,7 @@ import { useQuickPlay } from "@/hooks/useQuickPlay";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 
 import { searchTorrentio, getImdbIdFromTmdb, parseStreamInfo, TorrentioStream, isMagnetLink, extractMagnetFromTorrentioUrl, parseSizeToBytes, calculateOptimalMaxSize, sortStreamsByPopularity } from "@/lib/torrentio";
-import { addMagnetAndWait, listDownloads, getStreamableUrl as getTorBoxStreamUrl, TorBoxTorrent, StreamUnavailableError, checkInstantAvailability, isHashCached, findLargestVideoFile } from "@/lib/torbox";
+import { addMagnetAndWait, listDownloads, getStreamableUrl as getTorBoxStreamUrl, TorBoxTorrent, StreamUnavailableError, TorrentTimeoutError, checkInstantAvailability, isHashCached, findLargestVideoFile, continueWaitingForTorrent } from "@/lib/torbox";
 import { getImageUrl } from "@/lib/tmdb";
 import { prepareStreamUrl } from "@/lib/streamUtils";
 import { addDebugLog, classifyError } from "@/lib/streamDebugLog";
@@ -185,6 +185,11 @@ export function StreamSelectionDialog({
   const [cachedHashes, setCachedHashes] = useState<Set<string>>(new Set());
   const [isCheckingCache, setIsCheckingCache] = useState(false);
   const [cacheCheckFailed, setCacheCheckFailed] = useState(false);
+  
+  // Timeout retry state - when stream is still downloading
+  const [timeoutTorrentId, setTimeoutTorrentId] = useState<number | null>(null);
+  const [timeoutProgress, setTimeoutProgress] = useState<number>(0);
+  const [timeoutStream, setTimeoutStream] = useState<TorrentioStream | null>(null);
 
   // Extract hash from stream URL or infoHash
   const extractHash = useCallback((stream: TorrentioStream): string | null => {
@@ -809,6 +814,16 @@ export function StreamSelectionDialog({
     } catch (err: any) {
       console.error("Stream selection error:", err);
       
+      // Check if this is a timeout error (stream still downloading)
+      if (err instanceof TorrentTimeoutError) {
+        setTimeoutTorrentId(err.torrentId);
+        setTimeoutProgress(Math.round(err.progress * 100));
+        setTimeoutStream(stream);
+        setResolveStatus(`Still downloading (${Math.round(err.progress * 100)}%)`);
+        toast.warning("Stream is still downloading. You can keep waiting or try another stream.");
+        return; // Don't reset resolving state, let user choose
+      }
+      
       // Log to debug system
       const { type: errorType, message: errorMessage } = classifyError(err);
       addDebugLog({
@@ -867,10 +882,13 @@ export function StreamSelectionDialog({
       // No more streams or non-recoverable error
       toast.error(err.message || "Failed to process stream");
     } finally {
-      setIsResolving(false);
-      setResolvingStream(null);
-      setResolveProgress(0);
-      setResolveStatus("");
+      // Only reset if we didn't hit a timeout (user may want to continue waiting)
+      if (!timeoutTorrentId) {
+        setIsResolving(false);
+        setResolvingStream(null);
+        setResolveProgress(0);
+        setResolveStatus("");
+      }
     }
   };
 
@@ -921,6 +939,81 @@ export function StreamSelectionDialog({
       setResolveProgress(0);
       setResolveStatus("");
     }
+  };
+
+  // Handler for "Keep Waiting" button when stream times out
+  const handleKeepWaiting = async () => {
+    if (!timeoutTorrentId || !timeoutStream || !media) return;
+    
+    setResolveStatus("Continuing to wait...");
+    setResolveProgress(timeoutProgress);
+    
+    try {
+      const result = await continueWaitingForTorrent(timeoutTorrentId, (progress) => {
+        setResolveProgress(progress);
+        setTimeoutProgress(progress);
+        setResolveStatus(`Downloading: ${progress}%`);
+      }, 120); // Wait another 120 seconds
+      
+      // Stream is ready!
+      const videoFile = findLargestVideoFile(result);
+      
+      if (!videoFile) {
+        throw new Error("No video files found in torrent");
+      }
+      
+      setResolveProgress(95);
+      setResolveStatus("Getting stream URL...");
+      
+      const streamUrl = await getStreamableUrlForTorBox(result.id, videoFile.id);
+      
+      setResolveProgress(100);
+      setResolveStatus("Ready!");
+      
+      // Reset timeout state
+      setTimeoutTorrentId(null);
+      setTimeoutProgress(0);
+      setTimeoutStream(null);
+      
+      // Get quality info from original stream
+      const info = parseStreamInfo(timeoutStream);
+      const qualityInfo: StreamQualityInfo = {
+        quality: info.quality || "Unknown",
+        size: info.size,
+        qualityRank: info.qualityRank,
+      };
+      
+      setTimeout(() => {
+        onOpenChange(false);
+        const episodeContext = media.media_type === "tv" 
+          ? { seasonNumber: selectedSeason, episodeNumber: selectedEpisode }
+          : undefined;
+        onStreamSelected(media, streamUrl, qualityInfo, undefined, episodeContext);
+      }, 300);
+      
+    } catch (err: any) {
+      // Check if another timeout
+      if (err instanceof TorrentTimeoutError) {
+        setTimeoutProgress(Math.round(err.progress * 100));
+        setResolveStatus(`Still downloading (${Math.round(err.progress * 100)}%)`);
+        toast.warning("Still downloading. Keep waiting or try another stream.");
+      } else {
+        console.error("Keep waiting error:", err);
+        toast.error(err.message || "Stream download failed");
+        handleCancelTimeout();
+      }
+    }
+  };
+
+  // Handler to cancel timeout and reset state
+  const handleCancelTimeout = () => {
+    setTimeoutTorrentId(null);
+    setTimeoutProgress(0);
+    setTimeoutStream(null);
+    setIsResolving(false);
+    setResolvingStream(null);
+    setResolveProgress(0);
+    setResolveStatus("");
   };
 
   const posterUrl = media?.poster_path 
@@ -1503,14 +1596,56 @@ export function StreamSelectionDialog({
                                       </div>
                                     </div>
                                     
-                                    {/* Right: Play button */}
+                                    {/* Right: Play button or timeout controls */}
                                     {isCurrentlyResolving ? (
-                                      <div className="flex flex-col items-center gap-1 shrink-0">
-                                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                        {resolveStatus && (
-                                          <span className="text-[10px] text-primary">{resolveStatus}</span>
-                                        )}
-                                      </div>
+                                      timeoutTorrentId && stream.url === timeoutStream?.url ? (
+                                        // Timeout state - show "Keep Waiting" and "Cancel" buttons
+                                        <div className="flex flex-col items-center gap-2 shrink-0">
+                                          <div className="text-center">
+                                            <p className="text-xs text-amber-400 mb-1">
+                                              Downloading: {timeoutProgress}%
+                                            </p>
+                                            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden mb-2">
+                                              <div 
+                                                className="h-full bg-amber-400 rounded-full transition-all duration-300"
+                                                style={{ width: `${timeoutProgress}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleCancelTimeout();
+                                              }}
+                                              className="h-7 px-2 text-xs bg-white/5 border-white/10 hover:bg-white/10"
+                                            >
+                                              Cancel
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleKeepWaiting();
+                                              }}
+                                              className="h-7 px-2 text-xs bg-amber-500 hover:bg-amber-600 text-white border-0"
+                                            >
+                                              <Clock className="w-3 h-3 mr-1" />
+                                              Keep Waiting
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        // Normal resolving state
+                                        <div className="flex flex-col items-center gap-1 shrink-0">
+                                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                          {resolveStatus && (
+                                            <span className="text-[10px] text-primary">{resolveStatus}</span>
+                                          )}
+                                        </div>
+                                      )
                                     ) : (
                                       <div className={cn(
                                         "w-12 h-12 rounded-full flex items-center justify-center transition-all shrink-0",

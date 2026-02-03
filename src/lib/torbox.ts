@@ -322,11 +322,28 @@ export async function addTorrentFileAndWait(
 }
 
 /**
+ * Custom error for timeout that includes torrent info for retry
+ */
+export class TorrentTimeoutError extends Error {
+  torrentId: number;
+  progress: number;
+  
+  constructor(torrentId: number, progress: number) {
+    super(`Torrent still downloading (${Math.round(progress * 100)}%). You can keep waiting or try another stream.`);
+    this.name = "TorrentTimeoutError";
+    this.torrentId = torrentId;
+    this.progress = progress;
+  }
+}
+
+/**
  * Wait for a torrent to be ready for streaming
+ * Increased timeout to 120 seconds for better non-cached stream support
  */
 async function waitForTorrentReady(
   torrentId: number,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  maxWaitSeconds: number = 120
 ): Promise<TorBoxTorrent> {
   await new Promise((resolve) => setTimeout(resolve, 1000));
   
@@ -339,17 +356,21 @@ async function waitForTorrentReady(
   }
   
   // Check for errors
-  if (torrent.download_state === 'error' || torrent.download_state === 'stalled') {
+  if (torrent.download_state === 'error') {
     throw new StreamUnavailableError("Torrent failed to download");
   }
   
-  // Poll for completion
+  // Poll for completion with longer timeout
   let attempts = 0;
-  const maxAttempts = 30;
+  const maxAttempts = maxWaitSeconds;
+  let lastProgress = 0;
+  let stalledCount = 0;
   
   while (attempts < maxAttempts) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     torrent = await getTorrentInfo(torrentId);
+    
+    const currentProgress = torrent.progress ?? 0;
     
     if (onProgress && typeof torrent.progress === 'number') {
       onProgress(Math.round(torrent.progress * 100));
@@ -360,14 +381,37 @@ async function waitForTorrentReady(
       return torrent;
     }
     
-    if (torrent.download_state === 'error' || torrent.download_state === 'stalled') {
+    if (torrent.download_state === 'error') {
       throw new StreamUnavailableError("Torrent failed to download");
     }
     
+    // Only count as stalled if no progress for 30+ seconds AND has 0 seeds
+    if (currentProgress === lastProgress && torrent.seeds === 0) {
+      stalledCount++;
+      if (stalledCount >= 30) {
+        throw new StreamUnavailableError("Torrent has no seeds and is not progressing");
+      }
+    } else {
+      stalledCount = 0;
+    }
+    
+    lastProgress = currentProgress;
     attempts++;
   }
   
-  throw new Error("Torrent download timed out. The torrent may still be downloading.");
+  // Throw special timeout error that allows retry
+  throw new TorrentTimeoutError(torrentId, torrent.progress ?? 0);
+}
+
+/**
+ * Continue waiting for a torrent that previously timed out
+ */
+export async function continueWaitingForTorrent(
+  torrentId: number,
+  onProgress?: (progress: number) => void,
+  additionalSeconds: number = 120
+): Promise<TorBoxTorrent> {
+  return waitForTorrentReady(torrentId, onProgress, additionalSeconds);
 }
 
 /**
