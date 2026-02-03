@@ -714,7 +714,7 @@ export default function SettingsPage() {
               </a>
               {" "}to get more streams or bypass blocking.
             </p>
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <Input
                 id="torrentio-url"
                 type="url"
@@ -724,37 +724,40 @@ export default function SettingsPage() {
                   setTorrentioAddonUrl(e.target.value);
                   setTorrentioTestResult(null); // Reset test result on change
                 }}
-                className={cn("flex-1", isTVMode && "h-12 text-lg")}
+                className={cn(isTVMode && "h-12 text-lg")}
               />
-              <Button
-                variant="outline"
-                size={isTVMode ? "lg" : "default"}
-                onClick={testTorrentioConnection}
-                disabled={isTestingTorrentio}
-                className="gap-1"
-              >
-                {isTestingTorrentio ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Wifi className="w-4 h-4" />
-                )}
-                Test
-              </Button>
-              <Button
-                variant="default"
-                size={isTVMode ? "lg" : "default"}
-                onClick={() => {
-                  if (torrentioAddonUrl) {
-                    localStorage.setItem("torrentioAddonUrl", torrentioAddonUrl);
-                    toast.success("Custom Torrentio URL saved");
-                  } else {
-                    localStorage.removeItem("torrentioAddonUrl");
-                    toast.success("Reset to default Torrentio");
-                  }
-                }}
-              >
-                Save
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size={isTVMode ? "lg" : "default"}
+                  onClick={testTorrentioConnection}
+                  disabled={isTestingTorrentio}
+                  className="gap-1 flex-1"
+                >
+                  {isTestingTorrentio ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Wifi className="w-4 h-4" />
+                  )}
+                  Test Connection
+                </Button>
+                <Button
+                  variant="default"
+                  size={isTVMode ? "lg" : "default"}
+                  onClick={() => {
+                    if (torrentioAddonUrl) {
+                      localStorage.setItem("torrentioAddonUrl", torrentioAddonUrl);
+                      toast.success("Custom Torrentio URL saved");
+                    } else {
+                      localStorage.removeItem("torrentioAddonUrl");
+                      toast.success("Reset to default Torrentio");
+                    }
+                  }}
+                  className="flex-1"
+                >
+                  Save
+                </Button>
+              </div>
             </div>
             
             {/* Test Result Display */}
