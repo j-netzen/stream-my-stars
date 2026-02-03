@@ -1216,17 +1216,35 @@ export default function SettingsPage() {
             <Label className={cn(isTVMode ? "text-base" : "text-sm")}>
               Addon URL
             </Label>
+            <Input
+              type="url"
+              placeholder="https://torrentio.strem.fun/manifest.json"
+              value={torrentioAddonUrl}
+              onChange={(e) => {
+                setTorrentioAddonUrl(e.target.value);
+                setTorrentioTestResult(null);
+              }}
+              className={cn(isTVMode && "text-base h-12")}
+            />
             <div className="flex gap-2">
-              <Input
-                type="url"
-                placeholder="https://torrentio.strem.fun/manifest.json"
-                value={torrentioAddonUrl}
-                onChange={(e) => setTorrentioAddonUrl(e.target.value)}
-                className={cn(isTVMode && "text-base h-12")}
-              />
               <Button
                 variant="outline"
                 size={isTVMode ? "lg" : "default"}
+                onClick={testTorrentioConnection}
+                disabled={isTestingTorrentio}
+                className="flex-1 gap-1"
+              >
+                {isTestingTorrentio ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wifi className="w-4 h-4" />
+                )}
+                Test Connection
+              </Button>
+              <Button
+                variant="default"
+                size={isTVMode ? "lg" : "default"}
+                className="flex-1"
                 onClick={() => {
                   const url = torrentioAddonUrl.trim();
                   if (url) {
@@ -1245,7 +1263,28 @@ export default function SettingsPage() {
                 Save
               </Button>
             </div>
-            {torrentioAddonUrl && (
+            
+            {/* Test Result Display */}
+            {torrentioTestResult && (
+              <div className={cn(
+                "flex items-center gap-2 p-2 rounded-lg text-sm",
+                torrentioTestResult.success 
+                  ? "bg-green-500/10 text-green-500 border border-green-500/20" 
+                  : "bg-destructive/10 text-destructive border border-destructive/20"
+              )}>
+                {torrentioTestResult.success ? (
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                ) : (
+                  <XCircle className="w-4 h-4 flex-shrink-0" />
+                )}
+                <span>
+                  {torrentioTestResult.message}
+                  {torrentioTestResult.name && ` (${torrentioTestResult.name})`}
+                </span>
+              </div>
+            )}
+            
+            {torrentioAddonUrl && !torrentioTestResult && (
               <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
                 ✓ Custom addon configured - stream searches will use your personalized endpoint
               </p>
