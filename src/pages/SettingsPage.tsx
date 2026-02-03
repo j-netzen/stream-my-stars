@@ -40,6 +40,12 @@ export default function SettingsPage() {
   const [androidTVBoxMode, setAndroidTVBoxMode] = useState(() => 
     document.documentElement.classList.contains("android-tv-box")
   );
+  const [isTestingTorrentio, setIsTestingTorrentio] = useState(false);
+  const [torrentioTestResult, setTorrentioTestResult] = useState<{
+    success: boolean;
+    message: string;
+    name?: string;
+  } | null>(null);
 
   const fetchTorBoxData = async (retryCount = 0) => {
     const maxRetries = 2;
@@ -137,6 +143,49 @@ export default function SettingsPage() {
   const handleForceRefresh = async () => {
     toast.info("Clearing cache and reloading...");
     await forceRefresh();
+  };
+
+  const testTorrentioConnection = async () => {
+    setIsTestingTorrentio(true);
+    setTorrentioTestResult(null);
+    
+    try {
+      // Use the URL from input or default
+      const baseUrl = torrentioAddonUrl?.replace(/\/manifest\.json$/, "") || "https://torrentio.strem.fun";
+      const manifestUrl = `${baseUrl}/manifest.json`;
+      
+      console.log("[Torrentio Test] Fetching:", manifestUrl);
+      
+      const response = await fetch(manifestUrl, {
+        headers: { "Accept": "application/json" },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const manifest = await response.json();
+      
+      if (manifest.id && manifest.name) {
+        setTorrentioTestResult({
+          success: true,
+          message: "Connection successful!",
+          name: manifest.name,
+        });
+        toast.success(`Connected to ${manifest.name}`);
+      } else {
+        throw new Error("Invalid manifest format");
+      }
+    } catch (error: any) {
+      console.error("[Torrentio Test] Failed:", error);
+      setTorrentioTestResult({
+        success: false,
+        message: error.message || "Connection failed",
+      });
+      toast.error(`Connection failed: ${error.message}`);
+    } finally {
+      setIsTestingTorrentio(false);
+    }
   };
 
   return (
@@ -671,11 +720,28 @@ export default function SettingsPage() {
                 type="url"
                 placeholder="https://torrentio.strem.fun/..."
                 value={torrentioAddonUrl}
-                onChange={(e) => setTorrentioAddonUrl(e.target.value)}
-                className={cn(isTVMode && "h-12 text-lg")}
+                onChange={(e) => {
+                  setTorrentioAddonUrl(e.target.value);
+                  setTorrentioTestResult(null); // Reset test result on change
+                }}
+                className={cn("flex-1", isTVMode && "h-12 text-lg")}
               />
               <Button
                 variant="outline"
+                size={isTVMode ? "lg" : "default"}
+                onClick={testTorrentioConnection}
+                disabled={isTestingTorrentio}
+                className="gap-1"
+              >
+                {isTestingTorrentio ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Wifi className="w-4 h-4" />
+                )}
+                Test
+              </Button>
+              <Button
+                variant="default"
                 size={isTVMode ? "lg" : "default"}
                 onClick={() => {
                   if (torrentioAddonUrl) {
@@ -691,6 +757,26 @@ export default function SettingsPage() {
               </Button>
             </div>
             
+            {/* Test Result Display */}
+            {torrentioTestResult && (
+              <div className={cn(
+                "flex items-center gap-2 p-2 rounded-lg text-sm",
+                torrentioTestResult.success 
+                  ? "bg-green-500/10 text-green-500 border border-green-500/20" 
+                  : "bg-destructive/10 text-destructive border border-destructive/20"
+              )}>
+                {torrentioTestResult.success ? (
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                ) : (
+                  <XCircle className="w-4 h-4 flex-shrink-0" />
+                )}
+                <span>
+                  {torrentioTestResult.message}
+                  {torrentioTestResult.name && ` (${torrentioTestResult.name})`}
+                </span>
+              </div>
+            )}
+            
             {torrentioAddonUrl && (
               <Button
                 variant="ghost"
@@ -698,6 +784,7 @@ export default function SettingsPage() {
                 className="text-muted-foreground"
                 onClick={() => {
                   setTorrentioAddonUrl("");
+                  setTorrentioTestResult(null);
                   localStorage.removeItem("torrentioAddonUrl");
                   toast.success("Reset to default Torrentio");
                 }}
