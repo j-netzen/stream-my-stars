@@ -13,6 +13,20 @@ const corsHeaders = {
 // Torrentio base URL
 const TORRENTIO_BASE = "https://torrentio.strem.fun";
 
+// Browser-like headers to avoid blocking
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Origin": "https://web.stremio.com",
+  "Referer": "https://web.stremio.com/",
+  "Sec-Fetch-Dest": "empty",
+  "Sec-Fetch-Mode": "cors",
+  "Sec-Fetch-Site": "cross-site",
+  "Connection": "keep-alive",
+};
+
 // Rate limiting configuration
 const RATE_LIMIT = {
   maxRequests: 30,
@@ -328,13 +342,10 @@ serve(async (req) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         
-        // Use a simple manifest request to check if Torrentio is up
+        // Use browser-like headers to avoid blocking
         const torrentioResponse = await fetch(`${TORRENTIO_BASE}/manifest.json`, {
           signal: controller.signal,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json",
-          },
+          headers: BROWSER_HEADERS,
         });
         
         clearTimeout(timeoutId);
@@ -399,12 +410,11 @@ serve(async (req) => {
           console.log(`[TORRENTIO] Attempt ${attempt + 1}/${MAX_RETRIES}`);
 
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
+          // Use browser-like headers to avoid Cloudflare/anti-bot blocking
           const response = await fetch(torrentioUrl, {
-            headers: {
-              Accept: "application/json",
-            },
+            headers: BROWSER_HEADERS,
             signal: controller.signal,
           });
 
