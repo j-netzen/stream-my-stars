@@ -629,6 +629,104 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Stream Sources */}
+      <Card>
+        <CardHeader>
+          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
+            <Cloud className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
+            Stream Sources
+          </CardTitle>
+          <CardDescription className={isTVMode ? "text-base" : ""}>
+            Configure where to find streams for movies and TV shows
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Custom Torrentio Addon URL */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="torrentio-url" className={cn("font-medium", isTVMode && "text-lg")}>
+                Custom Torrentio Addon URL
+              </Label>
+              {torrentioAddonUrl && (
+                <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-500 border-green-500/30">
+                  Custom
+                </Badge>
+              )}
+            </div>
+            <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
+              Use a custom Torrentio addon URL from{" "}
+              <a 
+                href="https://torrentio.strem.fun/configure" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+              >
+                torrentio.strem.fun/configure
+              </a>
+              {" "}to get more streams or bypass blocking.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                id="torrentio-url"
+                type="url"
+                placeholder="https://torrentio.strem.fun/..."
+                value={torrentioAddonUrl}
+                onChange={(e) => setTorrentioAddonUrl(e.target.value)}
+                className={cn(isTVMode && "h-12 text-lg")}
+              />
+              <Button
+                variant="outline"
+                size={isTVMode ? "lg" : "default"}
+                onClick={() => {
+                  if (torrentioAddonUrl) {
+                    localStorage.setItem("torrentioAddonUrl", torrentioAddonUrl);
+                    toast.success("Custom Torrentio URL saved");
+                  } else {
+                    localStorage.removeItem("torrentioAddonUrl");
+                    toast.success("Reset to default Torrentio");
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </div>
+            
+            {torrentioAddonUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => {
+                  setTorrentioAddonUrl("");
+                  localStorage.removeItem("torrentioAddonUrl");
+                  toast.success("Reset to default Torrentio");
+                }}
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                Reset to default
+              </Button>
+            )}
+          </div>
+
+          {/* Tips */}
+          <div className={cn(
+            "flex items-start gap-2 p-3 rounded-lg bg-secondary/30",
+            isTVMode ? "text-base" : "text-sm"
+          )}>
+            <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <div className="text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">How to get more streams:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Visit <span className="text-primary">torrentio.strem.fun/configure</span></li>
+                <li>Select your preferred providers and options</li>
+                <li>Copy the manifest URL (ends with /manifest.json)</li>
+                <li>Paste it above and save</li>
+              </ol>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Buffer & Network Settings */}
       <Card>
         <CardHeader>
