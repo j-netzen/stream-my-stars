@@ -342,15 +342,41 @@ export async function searchTorrentio(
   season?: number,
   episode?: number
 ): Promise<TorrentioStream[]> {
-  // Always use client-side search - it's faster and less likely to be blocked
+  // Try client-side search first (faster)
   try {
-    console.log("[Torrentio] Using client-side search...");
+    console.log("[Torrentio] Trying client-side search...");
     const streams = await searchTorrentioClientSide(imdbId, type, season, episode);
-    console.log(`[Torrentio] Found ${streams.length} streams`);
+    console.log(`[Torrentio] Client-side found ${streams.length} streams`);
     return sortStreams(streams);
-  } catch (err: any) {
-    console.error("[Torrentio] Search failed:", err.message);
-    return [];
+  } catch (clientErr: any) {
+    console.warn("[Torrentio] Client-side failed, trying backend:", clientErr.message);
+    
+    // Fall back to backend edge function (avoids CORS issues)
+    try {
+      const { data, error } = await supabase.functions.invoke("torrentio", {
+        body: { 
+          action: "search", 
+          imdbId, 
+          type, 
+          season, 
+          episode 
+        },
+      });
+      
+      if (error) {
+        console.error("[Torrentio] Backend error:", error);
+        return [];
+      }
+      
+      const rawStreams: TorrentioStream[] = data.streams || [];
+      // Normalize streams to ensure they have usable URLs
+      const streams = rawStreams.map(normalizeStream).filter(s => s.url && s.url.trim());
+      console.log(`[Torrentio] Backend found ${rawStreams.length} streams, ${streams.length} with valid URLs`);
+      return sortStreams(streams);
+    } catch (backendErr: any) {
+      console.error("[Torrentio] Backend also failed:", backendErr.message);
+      return [];
+    }
   }
 }
 
