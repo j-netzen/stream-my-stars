@@ -181,3 +181,34 @@ export async function discoverByProvider(providerId: number, mediaType: "movie" 
     media_type: mediaType,
   }));
 }
+
+export interface TMDBEpisode {
+  id: number;
+  name: string;
+  overview: string;
+  episode_number: number;
+  season_number: number;
+  still_path: string | null;
+  air_date: string | null;
+  runtime: number | null;
+  vote_average: number;
+}
+
+export interface TMDBSeason {
+  id: number;
+  name: string;
+  overview: string;
+  season_number: number;
+  poster_path: string | null;
+  air_date: string | null;
+  episodes: TMDBEpisode[];
+}
+
+export async function getTVSeason(tvId: number, seasonNumber: number): Promise<TMDBSeason> {
+  const { data, error } = await supabase.functions.invoke("tmdb", {
+    body: { action: "tv_season", id: tvId, season_number: seasonNumber },
+  });
+
+  if (error) throw error;
+  return data;
+}
