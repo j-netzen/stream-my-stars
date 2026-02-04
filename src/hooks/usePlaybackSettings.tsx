@@ -107,27 +107,43 @@ export function usePlaybackSettings() {
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
-  // Measure actual connection speed
+  // Measure actual connection speed with multiple samples for accuracy
   const measureConnectionSpeed = useCallback(async (): Promise<number | null> => {
     try {
-      const testUrl = 'https://speed.cloudflare.com/__down?bytes=500000';
-      const startTime = performance.now();
+      // Use larger file sizes for more accurate measurements
+      // Cloudflare supports bytes parameter up to 100MB
+      const testSizes = [
+        { bytes: 1000000, name: '1MB' },   // Quick warmup
+        { bytes: 5000000, name: '5MB' },   // Main test
+      ];
       
-      const response = await fetch(testUrl, { 
-        cache: 'no-store',
-        mode: 'cors',
-      });
+      let totalBytes = 0;
+      let totalTime = 0;
       
-      if (!response.ok) {
-        throw new Error('Speed test failed');
+      for (const test of testSizes) {
+        const testUrl = `https://speed.cloudflare.com/__down?bytes=${test.bytes}`;
+        const startTime = performance.now();
+        
+        const response = await fetch(testUrl, { 
+          cache: 'no-store',
+          mode: 'cors',
+        });
+        
+        if (!response.ok) {
+          throw new Error('Speed test failed');
+        }
+        
+        const blob = await response.blob();
+        const endTime = performance.now();
+        
+        totalBytes += blob.size;
+        totalTime += (endTime - startTime) / 1000;
       }
       
-      const blob = await response.blob();
+      // Calculate speed: bits / seconds = bps, then convert to Mbps
+      const speedMbps = (totalBytes * 8) / (totalTime * 1000000);
       
-      const endTime = performance.now();
-      const durationSeconds = (endTime - startTime) / 1000;
-      const fileSizeBytes = blob.size;
-      const speedMbps = (fileSizeBytes * 8) / (durationSeconds * 1000000);
+      console.log(`[Speed Test] Downloaded ${(totalBytes / 1000000).toFixed(2)}MB in ${totalTime.toFixed(2)}s = ${speedMbps.toFixed(1)} Mbps`);
       
       setSettings(prev => ({
         ...prev,
@@ -139,6 +155,7 @@ export function usePlaybackSettings() {
     } catch (e) {
       console.warn('Failed to measure connection speed:', e);
       
+      // Fallback to Navigator connection API
       const connection = (navigator as any).connection;
       if (connection?.downlink) {
         const speedMbps = connection.downlink;

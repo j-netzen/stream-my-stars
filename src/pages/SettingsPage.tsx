@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useTVMode, SCALE_PRESETS, ScalePreset, InputMode } from "@/hooks/useTVMode";
+import { useTVMode } from "@/hooks/useTVMode";
 import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
-import { useBrowseHere } from "@/hooks/useBrowseHere";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
-import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Tv, Monitor, Maximize2, RotateCcw, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Mouse, Gamepad2, Trash2, Shield, Server, Cloud, Box, Play } from "lucide-react";
+import { Settings, User, Database, LogOut, Zap, RefreshCw, Loader2, CheckCircle, XCircle, Clock, Download, Info, Film, Wifi, WifiOff, Gauge, Key, Eye, EyeOff, Globe, Trash2, Shield, Server, Cloud, Play, Box, RotateCcw } from "lucide-react";
 import { getTorBoxUser, listDownloads, TorBoxUser, TorBoxTorrent } from "@/lib/torbox";
 // Debug logs functionality removed with video player cleanup
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,9 +22,8 @@ import { TorBoxPairingDialog } from "@/components/settings/TorBoxPairingDialog";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
-  const { isTVMode, setTVMode, uiScale, setUIScale, currentPreset, inputMode, setInputMode } = useTVMode();
+  const { isTVMode } = useTVMode();
   const { settings: playbackSettings, updateSetting: updatePlaybackSetting, measureConnectionSpeed } = usePlaybackSettings();
-  const { isAndroidTV, userAgent } = useBrowseHere();
   const { checkForUpdates, forceRefresh, isChecking, lastChecked } = useServiceWorkerUpdate();
   const [tbUser, setTbUser] = useState<TorBoxUser | null>(null);
   const [tbDownloads, setTbDownloads] = useState<TorBoxTorrent[]>([]);
@@ -37,9 +35,6 @@ export default function SettingsPage() {
   );
   // Debug logs removed with video player cleanup
   const [showPairingDialog, setShowPairingDialog] = useState(false);
-  const [androidTVBoxMode, setAndroidTVBoxMode] = useState(() => 
-    document.documentElement.classList.contains("android-tv-box")
-  );
   const [isTestingTorrentio, setIsTestingTorrentio] = useState(false);
   const [torrentioTestResult, setTorrentioTestResult] = useState<{
     success: boolean;
@@ -100,29 +95,6 @@ export default function SettingsPage() {
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  const handleTVModeChange = (enabled: boolean) => {
-    setTVMode(enabled);
-    toast.success(enabled ? "TV mode enabled" : "TV mode disabled");
-  };
-
-  const handleAndroidTVBoxMode = (enabled: boolean) => {
-    setAndroidTVBoxMode(enabled);
-    if (enabled) {
-      document.documentElement.classList.add("android-tv-box");
-      localStorage.setItem("android-tv-box", "true");
-      toast.success("Android TV Box mode enabled - compact layout active");
-    } else {
-      document.documentElement.classList.remove("android-tv-box");
-      localStorage.setItem("android-tv-box", "false");
-      toast.success("Android TV Box mode disabled");
-    }
-  };
-
-  const handleScaleChange = (preset: ScalePreset) => {
-    setUIScale(SCALE_PRESETS[preset].value);
-    toast.success(`UI scale set to ${SCALE_PRESETS[preset].label} (${SCALE_PRESETS[preset].value}%)`);
   };
 
   const handleCheckForUpdates = async () => {
@@ -206,212 +178,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* TV Mode */}
-      <Card>
-        <CardHeader>
-          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-            <Tv className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            TV Mode
-          </CardTitle>
-          <CardDescription className={isTVMode ? "text-base" : ""}>
-            Optimize the interface for TV viewing with a remote control
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="tv-mode" className={cn("font-medium", isTVMode && "text-sm")}>
-                Enable TV Mode
-              </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-sm")}>
-                Larger text, buttons, and better focus states for remote navigation
-              </p>
-            </div>
-            <Switch
-              id="tv-mode"
-              checked={isTVMode}
-              onCheckedChange={handleTVModeChange}
-            />
-          </div>
-          
-          <div className={cn(
-            "flex items-center gap-4 p-4 rounded-lg",
-            isTVMode ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
-          )}>
-            {isTVMode ? (
-              <>
-                <Tv className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium text-lg">TV Mode Active</p>
-                  <p className="text-muted-foreground">
-                    Interface is optimized for TV viewing. Use arrow keys to navigate.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <Monitor className="w-6 h-6 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Desktop Mode</p>
-                  <p className="text-sm text-muted-foreground">
-                    Standard interface for mouse and keyboard
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-            Tip: You can also enable TV mode by adding <code className="bg-secondary px-1.5 py-0.5 rounded">?tv=1</code> to the URL.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Input Mode */}
-      <Card>
-        <CardHeader>
-          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-            {inputMode === "dpad" ? (
-              <Gamepad2 className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            ) : (
-              <Mouse className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            )}
-            Input Mode
-          </CardTitle>
-          <CardDescription className={isTVMode ? "text-base" : ""}>
-            Choose how you navigate the interface
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-3">
-            <Button
-              variant={inputMode === "mouse" ? "default" : "outline"}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2",
-                inputMode === "mouse" && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                isTVMode && "h-14 text-lg"
-              )}
-              onClick={() => {
-                setInputMode("mouse");
-                toast.success("Switched to Mouse mode");
-              }}
-            >
-              <Mouse className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-              Mouse
-            </Button>
-            <Button
-              variant={inputMode === "dpad" ? "default" : "outline"}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2",
-                inputMode === "dpad" && "ring-2 ring-primary ring-offset-1 ring-offset-background",
-                isTVMode && "h-14 text-lg"
-              )}
-              onClick={() => {
-                setInputMode("dpad");
-                toast.success("Switched to D-pad mode");
-              }}
-            >
-              <Gamepad2 className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-              D-pad / Remote
-            </Button>
-          </div>
-
-          <div className={cn(
-            "flex items-start gap-3 p-4 rounded-lg",
-            inputMode === "dpad" ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
-          )}>
-            {inputMode === "dpad" ? (
-              <>
-                <Gamepad2 className={cn("text-primary flex-shrink-0", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                <div>
-                  <p className={cn("font-medium", isTVMode && "text-lg")}>D-pad Mode Active</p>
-                  <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                    Use arrow keys or TV remote to navigate. Press Enter/OK to select.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <Mouse className={cn("text-muted-foreground flex-shrink-0", isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-                <div>
-                  <p className={cn("font-medium", isTVMode && "text-lg")}>Mouse Mode Active</p>
-                  <p className={cn("text-muted-foreground", isTVMode ? "text-base" : "text-sm")}>
-                    Click and scroll to navigate. Best for desktop and touch devices.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Android TV Box Mode */}
-      <Card>
-        <CardHeader>
-          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-            <Box className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            Android TV Box Mode
-            {isAndroidTV && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                Detected
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription className={isTVMode ? "text-base" : ""}>
-            Compact layout optimized for ONN, Fire TV Stick, and similar devices
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="android-tv-box" className={cn("font-medium", isTVMode && "text-sm")}>
-                Enable Compact Mode
-              </Label>
-              <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-sm")}>
-                Smaller UI elements, tighter spacing for easier air mouse navigation
-              </p>
-            </div>
-            <Switch
-              id="android-tv-box"
-              checked={androidTVBoxMode}
-              onCheckedChange={handleAndroidTVBoxMode}
-            />
-          </div>
-          
-          <div className={cn(
-            "flex items-center gap-4 p-4 rounded-lg",
-            androidTVBoxMode ? "bg-primary/10 border border-primary/20" : "bg-secondary/30"
-          )}>
-            {androidTVBoxMode ? (
-              <>
-                <Box className="w-8 h-8 text-primary" />
-                <div>
-                  <p className="font-medium text-base">Compact Mode Active</p>
-                  <p className="text-muted-foreground text-sm">
-                    Smaller cards, tighter rows, and streamlined navigation for TV boxes.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <Tv className="w-6 h-6 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Standard TV Layout</p>
-                  <p className="text-sm text-muted-foreground">
-                    Default sizing optimized for large screens and D-pad remotes.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {isAndroidTV && (
-            <p className={cn("text-muted-foreground text-xs p-2 bg-secondary/30 rounded")}>
-              Device: Android TV detected. Compact mode is recommended for air mouse navigation.
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Video Playback */}
       <Card>
@@ -798,79 +564,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* UI Scale */}
-      <Card>
-        <CardHeader>
-          <CardTitle className={cn("flex items-center gap-2", isTVMode && "text-xl")}>
-            <Maximize2 className={cn(isTVMode ? "w-6 h-6" : "w-5 h-5")} />
-            UI Scale
-          </CardTitle>
-          <CardDescription className={isTVMode ? "text-base" : ""}>
-            Adjust the overall interface size for your viewing distance
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Quick Presets */}
-          <div className="space-y-2">
-            <Label className={cn("font-medium", isTVMode && "text-base")}>Quick Presets</Label>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(SCALE_PRESETS) as ScalePreset[]).map((preset) => (
-                <Button
-                  key={preset}
-                  variant={currentPreset === preset ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleScaleChange(preset)}
-                  className={cn(
-                    currentPreset === preset && "ring-2 ring-primary ring-offset-1 ring-offset-background"
-                  )}
-                >
-                  {SCALE_PRESETS[preset].label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Fine-tune Slider */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className={cn("font-medium", isTVMode && "text-base")}>
-                Fine-tune Scale
-              </Label>
-              <span className={cn("font-mono font-medium", isTVMode ? "text-base" : "text-sm")}>
-                {uiScale}%
-              </span>
-            </div>
-            <Slider
-              value={[uiScale]}
-              min={80}
-              max={120}
-              step={5}
-              onValueChange={(value) => setUIScale(value[0])}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>80% (Smaller)</span>
-              <span>120% (Larger)</span>
-            </div>
-          </div>
-
-          {/* Reset Button */}
-          <div className="flex items-center justify-between pt-2 border-t">
-            <p className={cn("text-muted-foreground", isTVMode ? "text-sm" : "text-xs")}>
-              Adjust for your TV viewing distance. Sit closer? Use smaller scale.
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setUIScale(SCALE_PRESETS.normal.value)}
-              disabled={uiScale === SCALE_PRESETS.normal.value}
-            >
-              <RotateCcw className="w-3 h-3 mr-1" />
-              Reset
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Account */}
       <Card>
