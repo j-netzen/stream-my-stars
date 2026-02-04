@@ -7,6 +7,7 @@ import { MediaHero } from "@/components/media/MediaHero";
 import { MediaDetailsDialog } from "@/components/media/MediaDetailsDialog";
 import { AddToPlaylistDialog } from "@/components/media/AddToPlaylistDialog";
 import { StreamSelectionDialog, EpisodeContext } from "@/components/media/StreamSelectionDialog";
+import { TVShowBrowserDialog } from "@/components/media/TVShowBrowserDialog";
 import { VideoPlayerWrapper } from "@/components/media/player";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ export default function TVShowsPage() {
   const [detailsMedia, setDetailsMedia] = useState<Media | null>(null);
   const [playlistMedia, setPlaylistMedia] = useState<Media | null>(null);
   const [streamSelectMedia, setStreamSelectMedia] = useState<Media | null>(null);
+  const [browserMedia, setBrowserMedia] = useState<Media | null>(null);
+  const [pendingEpisode, setPendingEpisode] = useState<{ season: number; episode: number } | null>(null);
   const [nextEpisodeRequest, setNextEpisodeRequest] = useState<{ media: Media; season: number; episode: number } | null>(null);
 
   const tvShows = media
@@ -67,11 +70,20 @@ export default function TVShowsPage() {
   const featured = showsWithBackdrops[featuredIndex] || tvShows[0];
 
   const handlePlay = (item: Media) => {
-    if (item.tmdb_id) {
+    // If it has TMDB ID and is a TV show with seasons, open the browser
+    if (item.tmdb_id && item.media_type === "tv" && item.seasons) {
+      setBrowserMedia(item);
+    } else if (item.tmdb_id) {
       setStreamSelectMedia(item);
     } else {
       setActiveMedia(item);
     }
+  };
+
+  // Handle episode selection from browser
+  const handleEpisodeSelect = (item: Media, seasonNumber: number, episodeNumber: number) => {
+    setPendingEpisode({ season: seasonNumber, episode: episodeNumber });
+    setStreamSelectMedia(item);
   };
 
   // Handle stream selection - store both media and URL
@@ -192,6 +204,14 @@ export default function TVShowsPage() {
           </div>
         )}
 
+        {/* TV Show Browser Dialog */}
+        <TVShowBrowserDialog
+          media={browserMedia}
+          open={!!browserMedia}
+          onOpenChange={(open) => !open && setBrowserMedia(null)}
+          onEpisodeSelect={handleEpisodeSelect}
+        />
+
         {/* Stream Selection Dialog */}
         <StreamSelectionDialog
           media={streamSelectMedia}
@@ -200,11 +220,12 @@ export default function TVShowsPage() {
             if (!open) {
               setStreamSelectMedia(null);
               setNextEpisodeRequest(null);
+              setPendingEpisode(null);
             }
           }}
           onStreamSelected={handleStreamSelected}
-          defaultSeason={nextEpisodeRequest?.season}
-          defaultEpisode={nextEpisodeRequest?.episode}
+          defaultSeason={pendingEpisode?.season ?? nextEpisodeRequest?.season}
+          defaultEpisode={pendingEpisode?.episode ?? nextEpisodeRequest?.episode}
         />
 
         {/* Media Details Dialog */}

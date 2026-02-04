@@ -66,7 +66,7 @@ const RATE_LIMIT = {
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 // ========== INPUT VALIDATION ==========
-const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos", "tv_airing_today", "now_playing_movies", "watch_providers", "discover_by_provider"] as const;
+const VALID_ACTIONS = ["search", "movie_details", "tv_details", "trending", "popular_movies", "popular_tv", "get_imdb_id", "get_videos", "tv_airing_today", "now_playing_movies", "watch_providers", "discover_by_provider", "tv_season"] as const;
 const VALID_MEDIA_TYPES = ["movie", "tv", "all"] as const;
 const MAX_QUERY_LENGTH = 200;
 const MAX_ID_VALUE = 999999999; // TMDB IDs are large integers
@@ -79,6 +79,7 @@ interface ValidationResult {
     query?: string;
     id?: number;
     media_type?: string;
+    season_number?: number;
   };
 }
 
@@ -105,7 +106,7 @@ function validateTmdbInput(body: unknown): ValidationResult {
   }
   
   // Validate id for detail actions
-  if (["movie_details", "tv_details", "get_imdb_id", "get_videos", "watch_providers", "discover_by_provider"].includes(action)) {
+  if (["movie_details", "tv_details", "get_imdb_id", "get_videos", "watch_providers", "discover_by_provider", "tv_season"].includes(action)) {
     if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || id > MAX_ID_VALUE) {
       return { valid: false, error: "ID must be a positive integer" };
     }
@@ -120,13 +121,22 @@ function validateTmdbInput(body: unknown): ValidationResult {
     }
   }
   
+  // Validate season_number for tv_season action
+  const { season_number } = body as Record<string, unknown>;
+  if (action === "tv_season") {
+    if (typeof season_number !== 'number' || !Number.isInteger(season_number) || season_number < 0) {
+      return { valid: false, error: "season_number must be a non-negative integer" };
+    }
+  }
+  
   return { 
     valid: true, 
     data: { 
       action, 
       query: typeof query === 'string' ? query.trim() : undefined, 
       id: id as number | undefined, 
-      media_type: media_type as string | undefined 
+      media_type: media_type as string | undefined,
+      season_number: season_number as number | undefined 
     } 
   };
 }
@@ -273,6 +283,11 @@ serve(async (req) => {
       case "discover_by_provider": {
         const endpoint = media_type === "movie" ? "movie" : "tv";
         url = `${TMDB_BASE_URL}/discover/${endpoint}?api_key=${TMDB_API_KEY}&with_watch_providers=${id}&watch_region=US&sort_by=popularity.desc`;
+        break;
+      }
+      case "tv_season": {
+        const { season_number } = validation.data as { season_number?: number };
+        url = `${TMDB_BASE_URL}/tv/${id}/season/${season_number}?api_key=${TMDB_API_KEY}`;
         break;
       }
       default:
