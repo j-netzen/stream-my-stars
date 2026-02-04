@@ -23,6 +23,7 @@ interface UseHlsPlaybackOptions {
   onManifestParsed?: () => void;
   onError?: (message: string) => void;
   onPlaybackStarted?: () => void;
+  onMutedAutoplay?: () => void; // Called when we had to mute for autoplay
 }
 
 const LOAD_TIMEOUT_MS = 25000;
@@ -139,24 +140,37 @@ export function useHlsPlayback(options: UseHlsPlaybackOptions = {}) {
 
     const isHLS = url.includes('.m3u8') || url.includes('m3u8');
 
-    const startPlayback = () => {
+    const startPlayback = async () => {
       clearLoadTimeout();
       if (resumeTime > 0) {
         video.currentTime = resumeTime;
       }
-      video.play()
-        .then(() => {
+      
+      try {
+        // Try unmuted autoplay first
+        await video.play();
+        setIsLoading(false);
+        setTimeoutMessage(null);
+        setRetryCount(0);
+        options.onPlaybackStarted?.();
+      } catch (e) {
+        console.log('[useHlsPlayback] Unmuted autoplay blocked, trying muted...');
+        // Fallback to muted autoplay
+        video.muted = true;
+        try {
+          await video.play();
           setIsLoading(false);
           setTimeoutMessage(null);
           setRetryCount(0);
           options.onPlaybackStarted?.();
-        })
-        .catch((e) => {
-          console.error('[useHlsPlayback] Play failed:', e);
-          setError('Failed to start playback');
-          updateDebugState({ lastError: e.message, lastErrorTime: Date.now() });
+          options.onMutedAutoplay?.(); // Notify that we had to mute
+        } catch (mutedError) {
+          console.error('[useHlsPlayback] Even muted autoplay failed:', mutedError);
+          setError('Tap video to play');
+          updateDebugState({ lastError: 'Autoplay blocked', lastErrorTime: Date.now() });
           setIsLoading(false);
-        });
+        }
+      }
     };
 
     const handleRetry = () => {
