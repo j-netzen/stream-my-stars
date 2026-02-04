@@ -15,6 +15,11 @@ export interface PlaybackSettings {
   useSmartProxy: boolean; // automatically detect when to use backend vs public proxy
   proxyMode: ProxyMode; // which proxy to use: none, public (corsproxy.io), or backend
   
+  // Volume settings
+  rememberVolume: boolean; // remember volume preference across sessions
+  preferUnmuted: boolean; // user prefers unmuted playback (set when they unmute)
+  lastVolume: number; // last volume level (0-1)
+  
   // Network detection
   connectionSpeedMbps: number | null; // detected connection speed
   isSlowConnection: boolean;
@@ -31,6 +36,9 @@ const DEFAULT_SETTINGS: PlaybackSettings = {
   useCorsProxy: true,
   useSmartProxy: true,
   proxyMode: 'public',
+  rememberVolume: true,
+  preferUnmuted: false,
+  lastVolume: 1,
   connectionSpeedMbps: null,
   isSlowConnection: false,
   bufferAhead: 30,

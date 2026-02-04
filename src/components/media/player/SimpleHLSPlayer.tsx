@@ -13,6 +13,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { X, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Media } from "@/hooks/useMedia";
+import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { useHlsPlayback } from "./hooks/useHlsPlayback";
 import { useProgressTracker } from "./hooks/useProgressTracker";
 import { PlayerPosterOverlay } from "./components/PlayerPosterOverlay";
@@ -86,6 +87,9 @@ export function SimpleHLSPlayer({
   // Determine if this is a TV show with episode context
   const isTVShow = media.media_type === "tv" && episodeNumber !== undefined && seasonNumber !== undefined;
 
+  // Playback settings
+  const { settings, updateSetting } = usePlaybackSettings();
+
   // Progress tracking
   const {
     resumeTime,
@@ -116,10 +120,17 @@ export function SimpleHLSPlayer({
     onPlaybackStarted: () => {
       setIsPlaying(true);
       startTracking();
+      // Apply saved volume settings
+      if (videoRef.current && settings.rememberVolume) {
+        videoRef.current.volume = settings.lastVolume;
+      }
     },
     onMutedAutoplay: () => {
-      console.log('[SimpleHLSPlayer] Autoplay required muting, showing unmute prompt');
-      setShowUnmutePrompt(true);
+      // Only show unmute prompt if user hasn't previously indicated preference
+      if (!settings.preferUnmuted) {
+        console.log('[SimpleHLSPlayer] Autoplay required muting, showing unmute prompt');
+        setShowUnmutePrompt(true);
+      }
     },
   });
 
@@ -268,6 +279,10 @@ export function SimpleHLSPlayer({
             if (videoRef.current) {
               videoRef.current.muted = false;
               setShowUnmutePrompt(false);
+              // Remember that user prefers unmuted
+              if (settings.rememberVolume) {
+                updateSetting('preferUnmuted', true);
+              }
             }
           }}
           className={cn(
@@ -306,9 +321,14 @@ export function SimpleHLSPlayer({
           }
         }}
         onVolumeChange={(e) => {
-          // Hide unmute prompt when user manually unmutes
-          if (!e.currentTarget.muted) {
+          const video = e.currentTarget;
+          if (!video.muted) {
             setShowUnmutePrompt(false);
+            // Remember user prefers unmuted and save volume
+            if (settings.rememberVolume) {
+              updateSetting('preferUnmuted', true);
+              updateSetting('lastVolume', video.volume);
+            }
           }
         }}
       />

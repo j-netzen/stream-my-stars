@@ -11,8 +11,9 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { Media } from "@/hooks/useMedia";
 import { useWatchProgress } from "@/hooks/useWatchProgress";
+import { usePlaybackSettings } from "@/hooks/usePlaybackSettings";
 import { getImageUrl } from "@/lib/tmdb";
-import { X, Volume2, VolumeX } from "lucide-react";
+import { X, VolumeX } from "lucide-react";
 
 interface MinimalVideoPlayerProps {
   media: Media;
@@ -31,9 +32,9 @@ export function MinimalVideoPlayer({
 }: MinimalVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressIntervalRef = useRef<number | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
   const [showUnmutePrompt, setShowUnmutePrompt] = useState(false);
 
+  const { settings, updateSetting } = usePlaybackSettings();
   const { getProgressForMedia, updateProgress } = useWatchProgress();
   const savedProgress = getProgressForMedia(media.id, episodeNumber, seasonNumber);
   const resumeTime = savedProgress?.progress_seconds || 0;
@@ -76,19 +77,38 @@ export function MinimalVideoPlayer({
       video.currentTime = resumeTime;
     }
 
+    // Set initial volume from saved preference
+    if (settings.rememberVolume) {
+      video.volume = settings.lastVolume;
+    }
+
     const attemptAutoplay = async () => {
-      try {
-        // Try unmuted autoplay first
-        await video.play();
-        console.log('[MinimalVideoPlayer] Unmuted autoplay succeeded');
-      } catch (error) {
-        console.log('[MinimalVideoPlayer] Unmuted autoplay blocked, trying muted...');
-        // Mute and retry
-        video.muted = true;
-        setIsMuted(true);
+      // If user previously unmuted, try unmuted first
+      const tryUnmutedFirst = settings.rememberVolume && settings.preferUnmuted;
+      
+      if (tryUnmutedFirst) {
         try {
           await video.play();
-          // Show unmute prompt since we had to mute
+          console.log('[MinimalVideoPlayer] Unmuted autoplay succeeded (user preference)');
+          return;
+        } catch (error) {
+          console.log('[MinimalVideoPlayer] Unmuted autoplay blocked despite preference');
+        }
+      }
+
+      try {
+        // Try unmuted autoplay
+        await video.play();
+        console.log('[MinimalVideoPlayer] Unmuted autoplay succeeded');
+        // User successfully played unmuted, remember this
+        if (settings.rememberVolume) {
+          updateSetting('preferUnmuted', true);
+        }
+      } catch (error) {
+        console.log('[MinimalVideoPlayer] Unmuted autoplay blocked, trying muted...');
+        video.muted = true;
+        try {
+          await video.play();
           setShowUnmutePrompt(true);
           console.log('[MinimalVideoPlayer] Muted autoplay succeeded');
         } catch (mutedError) {
@@ -110,15 +130,18 @@ export function MinimalVideoPlayer({
       }
       saveProgress();
     };
-  }, [resumeTime, saveProgress]);
+  }, [resumeTime, saveProgress, settings.rememberVolume, settings.preferUnmuted, settings.lastVolume, updateSetting]);
 
   // Handle unmute
   const handleUnmute = () => {
     const video = videoRef.current;
     if (video) {
       video.muted = false;
-      setIsMuted(false);
       setShowUnmutePrompt(false);
+      // Remember that user prefers unmuted
+      if (settings.rememberVolume) {
+        updateSetting('preferUnmuted', true);
+      }
     }
   };
 
@@ -162,9 +185,13 @@ export function MinimalVideoPlayer({
         onEnded={saveProgress}
         onVolumeChange={(e) => {
           const video = e.currentTarget;
-          setIsMuted(video.muted);
           if (!video.muted) {
             setShowUnmutePrompt(false);
+            // Remember user prefers unmuted and save volume
+            if (settings.rememberVolume) {
+              updateSetting('preferUnmuted', true);
+              updateSetting('lastVolume', video.volume);
+            }
           }
         }}
       >
