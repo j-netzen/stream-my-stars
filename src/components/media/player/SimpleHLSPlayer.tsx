@@ -10,7 +10,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X } from "lucide-react";
+import { X, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Media } from "@/hooks/useMedia";
 import { useHlsPlayback } from "./hooks/useHlsPlayback";
@@ -44,6 +44,7 @@ export function SimpleHLSPlayer({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
+  const [showUnmutePrompt, setShowUnmutePrompt] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -115,6 +116,10 @@ export function SimpleHLSPlayer({
     onPlaybackStarted: () => {
       setIsPlaying(true);
       startTracking();
+    },
+    onMutedAutoplay: () => {
+      console.log('[SimpleHLSPlayer] Autoplay required muting, showing unmute prompt');
+      setShowUnmutePrompt(true);
     },
   });
 
@@ -256,6 +261,25 @@ export function SimpleHLSPlayer({
         <X className="w-6 h-6 text-white" />
       </button>
 
+      {/* Unmute prompt */}
+      {showUnmutePrompt && isPlaying && (
+        <button
+          onClick={() => {
+            if (videoRef.current) {
+              videoRef.current.muted = false;
+              setShowUnmutePrompt(false);
+            }
+          }}
+          className={cn(
+            "absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all duration-500 animate-pulse",
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+        >
+          <VolumeX className="w-5 h-5" />
+          <span>Tap to unmute</span>
+        </button>
+      )}
+
       {/* Debug panel */}
       <PlayerDebugPanel
         debugState={debugState}
@@ -279,6 +303,12 @@ export function SimpleHLSPlayer({
           // Show next episode overlay for TV shows
           if (isTVShow && onPlayNextEpisode) {
             setShowNextEpisode(true);
+          }
+        }}
+        onVolumeChange={(e) => {
+          // Hide unmute prompt when user manually unmutes
+          if (!e.currentTarget.muted) {
+            setShowUnmutePrompt(false);
           }
         }}
       />
