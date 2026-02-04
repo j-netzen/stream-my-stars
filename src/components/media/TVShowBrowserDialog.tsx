@@ -277,7 +277,7 @@ export function TVShowBrowserDialog({
                       key={episode.id}
                       onClick={() => handleEpisodeClick(episode)}
                       className={cn(
-                        "w-full flex gap-4 p-3 rounded-lg hover:bg-accent transition-colors text-left group",
+                        "w-full flex gap-4 p-3 rounded-lg hover:bg-purple-900/60 transition-colors text-left group",
                         isTVMode && "p-4",
                         isCompleted && "opacity-75"
                       )}
