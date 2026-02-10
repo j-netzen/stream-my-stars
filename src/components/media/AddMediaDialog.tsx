@@ -406,7 +406,7 @@ export function AddMediaDialog({ open, onOpenChange }: AddMediaDialogProps) {
 
     // Filter torrents - use torrent ID
     torboxTorrents
-      .filter(t => t.files.length > 0 && (searchTerm === "" || t.name.toLowerCase().includes(searchTerm)))
+      .filter(t => t.files && t.files.length > 0 && (searchTerm === "" || t.name.toLowerCase().includes(searchTerm)))
       .forEach(t => {
         items.push({
           label: `[Torrent] ${t.name}`,
